@@ -18,3 +18,12 @@ Finally, install the `degas` package:
 ```
 pip install https://github.com/low-sky/degas/archive/master.zip
 ```
+
+## Running the Pipeline
+
+To execute the pipeline, we run the `calscans` data to calibrate the scans.  In the example file, the data are in the directory `TGBT15A_901_34.raw.vegas` running from scan 82 to scan 105.  The reference scans refer to the first scan of a vane calibration pair.
+
+```
+import degas
+degas.calscans('TGBT15A_901_34.raw.vegas', start=82, stop=105, refscans=[80])
+```

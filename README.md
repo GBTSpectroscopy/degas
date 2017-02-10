@@ -27,3 +27,5 @@ To execute the pipeline, we run the `calscans` data to calibrate the scans.  In 
 import degas
 degas.calscans('TGBT15A_901_34.raw.vegas', start=82, stop=105, refscans=[80])
 ```
+The pipeline creates a set of calibrated FITS files which can then be gridded into cubes using the gridding example given in the `examples` directory.
+

@@ -59,8 +59,10 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     tbg = 2.725
     tambient = np.mean(integ1.data['TAMBIENT'])
     avgfreq = np.mean(integ1.data['OBSFREQ'])
-    tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log, forcecalc=True)
-    zenithtau = weather.retrieve_zenith_opacity(mjd,avgfreq,log=log, forcecalc=True)
+    tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log,
+                                 forcecalc=True)
+    zenithtau = weather.retrieve_zenith_opacity(mjd,avgfreq,log=log,
+                                                forcecalc=True)
     
     tau = cal.elevation_adjusted_opacity(zenithtau, elevation)
     tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau) 
@@ -120,7 +122,6 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None):
             row_list, summary = sdf.parseSdfitsIndex(indexfile, 
                                                      mapscans=command_options.mapscans)
             feedlist = (row_list.feeds())
-            print(feedlist)
             for thisfeed in feedlist:
                 thispol = 0
                 thiswin = 0
@@ -138,13 +139,15 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None):
                 if pipe:
                     tsys = gettsys(cl_params, row_list, thisfeed, 
                                    thispol, thiswin, pipe, weather=w, log=log)
-                    log.doMessage('INFO', 'Feed: {0}, Tsys (K): {1}'.format(thisfeed,
-                                                                            tsys))
-
+                    log.doMessage('INFO', 'Feed: {0}, Tsys (K): {1}'.format(
+                            thisfeed,
+                            tsys))
+                    
                     for thisscan in cl_params.mapscans:
-                        print(thisscan)
-                        rows = row_list.get(thisscan, thisfeed, thispol, thiswin)
-
+                        print("Now Processing Scan {0} for Feed {1}".format(\
+                                thisscan, thisfeed))
+                        rows = row_list.get(thisscan, thisfeed,
+                                            thispol, thiswin)
                         ext = rows['EXTENSION']
                         rows = rows['ROW']
                         columns = tuple(pipe.infile[ext].get_colnames())

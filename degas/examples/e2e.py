@@ -11,9 +11,10 @@ import aplpy
 import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import gbtpipe
 
 # Assuming we have a directory containing all the files.
-degas.calscans('TGBT15A_901_34.raw.vegas', start=82, stop=105, refscans=[80])
+# degas.calscans('TGBT15A_901_34.raw.vegas', start=82, stop=105, refscans=[80])
 
 # Find all the files that we want to use in our map.
 flist = glob.glob('ngc1068*fits')
@@ -26,17 +27,16 @@ basebuff = 64
 # Note that we also use a few channels in the middle.
 
 # Grid them dataz.
-keystone.gridder.griddata(filelist=flist,
-                          startChannel=edgetrim,
-                          endChannel=1024-edgetrim,
-                          baselineRegion = [slice(edgetrim,
-                                                  edgetrim+basebuff,1),
-                                            slice(448,576,1),
-                                            slice(1024-edgetrim-basebuff,
-                                                  1024-basebuff,1)],
-                          dirname='NGC1068_HCN',
-                          flagRMS=True,
-                          flagRipple=True)
+gbtpipe.griddata(filelist=flist,
+                 startChannel=edgetrim,
+                 endChannel=1024-edgetrim,
+                 baselineRegion = [slice(edgetrim,
+                                         edgetrim+basebuff,1),
+                                   slice(448,576,1),
+                                   slice(1024-edgetrim-basebuff,
+                                         1024-basebuff,1)],
+                 flagRMS=True,
+                 flagRipple=True)
 
 # Now, we have a calibrated cube.  Let's make pictures.
 

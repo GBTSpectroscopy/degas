@@ -14,11 +14,6 @@ Install the `degas` package:
 pip install https://github.com/low-sky/degas/archive/master.zip
 ```
 
-If you want to also grid the data into cubes, install the Keystone Survey's gridder utilities:
-```
-pip install https://github.com/GBTAmmoniaSurvey/keystone/archive/master.zip
-```
-
 
 ## Running the Pipeline
 

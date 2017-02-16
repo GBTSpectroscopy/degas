@@ -14,6 +14,11 @@ from gbtpipe import SdFits
 # print tau
 
 
+def makelogdir():
+    if not os.path.exists('log'):
+        os.mkdir('log')
+
+
 def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
             weather=None, log=None):
     if not weather:
@@ -78,6 +83,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None):
     if not outdir:
         outdir = os.getcwd()
 
+    makelogdir()
     log = gbtpipe.Logging()
     w = gbtpipe.Weather()
     cl_params = gbtpipe.initParameters(inputdir)

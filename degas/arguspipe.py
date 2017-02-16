@@ -24,7 +24,7 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     if not weather:
         weather = gbtpipe.Weather()
     if not log:
-        log = gbtpipe.Logging()
+        log = gbtpipe.Logging(cl_params, 'gbtpipeline')
     cal = gbtpipe.Calibration()
 
     #Assume refscan is this scan and the next scan
@@ -35,12 +35,12 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     ext = row1['EXTENSION']
     rows = row1['ROW']
     columns = tuple(pipe.infile[ext].get_colnames())
-    integ1 = gbtpipe.ConvenientIntegration(pipe.infile[ext][columns][rows])
+    integ1 = gbtpipe.ConvenientIntegration(pipe.infile[ext][columns][rows], log=log)
     
     ext = row2['EXTENSION']
     rows = row2['ROW']
     columns = tuple(pipe.infile[ext].get_colnames())
-    integ2 = gbtpipe.ConvenientIntegration(pipe.infile[ext][columns][rows])
+    integ2 = gbtpipe.ConvenientIntegration(pipe.infile[ext][columns][rows], log=log)
 
     vec1 = integ1.data['DATA']
     vec2 = integ2.data['DATA']
@@ -79,12 +79,16 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 #cl_params.refscans = [111,]
 
 
-def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None):
+def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=None, loglevel='warning'):
     if not outdir:
         outdir = os.getcwd()
 
     makelogdir()
-    log = gbtpipe.Logging()
+    if not log:
+        log = gbtpipe.Logging('gbtpipeline')
+        if loglevel=='warning':
+            log.logger.setLevel(30)
+
     w = gbtpipe.Weather()
     cl_params = gbtpipe.initParameters(inputdir)
     cl_params.mapscans = list(np.linspace(start,stop,stop-start+1).astype('int'))
@@ -158,7 +162,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None):
                         rows = rows['ROW']
                         columns = tuple(pipe.infile[ext].get_colnames())
                         integs = gbtpipe.ConvenientIntegration(\
-                            pipe.infile[ext][columns][rows])
+                            pipe.infile[ext][columns][rows], log=log)
                         timestamps = integs.data['DATE-OBS']
                         elevation = np.median(integs.data['ELEVATIO'])
                         mjds = np.array([pipe.pu.dateToMjd(stamp) 

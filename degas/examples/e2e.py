@@ -20,7 +20,7 @@ degas.calscans('TGBT15A_901_34.raw.vegas', start=82,
                outdir='testdir')
 
 # Find all the files that we want to use in our map.
-flist = glob.glob('testdir/*fits')
+filelist = glob.glob('testdir/*fits')
 
 # Trim 100 channels from the end of each spectrum 
 # (which is 1024 channels long, in total)
@@ -30,7 +30,7 @@ basebuff = 64
 # Note that we also use a few channels in the middle.
 
 # Grid them dataz.
-gbtpipe.griddata(filelist=flist,
+gbtpipe.griddata(filelist,
                  startChannel=edgetrim,
                  endChannel=1024-edgetrim,
                  baselineRegion = [slice(edgetrim,

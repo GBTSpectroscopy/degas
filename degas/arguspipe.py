@@ -1,4 +1,4 @@
-import degas.gbtpipe as gbtpipe
+import gbtpipe
 import numpy as np
 import glob
 import os

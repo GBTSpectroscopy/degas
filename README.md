@@ -4,11 +4,6 @@ This package builds data cubes for ARGUS observations of dense gas tracers.
 
 The package expects an Anaconda-like user-based python environment which you can install on many machines from [continuum.io](https://www.continuum.io/downloads).  In addition to many of the standard astronomical packages, this software currently requires a few beta packages for GBT-specific context.
 
-Install the 'gbtpipe' package:
-```
-pip install https://github.com/low-sky/gbtpipe/archive/master.zip
-```
-
 Install the `degas` package:
 ```
 pip install https://github.com/low-sky/degas/archive/master.zip

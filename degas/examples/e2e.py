@@ -46,7 +46,7 @@ gbtpipe.griddata(filelist,
 mpl.rcParams['font.family']='serif'
 mpl.rcParams['font.serif'] = 'FreeSerif'
 
-hcn = SpectralCube.read('NGC1068_HCN.fits')
+hcn = SpectralCube.read('ngc1068.fits')
 hcn = hcn[:,35:75,35:75]
 hcn = hcn.with_spectral_unit(u.km/u.s,
                              velocity_convention='radio',
@@ -55,7 +55,7 @@ hcnslab = hcn.spectral_slab(800*u.km/u.s,1400*u.km/u.s)
 # This writes out an HCN only cube with the corect axes.
 hcnslab.write('ngc1068_hcn.fits', overwrite=True)
 
-hcop = SpectralCube.read('NGC1068_HCN.fits')
+hcop = SpectralCube.read('ngc1068.fits')
 hcop = hcop[:,35:75,35:75]
 hcop = hcop.with_spectral_unit(u.km/u.s,
                                velocity_convention='radio',

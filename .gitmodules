@@ -4,3 +4,6 @@
 [submodule "gbtpipe"]
 	path = gbtpipe
 	url = git@github.com:low-sky/gbtpipe.git
+[submodule "degas/gbtpipe"]
+	path = degas/gbtpipe
+	url = git@github.com:low-sky/gbtpipe.git

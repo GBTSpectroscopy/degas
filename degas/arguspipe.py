@@ -1,4 +1,4 @@
-import gbtpipe
+import degas.gbtpipe as gbtpipe
 import numpy as np
 import glob
 import os
@@ -142,7 +142,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=Non
                                                    thisfeed,
                                                    thispol,
                                                    thiswin,
-                                                   None)
+                                                   None, outdir=outdir)
                 except KeyError:
                     pipe = None
                     pass

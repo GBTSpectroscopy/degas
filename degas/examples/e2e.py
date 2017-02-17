@@ -3,7 +3,7 @@ import degas
 
 # for Gridding
 import glob
-import keystone
+import gbtpipe
 
 # For plotting
 from spectral_cube import SpectralCube
@@ -11,13 +11,16 @@ import aplpy
 import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import gbtpipe
+
 
 # Assuming we have a directory containing all the files.
-# degas.calscans('TGBT15A_901_34.raw.vegas', start=82, stop=105, refscans=[80])
+degas.calscans('TGBT15A_901_34.raw.vegas', start=82,
+               stop=105, 
+               refscans=[80],
+               outdir='testdir')
 
 # Find all the files that we want to use in our map.
-flist = glob.glob('ngc1068*fits')
+flist = glob.glob('testdir/*fits')
 
 # Trim 100 channels from the end of each spectrum 
 # (which is 1024 channels long, in total)

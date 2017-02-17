@@ -4,7 +4,7 @@ import glob
 import os
 import fitsio
 import copy
-from gbtpipe import SdFits
+
 
 # CRUFT
 #/users/rmaddale/bin/getForecastValues -freqList 89 -typeList Opacity -elev 90 -timeList 53441.4
@@ -99,7 +99,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=Non
 
         # Instantiate a SdFits object for I/O and interpreting the
         #  contents of the index file
-        sdf = SdFits()
+        sdf = gbtpipe.SdFits()
 
         # generate a name for the index file based on the name of the
         #  raw SDFITS file.  The index file simply has a different extension
@@ -126,7 +126,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=Non
             # copy the cl_params structure so we can modify it during calibration
             # for each seperate file.
             command_options = copy.deepcopy(cl_params)
-            sdf = SdFits()
+            sdf = gbtpipe.SdFits()
             cal = gbtpipe.Calibration()
             indexfile = sdf.nameIndexFile(command_options.infilename)
             row_list, summary = sdf.parseSdfitsIndex(indexfile, 

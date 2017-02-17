@@ -4,7 +4,7 @@ import glob
 import os
 import fitsio
 import copy
-
+import warnings
 
 # CRUFT
 #/users/rmaddale/bin/getForecastValues -freqList 89 -typeList Opacity -elev 90 -timeList 53441.4
@@ -79,7 +79,23 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 #cl_params.refscans = [111,]
 
 
-def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=None, loglevel='warning'):
+def calscans(inputdir, start=82, stop=105, refscans = [80], 
+             outdir=None, log=None, loglevel='warning'):
+
+    if os.path.isdir(inputdir):
+        fitsfiles = glob.glob(inputdir + '/*fits')
+        if len(fitsfiles) == 0:
+            warnings.warn("No FITS files found in input directory")
+            return False
+    elif os.path.isfile(inputdir):
+        warnings.warn("Input name is a file and not a directory.")
+        warnings.warn("Blindly reducing everything in this directory.")
+        infilename = inputdir
+        inputdir = os.getcwd()
+    else:
+        warnings.warn("No file or directory found for inputs")
+        return False
+
     if not outdir:
         outdir = os.getcwd()
 
@@ -111,7 +127,9 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=Non
             row_list, summary = sdf.parseSdfitsIndex(indexfile, cl_params.mapscans)
         except IOError:
             log.doMessage('ERR', 'Could not open index file', indexfile)
-            sys.exit()
+            log.close()
+            return False
+            # sys.exit()
 
     for infilename in glob.glob(input_directory + '/' +
                                 os.path.basename(input_directory) +
@@ -191,6 +209,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80], outdir=None, log=Non
                             row.data['TUNIT7'] = 'Ta*'
                             pipe.outfile[-1].append(row.data)
                     pipe.outfile.close()
+    return True
         # gbtpipe.preview_zenith_tau(log, row_list, command_options, 
         #                            row_list.feeds(), row_list.windows(),
         #                            row_list.pols())

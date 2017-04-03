@@ -47,9 +47,11 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     if 'Vane' in integ1.data['CALPOSITION'][0] and\
             'Observing' in integ2.data['CALPOSITION'][0]:
         onoff = np.median((vec1-vec2)/vec2)
+        vaneCounts = np.median(vec1)
     elif 'Vane' in integ2.data['CALPOSITION'][0] and\
             'Observing' in integ1.data['CALPOSITION'][0]:
         onoff = np.median((vec2-vec1)/vec1)
+        vaneCounts = np.median(vec2)
     else:
         import pdb; pdb.set_trace
 
@@ -72,7 +74,7 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     tau = cal.elevation_adjusted_opacity(zenithtau, elevation)
     tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau) 
     tsys = tcal / onoff
-    return tsys
+    return tcal, vaneCounts, tsys
 
 
 #cl_params.mapscans = list(np.linspace(113,136,136-113+1).astype('int'))
@@ -80,7 +82,8 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 
 
 def calscans(inputdir, start=82, stop=105, refscans = [80], 
-             outdir=None, log=None, loglevel='warning'):
+             outdir=None, log=None, loglevel='warning',
+             OffFrac=0.25, OffType='linefit'):
 
     if os.path.isdir(inputdir):
         fitsfiles = glob.glob(inputdir + '/*fits')
@@ -165,8 +168,9 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                     pipe = None
                     pass
                 if pipe:
-                    tsys = gettsys(cl_params, row_list, thisfeed, 
-                                   thispol, thiswin, pipe, weather=w, log=log)
+                    tcal, vaneCounts, tsys = gettsys(cl_params, row_list, 
+                                                     thisfeed, thispol, thiswin,
+                                                     pipe, weather=w, log=log)
                     log.doMessage('INFO', 'Feed: {0}, Tsys (K): {1}'.format(
                             thisfeed,
                             tsys))
@@ -192,11 +196,44 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
 
                         # Do the calibration here
                         ON = integs.data['DATA']
-                        OFF = np.median(ON, axis=0) # Empirical bandpass
-                        OFF.shape += (1,)
-                        OFF = OFF * np.ones((1, ON.shape[0]))
-                        OFF = OFF.T
-                        TA = tsys * (ON-OFF)/(OFF)
+
+                        if OffType == 'median':
+                            OFF = np.median(ON, axis=0) # Empirical bandpass
+                            OFF.shape += (1,)
+                            OFF = OFF * np.ones((1, ON.shape[0]))
+                            OFF = OFF.T
+                        if OffType == 'linefit':
+                            xaxis = np.linspace(-0.5,0.5,ON.shape[0])
+                            xaxis.shape += (1,)
+                            xaxis = xaxis * np.ones((1,ON.shape[1]))
+                            cutidx = np.int(OffFrac * ON.shape[0])
+                            xsub = np.r_[xaxis[0:cutidx,:],xaxis[-cutidx:,:]]
+                            ONsub = np.r_[ON[0:cutidx,:],ON[-cutidx:,:]]
+
+                            MeanON = np.nanmean(ONsub, axis=0)
+                            MeanON.shape += (1,)
+                            MeanON = MeanON * np.ones((1,ONsub.shape[0]))
+                            MeanON = MeanON.T
+
+                            MeanX = np.nanmean(xsub, axis=0)
+                            MeanX.shape += (1,)
+                            MeanX = MeanX * np.ones((1, ONsub.shape[0]))
+                            MeanX = MeanX.T
+
+                            slope = np.nansum(((xsub - MeanX) * (ONsub - MeanON)),
+                                              axis=0) /\
+                                              (np.nansum((xsub - MeanX)**2, axis=0))
+                            slope.shape += (1,)
+                            slope = slope * np.ones((1, ON.shape[0]))
+                            MeanON = MeanON[0,:]
+                            MeanON.shape += (1,)
+                            MeanON = MeanON * np.ones((1,ON.shape[0]))
+                            MeanON = MeanON.T
+                            OFF = slope.T * xaxis + MeanON
+                        medianOFF = np.nanmedian(OFF)
+                        TA = tcal * (medianOFF/(vaneCounts - medianOFF)) * (ON-OFF)/(OFF)
+                        # TAmod = tsys * (ON-OFF)/OFF
+                        # import pdb ; pdb.set_trace()
                         medianTA = np.median(TA, axis=1)
                         medianTA.shape = (1,) + medianTA.shape
                         medianTA = np.ones((ON.shape[1], 1)) * medianTA

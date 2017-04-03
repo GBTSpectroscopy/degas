@@ -39,34 +39,25 @@ gbtpipe.griddata(filelist,
                                    slice(1024-edgetrim-basebuff,
                                          1024-basebuff,1)],
                  flagRMS=True,
-                 flagRipple=True)
+                 flagRipple=True, pixPerBeam=4.0)
+
+# Postprocess the data
+degas.cleansplit('ngc1068.fits')
 
 # Now, we have a calibrated cube.  Let's make pictures.
 
 mpl.rcParams['font.family']='serif'
 mpl.rcParams['font.serif'] = 'FreeSerif'
 
-hcn = SpectralCube.read('ngc1068.fits')
+hcn = SpectralCube.read('NGC1068_HCN_rebase3_smooth1.fits')
 hcn = hcn[:,35:75,35:75]
-hcn = hcn.with_spectral_unit(u.km/u.s,
-                             velocity_convention='radio',
-                             rest_value=89.18852 * u.GHz)
-hcnslab = hcn.spectral_slab(800*u.km/u.s,1400*u.km/u.s)
-# This writes out an HCN only cube with the corect axes.
-hcnslab.write('ngc1068_hcn.fits', overwrite=True)
-
-hcop = SpectralCube.read('ngc1068.fits')
+hcn = hcn.spectral_slab(800 * u.km/u.s, 1300 * u.km / u.s)
+hcop = SpectralCube.read('NGC1068_HCOp_rebase3_smooth1.fits')
 hcop = hcop[:,35:75,35:75]
-hcop = hcop.with_spectral_unit(u.km/u.s,
-                               velocity_convention='radio',
-                               rest_value=88.63394 * u.GHz)
-hcopslab = hcop.spectral_slab(800*u.km/u.s,1400*u.km/u.s)
-# This writes out an HCO+ only cube with the corect axes.
-hcopslab.write('ngc1068_hcop.fits',overwrite=True)
-
+hcop = hcop.spectral_slab(800 * u.km/u.s, 1300 * u.km / u.s)
 # Let's make Moments!
-hcop_mom0 = hcopslab.moment(0,0)
-hcn_mom0 = hcnslab.moment(0,0)
+hcop_mom0 = hcop.moment(0,0)
+hcn_mom0 = hcn.moment(0,0)
 
 # And plot moments!
 fig = aplpy.FITSFigure(hcn_mom0.hdu,figsize=(4.5,4.0))
@@ -75,4 +66,4 @@ fig.show_contour(data=hcop_mom0.hdu, levels=[3,6,9,12,15],colors='white')
 fig.add_colorbar()
 fig.colorbar.set_axis_label_text('Integrated Intensity (K km/s)')
 fig.add_beam()
-fig.savefig('ngc1068_hcnhcop.png')
+fig.save('ngc1068_hcnhcop.png')

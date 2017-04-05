@@ -11,7 +11,7 @@ from astropy.convolution import Kernel1D
 def cleansplit(filename, galaxy=None,
                Vwindow = 650 * u.km / u.s,
                Vgalaxy = 300 * u.km / u.s,
-               blorder=3, HanningLoops=1):
+               blorder=3, HanningLoops=2):
     Cube = SpectralCube.read(filename)
     CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
                                         package='degas')

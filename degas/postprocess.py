@@ -49,10 +49,10 @@ def cleansplit(filename, galaxy=None,
         print "Assuming HCN/HCO+ spectral setup..."
         HCN = Cube.with_spectral_unit(u.km / u.s,
                                       velocity_convention='radio',
-                                      rest_value=89.18852 * u.GHz)
+                                      rest_value=88.631847 * u.GHz)
         HCOp = Cube.with_spectral_unit(u.km / u.s,
                                       velocity_convention='radio',
-                                        rest_value=88.63394 * u.GHz)
+                                        rest_value=89.188518 * u.GHz)
         CubeList = (HCN, HCOp)
         LineList = ('HCN','HCOp')
 

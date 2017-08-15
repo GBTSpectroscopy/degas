@@ -8,24 +8,24 @@ from astropy.coordinates import SkyCoord
 import numpy as np
 from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
+from astropy.io import fits
 
 def edgetrim(cube, wtsFile=None, weightCut=None):
-    wts = SpectralCube.read(wtsFile)
-    wtvals = np.squeeze(wts.filled_data[:])
+    wtvals = np.squeeze(fits.getdata(wtsFile))
     if weightCut:
         mask = wtvals > weightCut
     else:
         mask = wtvals > wtvals.max() / 5 # 5 is ad hoc
-        radius = 3
+        radius = 5
         elt = np.zeros((2*radius + 1, 2*radius+1))
         xx, yy = np.indices(elt.shape)
         # create a disk structuring element
         elt = ((xx - radius)**2 + (yy - radius)**2)<=radius
         mask = nd.binary_closing(mask, structure=elt)
-    cubemask = np.ones(cube.shape) * mask
+    cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
     cube = cube.with_mask(cubemask)
     cube = cube.minimal_subcube()
-    return
+    return(cube)
 
 
 def cleansplit(filename, galaxy=None,
@@ -79,6 +79,11 @@ def cleansplit(filename, galaxy=None,
         LineList = ('HCN','HCOp')
 
     for ThisCube, ThisLine in zip(CubeList, LineList):
+        if edgeMask:
+            ThisCube = edgetrim(ThisCube, 
+                                wtsFile = filename.replace('.fits','_wts.fits'),
+                                weightCut=weightCut)
+
         ThisCube =ThisCube.spectral_slab(V0 - Vwindow, V0 + Vwindow)
         ThisCube.write(Galaxy + '_' + ThisLine + '.fits', overwrite=True)
         StartChan = ThisCube.closest_spectral_channel(V0 - Vgalaxy)
@@ -99,10 +104,6 @@ def cleansplit(filename, galaxy=None,
             ThisCube = ThisCube[::2,:,:]
         
         # Trim edges.
-        if edgeMask:
-            edgetrim(ThisCube, 
-                     wtsfile = filename.replace('.fits','_wts.fits'),
-                     weightCut=weightCut)
 
         ThisCube.write(Galaxy + '_' + ThisLine +
                        '_rebase{0}'.format(blorder) +

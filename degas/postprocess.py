@@ -7,11 +7,33 @@ from astropy.utils.data import get_pkg_data_filename
 from astropy.coordinates import SkyCoord
 import numpy as np
 from astropy.convolution import Kernel1D
+import scipy.ndimage as nd
+
+def edgetrim(cube, wtsFile=None, weightCut=None):
+    wts = SpectralCube.read(wtsFile)
+    wtvals = np.squeeze(wts.filled_data[:])
+    if weightCut:
+        mask = wtvals > weightCut
+    else:
+        mask = wtvals > wtvals.max() / 5 # 5 is ad hoc
+        radius = 3
+        elt = np.zeros((2*radius + 1, 2*radius+1))
+        xx, yy = np.indices(elt.shape)
+        # create a disk structuring element
+        elt = ((xx - radius)**2 + (yy - radius)**2)<=radius
+        mask = nd.binary_closing(mask, structure=elt)
+    cubemask = np.ones(cube.shape) * mask
+    cube = cube.with_mask(cubemask)
+    cube = cube.minimal_subcube()
+    return
+
 
 def cleansplit(filename, galaxy=None,
                Vwindow = 650 * u.km / u.s,
                Vgalaxy = 300 * u.km / u.s,
-               blorder=3, HanningLoops=2):
+               blorder=3, HanningLoops=2,
+               edgeMask=True,
+               weightCut=None):
     Cube = SpectralCube.read(filename)
     CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
                                         package='degas')
@@ -75,8 +97,13 @@ def cleansplit(filename, galaxy=None,
         for i in range(HanningLoops):
             ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
+        
+        # Trim edges.
+        if edgeMask:
+            edgetrim(ThisCube, 
+                     wtsfile = filename.replace('.fits','_wts.fits'),
+                     weightCut=weightCut)
 
-        # Write Out
         ThisCube.write(Galaxy + '_' + ThisLine +
                        '_rebase{0}'.format(blorder) +
                        '_smooth{0}.fits'.format(HanningLoops),

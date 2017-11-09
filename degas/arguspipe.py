@@ -36,7 +36,7 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     rows = row1['ROW']
     columns = tuple(pipe.infile[ext].get_colnames())
     integ1 = gbtpipe.ConvenientIntegration(pipe.infile[ext][columns][rows], log=log)
-    
+
     ext = row2['EXTENSION']
     rows = row2['ROW']
     columns = tuple(pipe.infile[ext].get_colnames())
@@ -69,11 +69,11 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log,
                                  forcecalc=True)
     zenithtau = weather.retrieve_zenith_opacity(mjd, avgfreq, log=log,
-                                                forcecalc=True, 
+                                                forcecalc=True,
                                                 request='Opacity')
-    
+
     tau = cal.elevation_adjusted_opacity(zenithtau, elevation)
-    tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau) 
+    tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau)
     tsys = tcal / onoff
     return tcal, vaneCounts, tsys
 
@@ -82,7 +82,7 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 #cl_params.refscans = [111,]
 
 
-def calscans(inputdir, start=82, stop=105, refscans = [80], 
+def calscans(inputdir, start=82, stop=105, refscans = [80],
              outdir=None, log=None, loglevel='warning',
              OffFrac=0.25, OffType='linefit'):
 
@@ -129,7 +129,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
         try:
             # create a structure that lists the raw SDFITS rows for
             #  each scan/window/feed/polarization
-            row_list, summary = sdf.parseSdfitsIndex(indexfile, 
+            row_list, summary = sdf.parseSdfitsIndex(indexfile,
                                                      cl_params.mapscans)
         except IOError:
             log.doMessage('ERR', 'Could not open index file', indexfile)
@@ -140,7 +140,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
     for infilename in glob.glob(input_directory + '/' +
                                 os.path.basename(input_directory) +
                                 '*.fits'):
-            log.doMessage('DBG', 'Attempting to calibrate', 
+            log.doMessage('DBG', 'Attempting to calibrate',
                           os.path.basename(infilename).rstrip('.fits'))
 
             # change the infilename in the params structure to the
@@ -153,7 +153,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
             sdf = gbtpipe.SdFits()
             cal = gbtpipe.Calibration()
             indexfile = sdf.nameIndexFile(command_options.infilename)
-            row_list, summary = sdf.parseSdfitsIndex(indexfile, 
+            row_list, summary = sdf.parseSdfitsIndex(indexfile,
                                                      mapscans=command_options.mapscans)
             feedlist = (row_list.feeds())
             for thisfeed in feedlist:
@@ -161,7 +161,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                 thiswin = 0
                 command_options = copy.deepcopy(cl_params)
                 try:
-                    pipe = gbtpipe.MappingPipeline(command_options, 
+                    pipe = gbtpipe.MappingPipeline(command_options,
                                                    row_list,
                                                    thisfeed,
                                                    thispol,
@@ -171,14 +171,14 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                     pipe = None
                     pass
                 if pipe:
-                    tcal, vaneCounts, tsys = gettsys(cl_params, row_list, 
-                                                     thisfeed, thispol, 
+                    tcal, vaneCounts, tsys = gettsys(cl_params, row_list,
+                                                     thisfeed, thispol,
                                                      thiswin, pipe,
                                                      weather=w, log=log)
                     log.doMessage('INFO', 'Feed: {0}, Tsys (K): {1}'.format(
                             thisfeed,
                             tsys))
-                    
+
                     for thisscan in cl_params.mapscans:
                         print("Now Processing Scan {0} for Feed {1}".format(\
                                 thisscan, thisfeed))
@@ -191,12 +191,12 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             pipe.infile[ext][columns][rows], log=log)
                         timestamps = integs.data['DATE-OBS']
                         elevation = np.median(integs.data['ELEVATIO'])
-                        mjds = np.array([pipe.pu.dateToMjd(stamp) 
+                        mjds = np.array([pipe.pu.dateToMjd(stamp)
                                          for stamp in timestamps])
                         avgfreq = np.median(integs.data['OBSFREQ'])
                         zenithtau = w.retrieve_zenith_opacity(np.median(mjds),
                                                               avgfreq,
-                                                              log=log, 
+                                                              log=log,
                                                               forcecalc=True)
                         tau = cal.elevation_adjusted_opacity(zenithtau,
                                                              elevation)
@@ -229,7 +229,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
 
                             slope = (np.nansum(((xsub - MeanX)
                                                 * (ONsub - MeanON)),
-                                               axis=0) 
+                                               axis=0)
                                      / np.nansum((xsub - MeanX)**2,
                                                  axis=0))
                             slope.shape += (1,)
@@ -240,7 +240,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             MeanON = MeanON.T
                             OFF = slope.T * xaxis + MeanON
                         medianOFF = np.nanmedian(OFF, axis=0)
-                        
+
                         # Now construct a scalar factor by taking
                         # median OFF power (over time) and compare to
                         # the mean vaneCounts over time.  Then take
@@ -254,9 +254,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                         medianTA = np.median(TA, axis=1)
                         medianTA.shape = (1,) + medianTA.shape
                         medianTA = np.ones((ON.shape[1], 1)) * medianTA
-                        
-                        TA -= medianTA.T 
-                        TAstar = TA * np.exp(tau)
+                        TAstar = TA - medianTA.T
                         for ctr, row in enumerate(rows):
                             row = gbtpipe.Integration(
                                 pipe.infile[ext][columns][row])
@@ -266,4 +264,3 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             pipe.outfile[-1].append(row.data)
                     pipe.outfile.close()
     return True
-        

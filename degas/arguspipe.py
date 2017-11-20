@@ -6,32 +6,61 @@ import fitsio
 import copy
 import warnings
 
-# CRUFT
+# CRUFT - Disregard.
 #/users/rmaddale/bin/getForecastValues -freqList 89 -typeList Opacity -elev 90 -timeList 53441.4
 # tau = w.retrieve_zenith_opacity(53441.4,88e9,log=log)
 # print tau
 # tau = w.retrieve_zenith_opacity(53441.4,89e9,log=log,forcecalc=True)
 # print tau
+# cl_params.mapscans = list(np.linspace(113,136,136-113+1).astype('int'))
+# cl_params.refscans = [111,]
 
 
 def makelogdir():
+    # Creates log director required by default by gbtpipe
     if not os.path.exists('log'):
         os.mkdir('log')
 
 
 def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
             weather=None, log=None):
+    """
+    Determine Tsys for list of map rows
+
+    Parameters
+    ----------
+    cl_params : dict
+        command line parameter dictionary
+    row_list : gbtpipe.Row
+        Object row 
+    thisfeed : int
+        Feed (receptor) number
+    thispol : int
+        Polarization number
+    thiswin : int
+        Spectral window number
+    pipe : dict
+        Pipeline control dictionary
+    weather : gbtpipe.Weather
+        Object providing weather forecasting functionality
+    log : gbtpipe.Logging
+        Object providing access to log functionality.
+    """
+
     if not weather:
-        weather = gbtpipe.Weather()
+        weather = gbtpipe.Weather()  
     if not log:
         log = gbtpipe.Logging(cl_params, 'gbtpipeline')
     cal = gbtpipe.Calibration()
 
-    #Assume refscan is this scan and the next scan
+    # Assume refscan is this scan and the next scan
     thisscan = cl_params.refscans[0]
+
+    # Pull the right raw rows from the data
     row1 = row_list.get(thisscan, thisfeed, thispol, thiswin)
     row2 = row_list.get(thisscan+1, thisfeed, thispol, thiswin)
 
+    # Pull cal data into memory.
     ext = row1['EXTENSION']
     rows = row1['ROW']
     columns = tuple(pipe.infile[ext].get_colnames())
@@ -44,16 +73,21 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 
     vec1 = integ1.data['DATA']
     vec2 = integ2.data['DATA']
+
     if 'Vane' in integ1.data['CALPOSITION'][0] and\
             'Observing' in integ2.data['CALPOSITION'][0]:
+        # Directly do an on-off on the full data set
         onoff = np.median((vec1-vec2)/vec2)
         # Mean over time to get a vector of vaneCounts at each freq.
         vaneCounts = np.mean(vec1, axis=0)
+
+    # Now test case where Vane data were second position
     elif 'Vane' in integ2.data['CALPOSITION'][0] and\
             'Observing' in integ1.data['CALPOSITION'][0]:
         onoff = np.median((vec2-vec1)/vec1)
         vaneCounts = np.mean(vec2, axis=0)
     else:
+        # If you are here, then you will not get data today
         import pdb; pdb.set_trace()
 
     timestamps = integ1.data['DATE-OBS']
@@ -62,30 +96,59 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 
     elevation = np.mean(integ1.data['ELEVATIO'])
 
+    # Pull warm load temperature from the data
     twarm = np.mean(integ1.data['TWARM']+273.15)
-    tbg = 2.725
+    tbg = 2.725  # It's the CMB
     tambient = np.mean(integ1.data['TAMBIENT'])
     avgfreq = np.mean(integ1.data['OBSFREQ'])
+
+    # Use weather model to get the atmospheric temperature and opacity
     tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log,
                                  forcecalc=True)
     zenithtau = weather.retrieve_zenith_opacity(mjd, avgfreq, log=log,
                                                 forcecalc=True,
                                                 request='Opacity')
-
+    # This does the airmass calculation
     tau = cal.elevation_adjusted_opacity(zenithtau, elevation)
     tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau)
     tsys = tcal / onoff
     return tcal, vaneCounts, tsys
 
 
-#cl_params.mapscans = list(np.linspace(113,136,136-113+1).astype('int'))
-#cl_params.refscans = [111,]
-
-
-def calscans(inputdir, start=82, stop=105, refscans = [80],
+def calscans(inputdir, start=82, stop=105, refscans=[80],
              outdir=None, log=None, loglevel='warning',
              OffFrac=0.25, OffType='linefit'):
+    """
+    Main calibration routine
 
+    Parameters
+    ----------
+    inputdir : str
+        Name of input directory to chomp
+    
+    Keywords
+    --------
+    start : int
+         Number of start scan
+    stop : int
+         Number of stop scan
+    refscans : list of ints
+         Reference scans to include in the calibration
+    outdir : str
+         Where to put the calibrated data
+    log : gbtpipe.Logger
+         Logging object
+    loglevel : str
+         Passed to log object to set verbosity
+    OffFrac : float
+         Fraction of bandpass used to determine the off spectrum on either side.
+    OffType : str
+         Select off model 'linefit' fits a line to the off
+         setctions. 'median' uses the median of each part of the
+         bandwpass
+    """
+
+    # Grab them files
     if os.path.isdir(inputdir):
         fitsfiles = glob.glob(inputdir + '/*fits')
         if len(fitsfiles) == 0:
@@ -93,7 +156,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
             return False
     elif os.path.isfile(inputdir):
         warnings.warn("Input name is a file and not a directory.")
-        warnings.warn("Blindly reducing everything in this directory.")
+        warnings.warn("Blindly reducing everything in the same directory.")
         infilename = inputdir
         inputdir = os.getcwd()
     else:
@@ -103,17 +166,24 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
     if not outdir:
         outdir = os.getcwd()
 
+    # Instantiate loggin
     makelogdir()
     if not log:
         log = gbtpipe.Logging('gbtpipeline')
         if loglevel=='warning':
             log.logger.setLevel(30)
 
+    # Grab the weather object
     w = gbtpipe.Weather()
+    
+    # Start up the pipeline control object and feed in the propert scan numbers
     cl_params = gbtpipe.initParameters(inputdir)
+    # Assume spacing in uniform between start and stop
     cl_params.mapscans = list(np.linspace(start,stop,
                                           stop-start+1).astype('int'))
     cl_params.refscans = refscans
+    
+    
     if os.path.isdir(cl_params.infilename):
         log.doMessage('INFO', 'Infile name is a directory')
         input_directory = cl_params.infilename
@@ -156,6 +226,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
             row_list, summary = sdf.parseSdfitsIndex(indexfile,
                                                      mapscans=command_options.mapscans)
             feedlist = (row_list.feeds())
+            #Currently Argus only has one spectral window and polarization
             for thisfeed in feedlist:
                 thispol = 0 # TODO: generalize to different POL/WIN
                 thiswin = 0
@@ -180,15 +251,17 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             tsys))
 
                     for thisscan in cl_params.mapscans:
-                        print("Now Processing Scan {0} for Feed {1}".format(\
+                        warnings.warn("Now Processing Scan {0} for Feed {1}".format(
                                 thisscan, thisfeed))
                         rows = row_list.get(thisscan, thisfeed,
                                             thispol, thiswin)
                         ext = rows['EXTENSION']
                         rows = rows['ROW']
                         columns = tuple(pipe.infile[ext].get_colnames())
-                        integs = gbtpipe.ConvenientIntegration(\
+                        integs = gbtpipe.ConvenientIntegration(
                             pipe.infile[ext][columns][rows], log=log)
+
+                        # Grab everything we need to get a Tsys measure
                         timestamps = integs.data['DATE-OBS']
                         elevation = np.median(integs.data['ELEVATIO'])
                         mjds = np.array([pipe.pu.dateToMjd(stamp)
@@ -201,15 +274,21 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                         tau = cal.elevation_adjusted_opacity(zenithtau,
                                                              elevation)
 
-                        # Do the calibration here
+                        # This block actually does the calibration
                         ON = integs.data['DATA']
 
                         if OffType == 'median':
+                            # Model the off power as the median counts
+                            # across the whole bandpass. This assumes
+                            # that line power is weak per scan and per
+                            # channel.
                             OFF = np.median(ON, axis=0) # Empirical bandpass
                             OFF.shape += (1,)
                             OFF = OFF * np.ones((1, ON.shape[0]))
                             OFF = OFF.T
                         if OffType == 'linefit':
+                            # This block fits a line to the ends of
+                            # the bandpass as a model for the power.
                             xaxis = np.linspace(-0.5,0.5,ON.shape[0])
                             xaxis.shape += (1,)
                             xaxis = xaxis * np.ones((1,ON.shape[1]))
@@ -217,6 +296,9 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             xsub = np.r_[xaxis[0:cutidx,:], xaxis[-cutidx:,:]]
                             ONsub = np.r_[ON[0:cutidx,:], ON[-cutidx:,:]]
 
+                            # This is a little tedious because we want
+                            # to vectorize the least-squares fit per
+                            # scan.
                             MeanON = np.nanmean(ONsub, axis=0)
                             MeanON.shape += (1,)
                             MeanON = MeanON * np.ones((1, ONsub.shape[0]))
@@ -227,6 +309,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             MeanX = MeanX * np.ones((1, ONsub.shape[0]))
                             MeanX = MeanX.T
 
+                            # The solution to all linear least-squares.
                             slope = (np.nansum(((xsub - MeanX)
                                                 * (ONsub - MeanON)),
                                                axis=0)
@@ -238,6 +321,7 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                             MeanON.shape += (1,)
                             MeanON = MeanON * np.ones((1,ON.shape[0]))
                             MeanON = MeanON.T
+                            # This the off model.
                             OFF = slope.T * xaxis + MeanON
                         medianOFF = np.nanmedian(OFF, axis=0)
 
@@ -256,6 +340,8 @@ def calscans(inputdir, start=82, stop=105, refscans = [80],
                         medianTA = np.ones((ON.shape[1], 1)) * medianTA
                         TAstar = TA - medianTA.T
                         for ctr, row in enumerate(rows):
+                            # This updates the output SDFITS file with
+                            # the newly calibrated data.
                             row = gbtpipe.Integration(
                                 pipe.infile[ext][columns][row])
                             row.data['DATA'] = TAstar[ctr,:]

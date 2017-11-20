@@ -11,7 +11,13 @@ import scipy.ndimage as nd
 from astropy.io import fits
 
 def edgetrim(cube, wtsFile=None, weightCut=None):
+    """
+    This trims off the edges of the cubes based on where the weights
+    are lower than required to get a good signal.
+    """
+
     wtvals = np.squeeze(fits.getdata(wtsFile))
+
     if weightCut:
         mask = wtvals > weightCut
     else:
@@ -33,12 +39,47 @@ def cleansplit(filename, galaxy=None,
                Vgalaxy = 300 * u.km / u.s,
                blorder=3, HanningLoops=2,
                edgeMask=True,
-               weightCut=None):
+               weightCut=None,
+               spectralSetup=None):
+    """
+    Takes a raw DEGAS cube and produces individual cubes for each
+    spectral line.
+    
+    Paramters
+    ---------
+    filename : str
+        The file to split.
+    
+    Keywords
+    --------
+    galaxy : Galaxy object
+        Currently unused
+    Vwindow : astropy.Quantity
+        Width of the window in velocity units
+    Vgalaxy : astropy.Quantity
+        Line of sight velocity of the galaxy centre
+    blorder : int
+        Baseline order
+    HanningLoops : int
+        Number of times to smooth and resample the data
+    edgeMask : bool
+        Determine whether to apply an edgeMask
+    weightCut : float
+        Minimum weight value to include in the data
+    spectralSetup : str
+        String to determine how we set up the spectrum
+        'hcn_hcop' -- split based on HCN/HCO+ setup
+        '13co_c18o' -- split based on 13CO/C18O setup
+        '12co' -- don't split; assume single line
+    """
+
     Cube = SpectralCube.read(filename)
     CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
                                         package='degas')
-                                    
     Catalog = Table.read(CatalogFile, format='ascii')
+
+    # Find which galaxy in our catalog corresponds to the object we
+    # are mapping
     if galaxy is None:
         RABound, DecBound = Cube.world_extrema
         match = np.zeros_like(Catalog, dtype=np.bool)
@@ -56,39 +97,60 @@ def cleansplit(filename, galaxy=None,
         print "Catalog Match with " + Galaxy
     V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
 
-    # Check spectral setups.  If > 100 GHz, assume it's the 13CO/C180
-    if Cube.spectral_axis.max() > 100 * u.GHz:
-        print "Assuming 13CO/C18O spectral setup..."
+    # Check spectral setups.  Use the max frequencies present to
+    # determine which spectral setup we used if not specifed.
+    if spectralSetup is None:
+        if (Cube.spectral_axis.max() > 105 * u.GHz and
+            Cube.spectral_axis.max() < 113 * u.GHz):
+            warnings.warn("assuming 13CO/C18O spectral setup")
+            spectralSetup = '13co_c18o'
+        if (Cube.spectral_axis.max() > 82 * u.GHz and
+            Cube.spectral_axis.max() < 90 * u.GHz):
+            warnings.warn("assuming HCN/HCO+ spectral setup")
+            spectralSetup = 'hcn_hcop'
+        if (Cube.spectral_axis.max() > 113 * u.GHz):
+            warnings.warn("assuming 12CO spectral setup")
+            spectralSetup = '12co'
+
+    if spectralSetup is '13co_c18o': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
                                              velocity_convention='radio',
                                              rest_value=109.78217 * u.GHz)
         ThirteenCO = Cube.with_spectral_unit(u.km / u.s,
-                                      velocity_convention='radio',
-                                      rest_value=110.20135 * u.GHz)
+                                             velocity_convention='radio',
+                                             rest_value=110.20135 * u.GHz)
         CubeList = (CEighteenO, ThirteenCO)
         LineList = ('C18O','13CO')
-    else:
-        print "Assuming HCN/HCO+ spectral setup..."
+
+    elif spectralSetup is 'hcn_hcop':
         HCN = Cube.with_spectral_unit(u.km / u.s,
                                       velocity_convention='radio',
                                       rest_value=88.631847 * u.GHz)
         HCOp = Cube.with_spectral_unit(u.km / u.s,
-                                      velocity_convention='radio',
-                                        rest_value=89.188518 * u.GHz)
+                                       velocity_convention='radio',
+                                       rest_value=89.188518 * u.GHz)
         CubeList = (HCN, HCOp)
         LineList = ('HCN','HCOp')
+
+    elif spectralSetup is '12co':
+        TwelveCO = Cube.with_spectralCube(u.km / u.s,
+                                      velocity_convention='radio',
+                                      rest_value=115.27120180 * u.GHz)
+        CubeList = (TwelveCO)
+        LineList = ('12CO')
 
     for ThisCube, ThisLine in zip(CubeList, LineList):
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
                                 wtsFile = filename.replace('.fits','_wts.fits'),
-                                weightCut=weightCut)
+                                weightCut=weightCu
 
+        # Trim each cube to the specified velocity range
         ThisCube =ThisCube.spectral_slab(V0 - Vwindow, V0 + Vwindow)
         ThisCube.write(Galaxy + '_' + ThisLine + '.fits', overwrite=True)
         StartChan = ThisCube.closest_spectral_channel(V0 - Vgalaxy)
         EndChan = ThisCube.closest_spectral_channel(V0 + Vgalaxy)
-        
+
         # Rebaseline
         gbtpipe.Baseline.rebaseline(Galaxy + '_' + ThisLine + '.fits',
                                     baselineRegion=[slice(0,StartChan,1),
@@ -102,9 +164,8 @@ def cleansplit(filename, galaxy=None,
         for i in range(HanningLoops):
             ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
-        
-        # Trim edges.
 
+        # Final Writeout
         ThisCube.write(Galaxy + '_' + ThisLine +
                        '_rebase{0}'.format(blorder) +
                        '_smooth{0}.fits'.format(HanningLoops),

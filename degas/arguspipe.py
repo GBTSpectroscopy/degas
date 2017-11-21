@@ -117,7 +117,8 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
 
 def calscans(inputdir, start=82, stop=105, refscans=[80],
              outdir=None, log=None, loglevel='warning',
-             OffFrac=0.25, OffType='linefit'):
+             OffFrac=0.25, OffType='linefit',
+             verbose=True):
     """
     Main calibration routine
 
@@ -146,6 +147,8 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
          Select off model 'linefit' fits a line to the off
          setctions. 'median' uses the median of each part of the
          bandwpass
+    verbose : bool
+         Notify after every scan.
     """
 
     # Grab them files
@@ -251,8 +254,9 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             tsys))
 
                     for thisscan in cl_params.mapscans:
-                        warnings.warn("Now Processing Scan {0} for Feed {1}".format(
-                                thisscan, thisfeed))
+                        if verbose:
+                            warnings.warn("Now Processing Scan {0} for Feed {1}".format(
+                                    thisscan, thisfeed))
                         rows = row_list.get(thisscan, thisfeed,
                                             thispol, thiswin)
                         ext = rows['EXTENSION']

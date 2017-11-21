@@ -143,7 +143,7 @@ def cleansplit(filename, galaxy=None,
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
                                 wtsFile = filename.replace('.fits','_wts.fits'),
-                                weightCut=weightCu
+                                weightCut=weightCut)
 
         # Trim each cube to the specified velocity range
         ThisCube =ThisCube.spectral_slab(V0 - Vwindow, V0 + Vwindow)

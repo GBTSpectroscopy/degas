@@ -182,7 +182,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     # Clean up permissions
     fl = glob.glob(OutputDirectory + '/*fits')
     for thisfile in fl:
-        os.chown(fl,0774)
+        os.chown(thisfile,0774)
 
 
     

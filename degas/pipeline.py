@@ -3,17 +3,20 @@ import subprocess
 import glob
 import warnings
 from astropy.time import Time
+import pkg_resources
+import numpy as np
+
 from . import catalogs
 from . import arguspipe
-import numpy as np
+
 
 def reduceSession(session=1, overwrite=False, release = 'all', 
                   project='17B-151',
                   outputDir='/lustre/pipeline/scratch/DEGAS/'):
     """
-    Function to reduce all data using the GBT-pipeline.
+    Function to reduce single-session data using the GBT-pipeline.
     
-    reduceAll(overwrite=False, release='all')
+    reduceSession(overwrite=False, release='all')
 
     release : string
         Variable that selects which set of data is to be reduced. 
@@ -24,27 +27,28 @@ def reduceSession(session=1, overwrite=False, release = 'all',
     """
 
     catalogs.updateLogs(release=release)
-    RegionCatalog = catalogs.loadCatalog()
+    ObjectCatalog = catalogs.loadCatalog()
     Log = catalogs.parseLog()
-    SessionRows = (Log['Session'] == session) * (Log['Project'] == project)
+    SessionRows = ((Log['Astrid Session'] == session) *
+                   (Log['Project'] == project))
     Log = Log[SessionRows]
-    uniqSrc = RegionCatalog['NAME']
+    uniqSrc = ObjectCatalog['NAME']
     if outputDir is None:
         cwd = os.getcwd()
     else:
         cwd = outputDir
 
-    for region in uniqSrc:
-        if region != 'none':
+    for galaxy in uniqSrc:
+        if galaxy != 'none':
             try:
-                os.chdir(cwd+'/'+region)
+                os.chdir(cwd+'/'+galaxy)
             except OSError:
-                os.mkdir(cwd+'/'+region)
-                os.chdir(cwd+'/'+region)
-            LogRows = Log['Source'] == region
+                os.mkdir(cwd+'/'+galaxy)
+                os.chdir(cwd+'/'+galaxy)
+            LogRows = Log['Source'] == galaxy
             if np.any(LogRows):
-                wrapper(region=region, overwrite = overwrite,
-                        release=release, obslog = LogRows,
+                wrapper(galaxy=galaxy, overwrite = overwrite,
+                        release=release, obslog = Log[LogRows],
                         startdate=Log[LogRows][0]['Date (UT)'],
                         enddate=Log[LogRows][-1]['Date (UT)'])
                 os.chdir(cwd)
@@ -93,6 +97,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
         if (galaxy in observation['Source']) & \
                 (ObsDate >= StartDate) & (ObsDate <= EndDate) & \
                 (observation[release]):
+
             print(observation['Date (UT)'])
             Nscans = observation['End Scan'] - observation['Start Scan'] + 1
             if Nscans - observation['Nrows'] == 4:
@@ -107,8 +112,9 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                 startscan = observation['Start Scan'] + 2
                 endscan = observation['End Scan']
             if Nscans - observation['Nrows'] < 2:
-                warnings.warn("Number of scans = Number of Mapped Rows: no Vane Cal")
+                warnings.warn("Number of scans = Number of Mapped Rows: no VaneCal")
                 raise
+            
 
             # TODO: Beam gains?
             if str(observation['Alternate Data Directory']) == '--':
@@ -172,17 +178,19 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         except:
             warnings.warn('Unable to make output directory '+OutputDirectory)
             raise
-
+    suffixname='_sess{0}_v{1}'.format(SessionNumber,
+                                      pkg_resources.get_distribution("degas").version)
     arguspipe.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                        start=StartScan,
                        stop=EndScan,
                        refscans=RefScans,
-                       outdir=OutputDirectory)
-
+                       outdir=OutputDirectory,
+                       suffix=suffixname)
+                                       
     # Clean up permissions
     fl = glob.glob(OutputDirectory + '/*fits')
     for thisfile in fl:
-        os.chown(thisfile,0774)
+        os.chmod(thisfile,0664)
 
 
     

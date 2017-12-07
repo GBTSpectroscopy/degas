@@ -10,17 +10,17 @@ from . import catalogs
 from . import arguspipe
 
 
-def reduceSession(session=1, overwrite=False, release = 'all', 
+def reduceSession(session=1, overwrite=False, release = 'QA2', 
                   project='17B-151',
                   outputDir='/lustre/pipeline/scratch/DEGAS/'):
     """
     Function to reduce single-session data using the GBT-pipeline.
     
-    reduceSession(overwrite=False, release='all')
+    reduceSession(overwrite=False, release='QA2')
 
     release : string
         Variable that selects which set of data is to be reduced. 
-        Default value is 'all', while 'DR1' generates the Data Release 1, and 
+        Default value is 'QA2', while 'DR1' generates the Data Release 1, and 
         hopefully 'DR2' will be available in the near future.
     overwrite : bool
         If True it will overwrite files.
@@ -55,7 +55,7 @@ def reduceSession(session=1, overwrite=False, release = 'all',
 
 def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
             overwrite=False, startdate = '2015-01-1',
-            enddate='2020-12-31',release='all',obslog = None):
+            enddate='2020-12-31',release='QA2',obslog = None):
     """
     This is the DEGAS pipeline which chomps the observation logs and
     then batch calibrates the data.  It requires AstroPy because

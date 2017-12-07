@@ -15,3 +15,4 @@ if not _ASTROPY_SETUP_:
     from arguspipe import *
     from postprocess import *
     from pipeline import *
+    from gridding import *

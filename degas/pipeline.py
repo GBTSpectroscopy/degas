@@ -12,7 +12,8 @@ from . import arguspipe
 
 def reduceSession(session=1, overwrite=False, release = 'QA2', 
                   project='17B-151',
-                  outputDir='/lustre/pipeline/scratch/DEGAS/'):
+                  outputDir='/lustre/pipeline/scratch/DEGAS/',
+                  **kwargs):
     """
     Function to reduce single-session data using the GBT-pipeline.
     
@@ -50,12 +51,13 @@ def reduceSession(session=1, overwrite=False, release = 'QA2',
                 wrapper(galaxy=galaxy, overwrite = overwrite,
                         release=release, obslog = Log[LogRows],
                         startdate=Log[LogRows][0]['Date (UT)'],
-                        enddate=Log[LogRows][-1]['Date (UT)'])
+                        enddate=Log[LogRows][-1]['Date (UT)'], **kwargs)
                 os.chdir(cwd)
 
 def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
             overwrite=False, startdate = '2015-01-1',
-            enddate='2020-12-31',release='QA2',obslog = None):
+            enddate='2020-12-31',release='QA2',obslog=None,
+            **kwargs):
     """
     This is the DEGAS pipeline which chomps the observation logs and
     then batch calibrates the data.  It requires AstroPy because
@@ -124,7 +126,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            RefScans=refscans,
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
-                           overwrite=overwrite)
+                           overwrite=overwrite, **kwargs)
             else :
                 doPipeline(SessionNumber=observation['Astrid Session'],
                            StartScan=observation['Start Scan'],
@@ -133,7 +135,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
                            RawDataDir=observation['Special RawDir'],
-                           overwrite=overwrite)
+                           overwrite=overwrite, **kwargs)
 
 def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                RefScans=[25, 45],
@@ -143,7 +145,8 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                OptionDict = None,
                RawDataDir = None,
                Gains=None,
-               OutputRoot = None, overwrite=False):
+               OffType='median',
+               OutputRoot = None, overwrite=False, **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
@@ -185,6 +188,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                        stop=EndScan,
                        refscans=RefScans,
                        outdir=OutputDirectory,
+                       OffType=OffType,
                        suffix=suffixname)
                                        
     # Clean up permissions

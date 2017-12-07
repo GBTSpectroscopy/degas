@@ -289,7 +289,9 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             # across the whole bandpass. This assumes
                             # that line power is weak per scan and per
                             # channel.
-                            OFF = np.median(ON, axis=0) # Empirical bandpass
+                            edgeScans = int(np.floor(OffFrac * ON.shape[0]))
+                            OFF = np.median(np.r_[ON[0:edgeScans,:],
+                                                  ON[-edgeScans:,:]], axis=0) # Empirical bandpass
                             OFF.shape += (1,)
                             OFF = OFF * np.ones((1, ON.shape[0]))
                             OFF = OFF.T

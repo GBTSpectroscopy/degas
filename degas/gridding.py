@@ -12,7 +12,6 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
 
     filelist = glob.glob(datadir + galaxy + '/' +
                          setup + '/*fits')
-    import pdb; pdb.set_trace()
     OutputDirectory = datadir + galaxy + '/images/'
     if not os.access(OutputDirectory, os.W_OK):
         try:
@@ -28,6 +27,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                                  edgetrim+basebuff,1),
                                            slice(1024-edgetrim-basebuff,
                                                  1024-basebuff,1)],
+                         outdir=OutputDirectory,
                          flagRMS=True, plotTimeSeries=True,
                          flagRipple=True, pixPerBeam=4.0)
 
@@ -40,6 +40,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                            slice(448,576,1),
                                            slice(1024-edgetrim-basebuff,
                                                  1024-basebuff,1)],
+                         outdir=OutputDirectory,
                          flagRMS=True, plotTimeSeries=True,
                          flagRipple=True, pixPerBeam=4.0)
 

@@ -7,7 +7,7 @@ import numpy as np
 from astropy.utils.data import get_pkg_data_filename
 
 def updateLogs(output='ObservationLog.csv',release=None):
-    if (release is None) or ('all' in release):
+    if (release is None) or ('QA2' in release):
         command = "wget --no-check-certificate --output-document="+output+" 'https://docs.google.com/spreadsheet/ccc?key=1wFgxwpDHuYsb7ISWUyBg1xGO6SraRwCIlm1u_fHlrPs&output=csv'"
         # The returns from subprocess are the error codes from the OS
         # If 0 then it worked so we should return True
@@ -43,7 +43,7 @@ def parseLog(logfile='ObservationLog.csv'):
     t = t[idx]
 
     # Convert from Google Booleans to Python Booleans
-    for drkey in ['all','DR1']:
+    for drkey in ['QA2','DR1']:
         t[drkey] = t[drkey].data.data=='TRUE'
 
     return(t)

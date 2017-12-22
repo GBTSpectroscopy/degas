@@ -51,11 +51,14 @@ def reduceSession(session=1, overwrite=False, release = 'QA2',
                 wrapper(galaxy=galaxy, overwrite = overwrite,
                         release=release, obslog = Log[LogRows],
                         startdate=Log[LogRows][0]['Date (UT)'],
-                        enddate=Log[LogRows][-1]['Date (UT)'], **kwargs)
+                        enddate=Log[LogRows][-1]['Date (UT)'],
+                        project=project,
+                        **kwargs)
                 os.chdir(cwd)
 
 def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
             overwrite=False, startdate = '2015-01-1',
+            project='17B-151',
             enddate='2020-12-31',release='QA2',obslog=None,
             **kwargs):
     """
@@ -98,7 +101,8 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
         ObsDate = Time(observation['Date (UT)'])
         if (galaxy in observation['Source']) & \
                 (ObsDate >= StartDate) & (ObsDate <= EndDate) & \
-                (observation[release]):
+                (observation[release]) & \
+                ('Map' in observation['Scan Type']):
 
             print(observation['Date (UT)'])
             Nscans = observation['End Scan'] - observation['Start Scan'] + 1
@@ -126,6 +130,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            RefScans=refscans,
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
+                           Project=project,
                            overwrite=overwrite, **kwargs)
             else :
                 doPipeline(SessionNumber=observation['Astrid Session'],
@@ -135,6 +140,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
                            RawDataDir=observation['Special RawDir'],
+                           Project=project,
                            overwrite=overwrite, **kwargs)
 
 def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,

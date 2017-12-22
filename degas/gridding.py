@@ -1,12 +1,28 @@
 import gbtpipe
 import glob
 import os
+import pkg_resources
 from . import catalogs
+from . import postprocess
+
+
+def gridBlocks(release='QA0', edgetrim = 100,
+               basebuff = 64):
+    """
+    This builds tiny maps suitable for QA1 of blocks
+    """
+
+    pipeversion = pkg_resources.get_distribution("degas").version
+    filelist = glob.glob(datadir + galaxy + '/' +
+                         setup + '/*fits')
 
 def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                datadir='/lustre/pipeline/scratch/DEGAS/',
                overwrite=True, release='QA2', edgetrim = 100,
                basebuff = 64):
+
+    pipeversion = pkg_resources.get_distribution("degas").version
+
 
     # Note that we also use a few channels in the middle.
 
@@ -19,7 +35,8 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
             os.chdir(OutputDirectory)
         except OSError:
             raise
-    if '12CO' in setup:    
+    if '12CO' in setup:
+        filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         gbtpipe.griddata(filelist,
                          startChannel=edgetrim,
                          endChannel=1024-edgetrim,
@@ -29,9 +46,12 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                                  1024-basebuff,1)],
                          outdir=OutputDirectory,
                          flagRMS=True, plotTimeSeries=True,
-                         flagRipple=True, pixPerBeam=4.0)
-
+                         flagRipple=True, pixPerBeam=4.0,
+                         outname=filename)
+        postprocess.cleansplit(filename, galaxy=galaxy,
+                               spectralSetup=setup)
     else:
+        filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         gbtpipe.griddata(filelist,
                          startChannel=edgetrim,
                          endChannel=1024-edgetrim,
@@ -41,8 +61,12 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                            slice(1024-edgetrim-basebuff,
                                                  1024-basebuff,1)],
                          outdir=OutputDirectory,
+                         blorder=5,
                          flagRMS=True, plotTimeSeries=True,
-                         flagRipple=True, pixPerBeam=4.0)
-
+                         flagRipple=True, pixPerBeam=4.0,
+                         outname=filename)
+        postprocess.cleansplit(filename, galaxy=galaxy,
+                               spectralSetup=setup)
+        
 
     

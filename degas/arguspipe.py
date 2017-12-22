@@ -88,6 +88,10 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
         vaneCounts = np.mean(vec2, axis=0)
     else:
         # If you are here, then you will not get data today
+        warnings.warn("No Vane scans found in putative reference scans.")
+        warnings.warn("Making a wild guess that's probably wrong...")
+        onoff = np.median((vec1-vec2)/vec2)
+        vaneCounts = np.mean(vec1, axis=0)
         import pdb; pdb.set_trace()
 
     timestamps = integ1.data['DATE-OBS']

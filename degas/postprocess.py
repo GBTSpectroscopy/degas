@@ -103,16 +103,16 @@ def cleansplit(filename, galaxy=None,
         if (Cube.spectral_axis.max() > 105 * u.GHz and
             Cube.spectral_axis.max() < 113 * u.GHz):
             warnings.warn("assuming 13CO/C18O spectral setup")
-            spectralSetup = '13co_c18o'
+            spectralSetup = '13CO_C18O'
         if (Cube.spectral_axis.max() > 82 * u.GHz and
             Cube.spectral_axis.max() < 90 * u.GHz):
             warnings.warn("assuming HCN/HCO+ spectral setup")
-            spectralSetup = 'hcn_hcop'
+            spectralSetup = 'HCN_HCO+'
         if (Cube.spectral_axis.max() > 113 * u.GHz):
             warnings.warn("assuming 12CO spectral setup")
-            spectralSetup = '12co'
+            spectralSetup = '12CO'
 
-    if spectralSetup is '13co_c18o': 
+    if spectralSetup is '13CO_c18O': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
                                              velocity_convention='radio',
                                              rest_value=109.78217 * u.GHz)
@@ -122,7 +122,7 @@ def cleansplit(filename, galaxy=None,
         CubeList = (CEighteenO, ThirteenCO)
         LineList = ('C18O','13CO')
 
-    elif spectralSetup is 'hcn_hcop':
+    elif spectralSetup is 'HCN_HCO+':
         HCN = Cube.with_spectral_unit(u.km / u.s,
                                       velocity_convention='radio',
                                       rest_value=88.631847 * u.GHz)
@@ -132,7 +132,7 @@ def cleansplit(filename, galaxy=None,
         CubeList = (HCN, HCOp)
         LineList = ('HCN','HCOp')
 
-    elif spectralSetup is '12co':
+    elif spectralSetup is '12CO':
         TwelveCO = Cube.with_spectralCube(u.km / u.s,
                                       velocity_convention='radio',
                                       rest_value=115.27120180 * u.GHz)

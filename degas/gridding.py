@@ -7,7 +7,10 @@ from . import postprocess
 
 
 def gridBlocks(release='QA0', edgetrim = 100,
-               basebuff = 64):
+               basebuff = 64,
+               datadir='/lustre/pipeline/scratch/DEGAS/',
+               setup='13CO_C18O'):
+
     """
     This builds tiny maps suitable for QA1 of blocks
     """
@@ -47,6 +50,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                          outdir=OutputDirectory,
                          flagRMS=True, plotTimeSeries=True,
                          flagRipple=True, pixPerBeam=4.0,
+                         plotsubdir='timeseries',
                          outname=filename)
         postprocess.cleansplit(filename, galaxy=galaxy,
                                spectralSetup=setup)
@@ -64,6 +68,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                          blorder=5,
                          flagRMS=True, plotTimeSeries=True,
                          flagRipple=True, pixPerBeam=4.0,
+                         plotsubdir='timeseries',
                          outname=filename)
         postprocess.cleansplit(filename, galaxy=galaxy,
                                spectralSetup=setup)

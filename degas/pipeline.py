@@ -39,13 +39,21 @@ def reduceAll(release='QA0',
             LogRows = Log['Source'] == galaxy
             ExtantFiles = glob.glob(galaxy+'*')
             # TODO Fill in overwrite functionality and version checking
-            if np.any(LogRows):
+            for row in Log[LogRows]:
                 wrapper(galaxy=galaxy, overwrite = overwrite,
-                        release=release, obslog = Log[LogRows],
-                        startdate=Log[LogRows][0]['Date (UT)'],
-                        enddate=Log[LogRows][-1]['Date (UT)'],
-                        project=Log[LogRows][-1]['Project'],
+                        release=release, obslog = row,
+                        startdate=row['Date (UT)'],
+                        enddate=row['Date (UT)'],
+                        project=row['Project'],
                         **kwargs)
+                
+            # if np.any(LogRows):
+            #     wrapper(galaxy=galaxy, overwrite = overwrite,
+            #             release=release, obslog = Log[LogRows],
+            #             startdate=Log[LogRows][0]['Date (UT)'],
+            #             enddate=Log[LogRows][-1]['Date (UT)'],
+            #             project=Log[LogRows][-1]['Project'],
+            #             **kwargs)
                 os.chdir(cwd)
 
 

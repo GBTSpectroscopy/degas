@@ -5,9 +5,48 @@ import warnings
 from astropy.time import Time
 import pkg_resources
 import numpy as np
+from distutils.version import LooseVersion
 
 from . import catalogs
 from . import arguspipe
+
+def reduceAll(release='QA0',
+              update=False,
+              overwrite=True,
+              outputDir='/lustre/pipeline/scratch/DEGAS/',
+              **kwargs):
+
+    version = pkg_resources.get_distribution("degas").version
+    catalogs.updateLogs(release=release)
+    ObjectCatalog = catalogs.loadCatalog()
+    Log = catalogs.parseLog()
+    SessionRows = np.where(['Map' in row['Scan Type'] for row in Log])
+    Log = Log[SessionRows]
+
+    uniqSrc = ObjectCatalog['NAME']
+    if outputDir is None:
+        cwd = os.getcwd()
+    else:
+        cwd = outputDir
+
+    for galaxy in uniqSrc:
+        if galaxy != 'none':
+            try:
+                os.chdir(cwd+'/'+galaxy)
+            except OSError:
+                os.mkdir(cwd+'/'+galaxy)
+                os.chdir(cwd+'/'+galaxy)
+            LogRows = Log['Source'] == galaxy
+            ExtantFiles = glob.glob(galaxy+'*')
+            # TODO Fill in overwrite functionality and version checking
+            if np.any(LogRows):
+                wrapper(galaxy=galaxy, overwrite = overwrite,
+                        release=release, obslog = Log[LogRows],
+                        startdate=Log[LogRows][0]['Date (UT)'],
+                        enddate=Log[LogRows][-1]['Date (UT)'],
+                        project=Log[LogRows][-1]['Project'],
+                        **kwargs)
+                os.chdir(cwd)
 
 
 def reduceSession(session=1, overwrite=False, release = 'QA2', 
@@ -187,8 +226,9 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         except:
             warnings.warn('Unable to make output directory '+OutputDirectory)
             raise
-    suffixname='_sess{0}_v{1}'.format(SessionNumber,
-                                      pkg_resources.get_distribution("degas").version)
+    suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
+                                          pkg_resources.get_distribution("degas").version,
+                                          Project)
     arguspipe.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                        start=StartScan,
                        stop=EndScan,

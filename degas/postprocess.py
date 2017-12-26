@@ -9,7 +9,7 @@ import numpy as np
 from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
 from astropy.io import fits
-
+from radio_beam import Beam
 def edgetrim(cube, wtsFile=None, weightCut=None):
     """
     This trims off the edges of the cubes based on where the weights
@@ -37,10 +37,11 @@ def edgetrim(cube, wtsFile=None, weightCut=None):
 def cleansplit(filename, galaxy=None,
                Vwindow = 650 * u.km / u.s,
                Vgalaxy = 300 * u.km / u.s,
-               blorder=3, HanningLoops=2,
+               blorder=3, HanningLoops=0,
                edgeMask=True,
                weightCut=None,
-               spectralSetup=None):
+               spectralSetup=None,
+               spatialSmooth=1.0):
     """
     Takes a raw DEGAS cube and produces individual cubes for each
     spectral line.
@@ -66,6 +67,8 @@ def cleansplit(filename, galaxy=None,
         Determine whether to apply an edgeMask
     weightCut : float
         Minimum weight value to include in the data
+    spatialSmooth : float
+        Factor to increase the (linear) beam size by in a convolution.
     spectralSetup : str
         String to determine how we set up the spectrum
         'hcn_hcop' -- split based on HCN/HCO+ setup
@@ -95,7 +98,7 @@ def cleansplit(filename, galaxy=None,
         MatchRow = Catalog[match]
         Galaxy = MatchRow['NAME'].data[0]
         print "Catalog Match with " + Galaxy
-    V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
+        V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
 
     # Check spectral setups.  Use the max frequencies present to
     # determine which spectral setup we used if not specifed.
@@ -112,7 +115,7 @@ def cleansplit(filename, galaxy=None,
             warnings.warn("assuming 12CO spectral setup")
             spectralSetup = '12CO'
 
-    if spectralSetup is '13CO_c18O': 
+    if spectralSetup is '13CO_C18O': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
                                              velocity_convention='radio',
                                              rest_value=109.78217 * u.GHz)
@@ -164,10 +167,19 @@ def cleansplit(filename, galaxy=None,
         for i in range(HanningLoops):
             ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
+            
+        # Spatial Smooth
+        if spatialSmooth > 1.0:
+            newBeam = Beam(major=ThisCube.beam.major * spatialSmooth,
+                           minor=ThisCube.beam.minor * spatialSmooth)
+            ThisCube.convolve_to(newBeam)
+            smoothstr = '_smooth{0}'.format(spatialSmooth)
+        else:
+            smoothstr = ''
 
         # Final Writeout
         ThisCube.write(Galaxy + '_' + ThisLine +
-                       '_rebase{0}'.format(blorder) +
-                       '_smooth{0}.fits'.format(HanningLoops),
+                       '_rebase{0}'.format(blorder) + smoothstr +
+                       '_hanning{0}.fits'.format(HanningLoops),
                        overwrite=True)
 

@@ -70,7 +70,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                          flagRipple=True, pixPerBeam=4.0,
                          plotsubdir='timeseries',
                          outname=filename)
-        postprocess.cleansplit(filename, galaxy=galaxy,
+        postprocess.cleansplit(filename + '.fits', galaxy=galaxy,
                                spectralSetup=setup)
         
 

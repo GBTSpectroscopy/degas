@@ -15,7 +15,23 @@ def reduceAll(release='QA0',
               overwrite=False,
               outputDir='/lustre/pipeline/scratch/DEGAS/',
               **kwargs):
+    """
+    This pulls logs and tries to reduce everything that's not already
+    on disk
 
+    Keywords:
+
+    release : str
+        Selects which data files to consider for batch reduction.
+    
+    update : bool 
+        Overwrite only if the current pipeline version is larger than
+        the version with which the file was generated.
+
+    overwrite: bool
+        Overwrite no matter what
+        
+    """
     currentVersion = pkg_resources.get_distribution("degas").version
     catalogs.updateLogs(release=release)
     ObjectCatalog = catalogs.loadCatalog()
@@ -65,8 +81,15 @@ def reduceAll(release='QA0',
                                 matchdata[idx] = True
                     # Assume we need all 16 files to be there for this
                     # to work
-                    filesIntact = (matchdata.sum() == 16)
-                if overwrite or not filesIntact:
+                    filesIntact = (matchdata.sum() >= 16)
+                # Kill off files that are going to be overwritten
+                if overwrite and filesIntact:
+                    gottaGo = ExtantFiles[matchdata]
+                    for thisfile in gottaGo:
+                        os.remove(thisfile)
+
+                # Actually do the calibration
+                if (overwrite) or (not filesIntact):
                     wrapper(galaxy=galaxy, overwrite = overwrite,
                             release=release, obslog = [row],
                             startdate=row['Date (UT)'],
@@ -81,7 +104,7 @@ def reduceAll(release='QA0',
             #             enddate=Log[LogRows][-1]['Date (UT)'],
             #             project=Log[LogRows][-1]['Project'],
             #             **kwargs)
-                os.chdir(cwd)
+            os.chdir(cwd)
 
 
 def reduceSession(session=1, overwrite=False, release = 'QA2', 

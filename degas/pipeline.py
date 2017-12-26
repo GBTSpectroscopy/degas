@@ -254,15 +254,15 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
     if RawDataDir is None:
-        RawDataDir = '/home/sdfits/'
-        # RawDataDir = '/lustre/pipeline/scratch/DEGAS/rawdata/'
+        # RawDataDir = '/home/sdfits/'
+        RawDataDir = '/lustre/pipeline/scratch/DEGAS/rawdata/'
     if Gains is None:
         Gains = '1,'*16
         Gains = Gains[0:-1]
     SessionDir = 'AGBT' + Project.replace('-','_') + '_' + str(SessionNumber).zfill(2) 
     SessionSubDir = SessionDir + '.raw.vegas/'
     print('Reducing '+SessionDir)
-                  
+    
     # Set default pipeline options as a dictionary
     if OutputRoot is None:
         OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
@@ -287,6 +287,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
                                           pkg_resources.get_distribution("degas").version,
                                           Project)
+    import pdb; pdb.set_trace()
     arguspipe.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                        start=StartScan,
                        stop=EndScan,

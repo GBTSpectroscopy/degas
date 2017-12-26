@@ -12,11 +12,11 @@ from . import arguspipe
 
 def reduceAll(release='QA0',
               update=False,
-              overwrite=True,
+              overwrite=False,
               outputDir='/lustre/pipeline/scratch/DEGAS/',
               **kwargs):
 
-    version = pkg_resources.get_distribution("degas").version
+    currentVersion = pkg_resources.get_distribution("degas").version
     catalogs.updateLogs(release=release)
     ObjectCatalog = catalogs.loadCatalog()
     Log = catalogs.parseLog()
@@ -28,8 +28,8 @@ def reduceAll(release='QA0',
         cwd = os.getcwd()
     else:
         cwd = outputDir
-
-    for galaxy in uniqSrc:
+    # TODO: Take out the [::-1]; just there for debug
+    for galaxy in uniqSrc[::-1]:
         if galaxy != 'none':
             try:
                 os.chdir(cwd+'/'+galaxy)
@@ -37,15 +37,42 @@ def reduceAll(release='QA0',
                 os.mkdir(cwd+'/'+galaxy)
                 os.chdir(cwd+'/'+galaxy)
             LogRows = Log['Source'] == galaxy
-            ExtantFiles = glob.glob(galaxy+'*')
             # TODO Fill in overwrite functionality and version checking
             for row in Log[LogRows]:
-                wrapper(galaxy=galaxy, overwrite = overwrite,
-                        release=release, obslog = row,
-                        startdate=row['Date (UT)'],
-                        enddate=row['Date (UT)'],
-                        project=row['Project'],
-                        **kwargs)
+                filesIntact = False # Assume files aren't there
+                setup = row['Setup'].replace('/','_')
+                querystring = (setup + '/'
+                               + '*' + row['Project']
+                               + '*' 
+                               + 'sess{0}'.format(row['Astrid Session'])
+                               + '*fits')
+                # Then look for the files
+                ExtantFiles = glob.glob(querystring)
+                if ExtantFiles:
+                    matchdata = np.zeros_like(ExtantFiles, dtype='bool')
+                    for idx, thisfile in enumerate(ExtantFiles):
+                        pieces = thisfile.split('_')
+                        dataStart = int(pieces[3])
+                        dataEnd = int(pieces[4])
+                        feed = int(pieces[6][-1])
+                        version = pieces[-1]
+                        version = LooseVersion(version[0:-5]) # Cut off .fits
+                        if ((dataStart >= row['Start Scan']) and
+                            (dataEnd <= row['End Scan'])):
+                            if not update:
+                                matchdata[idx] = True
+                            if update and version >= currentVersion:
+                                matchdata[idx] = True
+                    # Assume we need all 16 files to be there for this
+                    # to work
+                    filesIntact = (matchdata.sum() == 16)
+                if overwrite or not filesIntact:
+                    wrapper(galaxy=galaxy, overwrite = overwrite,
+                            release=release, obslog = [row],
+                            startdate=row['Date (UT)'],
+                            enddate=row['Date (UT)'],
+                            project=row['Project'],
+                            **kwargs)
                 
             # if np.any(LogRows):
             #     wrapper(galaxy=galaxy, overwrite = overwrite,

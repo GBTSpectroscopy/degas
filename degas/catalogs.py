@@ -7,15 +7,16 @@ import numpy as np
 from astropy.utils.data import get_pkg_data_filename
 
 def updateLogs(output='ObservationLog.csv',release=None):
-    if 'DR1' in release:
-        filename = get_pkg_data_filename('data/ObservationLog_DR1.csv',
-                                         package='degas')
-        command = 'cp '+filename+' ./ObservationLog.csv'
-        return not subprocess.call(command,shell=True)
     if release is None:
         command = "wget --no-check-certificate --output-document="+output+" 'https://docs.google.com/spreadsheet/ccc?key=1wFgxwpDHuYsb7ISWUyBg1xGO6SraRwCIlm1u_fHlrPs&output=csv'"
         # The returns from subprocess are the error codes from the OS
         # If 0 then it worked so we should return True
+        return not subprocess.call(command,shell=True)
+
+    if 'DR1' in release:
+        filename = get_pkg_data_filename('data/ObservationLog_DR1.csv',
+                                         package='degas')
+        command = 'cp '+filename+' ./ObservationLog.csv'
         return not subprocess.call(command,shell=True)
 
 def loadCatalog(release=None):

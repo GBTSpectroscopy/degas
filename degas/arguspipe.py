@@ -74,25 +74,29 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     vec1 = integ1.data['DATA']
     vec2 = integ2.data['DATA']
 
-    if 'Vane' in integ1.data['CALPOSITION'][0] and\
-            'Observing' in integ2.data['CALPOSITION'][0]:
+    if ((('Vane' in integ1.data['CALPOSITION'][0]) and
+         ('Observing' in integ2.data['CALPOSITION'][0])) or 
+        (('VANE' in integ1.data['OBJECT'][0]) and 
+         ('SKY' in integ2.data['OBJECT'][0]))):
         # Directly do an on-off on the full data set
         onoff = np.median((vec1-vec2)/vec2)
         # Mean over time to get a vector of vaneCounts at each freq.
         vaneCounts = np.mean(vec1, axis=0)
 
     # Now test case where Vane data were second position
-    elif 'Vane' in integ2.data['CALPOSITION'][0] and\
-            'Observing' in integ1.data['CALPOSITION'][0]:
+    elif ((('Vane' in integ2.data['CALPOSITION'][0]) and
+           ('Observing' in integ1.data['CALPOSITION'][0])) or 
+          (('VANE' in integ2.data['OBJECT'][0]) and 
+           ('SKY' in integ1.data['OBJECT'][0]))):
         onoff = np.median((vec2-vec1)/vec1)
         vaneCounts = np.mean(vec2, axis=0)
     else:
         # If you are here, then you will not get data today
         warnings.warn("No Vane scans found in putative reference scans.")
         warnings.warn("Making a wild guess that's probably wrong...")
-        onoff = np.median((vec1-vec2)/vec2)
-        vaneCounts = np.mean(vec1, axis=0)
-        import pdb; pdb.set_trace()
+        onoff = np.nanmedian((vec1-vec2)/vec2)
+        vaneCounts = np.nanmean(vec1, axis=0)
+        # import pdb; pdb.set_trace()
 
     timestamps = integ1.data['DATE-OBS']
     mjd = np.mean(np.array([pipe.pu.dateToMjd(stamp)

@@ -68,9 +68,12 @@ def reduceAll(release='QA0',
                     matchdata = np.zeros_like(ExtantFiles, dtype='bool')
                     for idx, thisfile in enumerate(ExtantFiles):
                         pieces = thisfile.split('_')
-                        dataStart = int(pieces[3])
-                        dataEnd = int(pieces[4])
-                        feed = int(pieces[6][-1])
+                        for place, piece in enumerate(pieces):
+                            if piece == 'scan':
+                                startplace = place
+                        dataStart = int(pieces[startplace + 1])
+                        dataEnd = int(pieces[startplace + 2])
+                        feed = int(pieces[startplace + 4][-1])
                         version = pieces[-1]
                         version = LooseVersion(version[0:-5]) # Cut off .fits
                         if ((dataStart >= row['Start Scan']) and
@@ -287,7 +290,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
                                           pkg_resources.get_distribution("degas").version,
                                           Project)
-    import pdb; pdb.set_trace()
+
     arguspipe.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                        start=StartScan,
                        stop=EndScan,

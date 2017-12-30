@@ -115,7 +115,7 @@ def cleansplit(filename, galaxy=None,
             warnings.warn("assuming 12CO spectral setup")
             spectralSetup = '12CO'
 
-    if spectralSetup is '13CO_C18O': 
+    if spectralSetup == '13CO_C18O': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
                                              velocity_convention='radio',
                                              rest_value=109.78217 * u.GHz)
@@ -125,7 +125,7 @@ def cleansplit(filename, galaxy=None,
         CubeList = (CEighteenO, ThirteenCO)
         LineList = ('C18O','13CO')
 
-    elif spectralSetup is 'HCN_HCO+':
+    elif spectralSetup == 'HCN_HCO+':
         HCN = Cube.with_spectral_unit(u.km / u.s,
                                       velocity_convention='radio',
                                       rest_value=88.631847 * u.GHz)
@@ -135,12 +135,12 @@ def cleansplit(filename, galaxy=None,
         CubeList = (HCN, HCOp)
         LineList = ('HCN','HCOp')
 
-    elif spectralSetup is '12CO':
-        TwelveCO = Cube.with_spectralCube(u.km / u.s,
-                                      velocity_convention='radio',
-                                      rest_value=115.27120180 * u.GHz)
-        CubeList = (TwelveCO)
-        LineList = ('12CO')
+    elif spectralSetup == '12CO':
+        TwelveCO = Cube.with_spectral_unit(u.km / u.s,
+                                           velocity_convention='radio',
+                                           rest_value=115.27120180 * u.GHz)
+        CubeList = (TwelveCO,)
+        LineList = ('12CO',)
 
     for ThisCube, ThisLine in zip(CubeList, LineList):
         if edgeMask:

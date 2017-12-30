@@ -32,6 +32,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
     filelist = glob.glob(datadir + galaxy + '/' +
                          setup + '/*fits')
     OutputDirectory = datadir + galaxy + '/images/'
+
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
@@ -52,8 +53,11 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                          flagRipple=True, pixPerBeam=4.0,
                          plotsubdir='timeseries',
                          outname=filename)
-        postprocess.cleansplit(filename, galaxy=galaxy,
-                               spectralSetup=setup)
+        postprocess.cleansplit(OutputDirectory
+                               + filename + '.fits',
+                               spectralSetup=setup,
+                               HanningLoops=1,
+                               spatialSmooth=1.3)
     else:
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         gbtpipe.griddata(filelist,
@@ -70,8 +74,11 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                          flagRipple=True, pixPerBeam=4.0,
                          plotsubdir='timeseries',
                          outname=filename)
-        postprocess.cleansplit(filename + '.fits', galaxy=galaxy,
-                               spectralSetup=setup)
+        postprocess.cleansplit(OutputDirectory
+                               + filename + '.fits',
+                               spectralSetup=setup,
+                               HanningLoops=1,
+                               spatialSmooth=1.3)
         
 
     

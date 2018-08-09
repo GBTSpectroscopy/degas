@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 from builtins import str
 import gbtpipe
 import numpy as np
@@ -7,6 +7,7 @@ import os
 import fitsio
 import copy
 import warnings
+import sys
 
 # CRUFT - Disregard.
 #/users/rmaddale/bin/getForecastValues -freqList 89 -typeList Opacity -elev 90 -timeList 53441.4
@@ -120,11 +121,11 @@ def gettsys(cl_params, row_list, thisfeed, thispol, thiswin, pipe,
     avgfreq = np.mean(integ1.data['OBSFREQ'])
 
     # Use weather model to get the atmospheric temperature and opacity
-    tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log,
-                                 forcecalc=True)
     zenithtau = weather.retrieve_zenith_opacity(mjd, avgfreq, log=log,
                                                 forcecalc=True,
                                                 request='Opacity')
+    tatm = weather.retrieve_Tatm(mjd, avgfreq, log=log,
+                                 forcecalc=True)
     # This does the airmass calculation
     tau = cal.elevation_adjusted_opacity(zenithtau, elevation)
     tcal = (tatm - tbg) + (twarm - tatm) * np.exp(tau)
@@ -275,8 +276,9 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
 
                     for thisscan in cl_params.mapscans:
                         if verbose:
-                            warnings.warn("Now Processing Scan {0} for Feed {1}".format(
-                                    thisscan, thisfeed))
+                            sys.stdout.flush()
+                            print("Now Processing Scan {0} for Feed {1}".format(
+                                    thisscan, thisfeed), end='\r')
                         rows = row_list.get(thisscan, thisfeed,
                                             thispol, thiswin)
                         ext = rows['EXTENSION']
@@ -300,7 +302,6 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
 
                         # This block actually does the calibration
                         ON = integs.data['DATA']
-
                         if OffType == 'median':
                             # Model the off power as the median counts
                             # across the whole bandpass. This assumes
@@ -312,6 +313,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             OFF.shape += (1,)
                             OFF = OFF * np.ones((1, ON.shape[0]))
                             OFF = OFF.T
+
                         if OffType == 'linefit':
                             # This block fits a line to the ends of
                             # the bandpass as a model for the power.
@@ -350,7 +352,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             # This the off model.
                             OFF = slope.T * xaxis + MeanON
                         medianOFF = np.nanmedian(OFF, axis=0)
-
+                                                
                         # Now construct a scalar factor by taking
                         # median OFF power (over time) and compare to
                         # the mean vaneCounts over time.  Then take
@@ -365,6 +367,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                         medianTA.shape = (1,) + medianTA.shape
                         medianTA = np.ones((ON.shape[1], 1)) * medianTA
                         TAstar = TA - medianTA.T
+
                         for ctr, row in enumerate(rows):
                             # This updates the output SDFITS file with
                             # the newly calibrated data.

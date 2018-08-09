@@ -13,7 +13,7 @@ from . import arguspipe
 def reduceAll(release='QA0',
               update=False,
               overwrite=False,
-              outputDir='/lustre/pipeline/scratch/DEGAS/',
+              outputDir=None,
               **kwargs):
     """
     This pulls logs and tries to reduce everything that's not already

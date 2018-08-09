@@ -10,6 +10,7 @@ from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
 from astropy.io import fits
 from radio_beam import Beam
+
 def edgetrim(cube, wtsFile=None, weightCut=None):
     """
     This trims off the edges of the cubes based on where the weights
@@ -22,7 +23,7 @@ def edgetrim(cube, wtsFile=None, weightCut=None):
         mask = wtvals > weightCut
     else:
         mask = wtvals > wtvals.max() / 5 # 5 is ad hoc
-        radius = 5
+        radius = 11
         elt = np.zeros((2*radius + 1, 2*radius+1))
         xx, yy = np.indices(elt.shape)
         # create a disk structuring element

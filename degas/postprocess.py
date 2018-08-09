@@ -98,7 +98,7 @@ def cleansplit(filename, galaxy=None,
                 match[index] = True
         MatchRow = Catalog[match]
         Galaxy = MatchRow['NAME'].data[0]
-        print "Catalog Match with " + Galaxy
+        print("Catalog Match with " + Galaxy)
         V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
 
     # Check spectral setups.  Use the max frequencies present to

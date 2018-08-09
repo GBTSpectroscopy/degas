@@ -41,7 +41,7 @@ def parseLog(logfile='ObservationLog.csv'):
     t = t[idx]
 
     # Convert from Google Booleans to Python Booleans
-    for drkey in ['QA2','DR1','QA1','QA0']:
+    for drkey in ['QA1','QA0']:
         t[drkey] = t[drkey].data.data=='TRUE'
 
     return(t)

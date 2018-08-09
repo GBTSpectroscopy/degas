@@ -87,7 +87,7 @@ def reduceAll(release='QA0',
                     filesIntact = (matchdata.sum() >= 16)
                 # Kill off files that are going to be overwritten
                 if overwrite and filesIntact:
-                    gottaGo = ExtantFiles[matchdata]
+                    gottaGo = np.array(ExtantFiles)[matchdata]
                     for thisfile in gottaGo:
                         os.remove(thisfile)
 
@@ -219,7 +219,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                 endscan = observation['End Scan']
             if Nscans - observation['Nrows'] < 2:
                 warnings.warn("Number of scans = Number of Mapped Rows: no VaneCal")
-                raise
+                raise Exception
             
 
             # TODO: Beam gains?

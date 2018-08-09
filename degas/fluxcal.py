@@ -129,7 +129,7 @@ scanDateStr = scanDate.strftime("%d-%B-%Y")
 table = fluxservice(frequency=str(avgfreq), sourcename="J"+srcName, date=scanDateStr)
 
 Snu = float(table['fluxdensity'])
-print "Snu=",Snu
+print("Snu=",Snu)
 #---
 
 # Calculating the efficiencies
@@ -143,7 +143,7 @@ d = 100e2 #m
 
 # Since it's Ta* that comes out of the above equations, I think I can drop the np.exp(tau) factor.
 eta_a = 0.352 * g.amplitude_0 / Snu
-print 'eta_a', eta_a
+print('eta_a', eta_a)
 
 avgwave = (avgfreq * u.Hz).to(u.cm,equivalencies=u.spectral())
 
@@ -152,4 +152,4 @@ avgwave = (avgfreq * u.Hz).to(u.cm,equivalencies=u.spectral())
 fwhm = 2.0 * sqrt(2.0*math.log(2.0))*g.stddev_0 /60.0 # degrees
 
 eta_mb = (0.8899 * (math.radians(fwhm))**2 * d**2 / avgwave.value**2) * eta_a
-print 'eta_mb', eta_mb
+print('eta_mb', eta_mb)

@@ -110,7 +110,7 @@ def reduceAll(release='QA0',
             os.chdir(cwd)
 
 
-def reduceSession(session=1, overwrite=False, release = 'QA2', 
+def reduceSession(session=1, overwrite=False, release = 'QA0', 
                   project='17B-151',
                   outputDir='/lustre/pipeline/scratch/DEGAS/',
                   **kwargs):
@@ -257,8 +257,10 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
     if RawDataDir is None:
-        # RawDataDir = '/home/sdfits/'
-        RawDataDir = '/lustre/pipeline/scratch/DEGAS/rawdata/'
+        try:
+            RawDataDir = os.environ["DEGASDIR"]+'/rawdata/'
+        except KeyError:
+            RawDataDir = '/lustre/pipeline/scratch/DEGAS/rawdata/'
     if Gains is None:
         Gains = '1,'*16
         Gains = Gains[0:-1]
@@ -268,7 +270,11 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     
     # Set default pipeline options as a dictionary
     if OutputRoot is None:
-        OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
+        try:
+            OutputRoot = os.environ["DEGASDIR"]
+        except KeyError:
+            OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
+
     # Try to make the output directory
     OutputDirectory = OutputRoot + Galaxy + '/' + Setup.replace('/','_')
 
@@ -302,7 +308,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     # Clean up permissions
     fl = glob.glob(OutputDirectory + '/*fits')
     for thisfile in fl:
-        os.chmod(thisfile,0664)
+        os.chmod(thisfile,0o664)
 
 
     

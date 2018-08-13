@@ -31,19 +31,23 @@ You can organize this however you want. A suggested structure might be a main de
 
 ### DEGAS Data tree
 
-Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this.
+Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. 
 
 ```
 rsync -ahv --bwlimit=8000 /lustre/pipeline/scratch/DEGAS/rawdata username@machine:/path/to/destination/DEGAS/.
 ```
 
+_Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this._
+
 ### Weather Database
 
-Copy over the GBT weather database to your machine.  It is located at `/users/rmaddale/Weather/ArchiveCoeffs/` on the GB machines.  You only need the files that start with `Coeffs`.  Make a directory on your local machine.  Let's call it `/home/username/GBTWeather/` in this example
+Copy over the GBT weather database to your machine.  It is located at `/users/rmaddale/Weather/ArchiveCoeffs/` on the GB machines.  You only need the files that start with `Coeffs`.  Make a directory on your local machine.  Let's call it `/home/username/GBTWeather/` in this example.
 
 ```
 rsync -ahv --bwlimit=8000 /users/rmaddale/Weather/ArchiveCoeffs/Coeffs* username@machine:/home/username/GBTWeather
 ```
+
+_Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this._
 
 ### Install and configure the DEGAS repository
 

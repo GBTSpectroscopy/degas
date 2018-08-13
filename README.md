@@ -27,6 +27,8 @@ You can run the DEGAS calibration pipeline on your own computer instead of GB. Y
 * The GBT Weather database
 * A local copy of this repository
 
+You can organize this however you want. A suggested structure might be a main degas directory with the DEGAS rawdata, GBT Weather database, and code underneath it.
+
 ### DEGAS Data tree
 
 Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre.

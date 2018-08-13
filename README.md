@@ -29,6 +29,8 @@ You can run the DEGAS calibration pipeline on your own computer instead of GB. Y
 
 You can organize this however you want. A suggested structure might be a main degas directory with the DEGAS rawdata, GBT Weather database, and code underneath it.
 
+_Note: if you are copying between NRAO sites, be careful! The bwlimit given below is greater than the bandwidth of the internal links. Contact Amanda before trying to do this._
+
 ### DEGAS Data tree
 
 Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. 
@@ -37,7 +39,6 @@ Copy over the DEGAS data tree to your local computer.  In practice, this is easi
 rsync -ahv --bwlimit=8000 /lustre/pipeline/scratch/DEGAS/rawdata username@machine:/path/to/destination/DEGAS/.
 ```
 
-_Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this._
 
 ### Weather Database
 
@@ -47,7 +48,7 @@ Copy over the GBT weather database to your machine.  It is located at `/users/rm
 rsync -ahv --bwlimit=8000 /users/rmaddale/Weather/ArchiveCoeffs/Coeffs* username@machine:/home/username/GBTWeather
 ```
 
-_Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this._
+
 
 ### Install and configure the DEGAS repository
 

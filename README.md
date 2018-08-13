@@ -47,7 +47,7 @@ rsync -ahv --bwlimit=8000 /users/rmaddale/Weather/ArchiveCoeffs/Coeffs* username
 
 1. Clone this repository and install it locally by running
 `python setup.py install`
-from inside the `degas` directory.
+from inside the `degas` directory. Bonus hint: to get command, click on the green button in the top right hand side of the page that says "clone or download". Type "git clone" on the command line and copy and paste the location displayed when you click the green button to the command line.
 
 2. Set environment variables that point to the DEGAS data and the GBT Weather.  The variable DEGASDIR should be pointed to the parent directory containing the raw file.  The variable GBTWEATHER points to the GBT Weather archive.
 

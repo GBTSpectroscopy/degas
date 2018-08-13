@@ -31,7 +31,7 @@ You can organize this however you want. A suggested structure might be a main de
 
 ### DEGAS Data tree
 
-Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre.
+Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. Note: if you are copying between NRAO sites, be careful! The bwlimit here is greater than the bandwidth of the internal links. Contact Amanda before trying to do this.
 
 ```
 rsync -ahv --bwlimit=8000 /lustre/pipeline/scratch/DEGAS/rawdata username@machine:/path/to/destination/DEGAS/.

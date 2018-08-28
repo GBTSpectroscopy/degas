@@ -22,7 +22,7 @@ The pipeline creates a set of calibrated FITS files which can then be gridded in
 
 ## Local Installation of the DEGAS pipeline
 
-You can run the DEGAS calibration pipeline on your own computer instead of GB. You will need:
+You can run the DEGAS calibration pipeline on your own computer instead of on a GB computer. You will need:
 * The DEGAS data tree
 * The GBT Weather database
 * A local copy of this repository
@@ -33,7 +33,7 @@ _Note: if you are copying between NRAO sites, be careful! The bwlimit given belo
 
 ### DEGAS Data tree
 
-Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. 
+Copy over the DEGAS data tree to your local computer.  In practice, this is easiest by doing a push from the GB machines to your computer using `rsync`.  Specifically, you need to grab the `rawdata` directory from our space on lustre. If you can't see lustre, make sure you are on one of the computers connected to lustre (list here: http://www.gb.nrao.edu/pubcomputing/public.shtml. You generally want the ones at the bottom (newton, planck, etc)).
 
 ```
 rsync -ahv --bwlimit=8000 /lustre/pipeline/scratch/DEGAS/rawdata username@machine:/path/to/destination/DEGAS/.
@@ -42,12 +42,13 @@ rsync -ahv --bwlimit=8000 /lustre/pipeline/scratch/DEGAS/rawdata username@machin
 
 ### Weather Database
 
-Copy over the GBT weather database to your machine.  It is located at `/users/rmaddale/Weather/ArchiveCoeffs/` on the GB machines.  You only need the files that start with `Coeffs`.  Make a directory on your local machine.  Let's call it `/home/username/GBTWeather/` in this example.
+Copy over the GBT weather database to your machine.  It is located at `/users/rmaddale/Weather/ArchiveCoeffs/` on the GB machines.  You only need the files that start with `Coeffs`.  Make a directory on your local machine.  Let's call it `/home/username/GBTWeather/` in this example. 
 
 ```
 rsync -ahv --bwlimit=8000 /users/rmaddale/Weather/ArchiveCoeffs/Coeffs* username@machine:/home/username/GBTWeather
 ```
 
+Again, if you can't see lustre, make sure you are on one of the computers connected to lustre (list here: http://www.gb.nrao.edu/pubcomputing/public.shtml. You generally want the ones at the bottom (newton, planck, etc)).
 
 
 ### Install and configure the DEGAS repository

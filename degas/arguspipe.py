@@ -277,7 +277,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                     for thisscan in cl_params.mapscans:
                         if verbose:
                             sys.stdout.flush()
-                            print("Now Processing Scan {0} for Feed {1}".format(
+                            print("Now Processing Scan {0:4f} for Feed {1:3f}".format(
                                     thisscan, thisfeed), end='\r')
                         rows = row_list.get(thisscan, thisfeed,
                                             thispol, thiswin)

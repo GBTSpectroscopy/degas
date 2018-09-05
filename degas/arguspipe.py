@@ -277,8 +277,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                     for thisscan in cl_params.mapscans:
                         if verbose:
                             sys.stdout.flush()
-                            print("Amanda made changes")
-                            print("Now Processing Scan {0:4f} for Feed {1:3f}".format(
+                            print("Now Processing Scan {0:3d} for Feed {1:2d}".format(
                                     thisscan, thisfeed), end='\r')
                         rows = row_list.get(thisscan, thisfeed,
                                             thispol, thiswin)
@@ -379,4 +378,5 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             row.data['TUNIT7'] = 'Ta*'
                             pipe.outfile[-1].append(row.data)
                     pipe.outfile.close()
+
     return True

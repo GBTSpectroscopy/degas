@@ -6,7 +6,7 @@ The package expects an Anaconda-like user-based python environment which you can
 
 Install the `degas` package:
 ```
-pip install https://github.com/low-sky/degas/archive/master.zip
+pip install https://github.com/GBTspectroscopy/degas/archive/master.zip
 ```
 
 

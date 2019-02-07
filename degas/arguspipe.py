@@ -9,14 +9,9 @@ import copy
 import warnings
 import sys
 
-# CRUFT - Disregard.
-#/users/rmaddale/bin/getForecastValues -freqList 89 -typeList Opacity -elev 90 -timeList 53441.4
-# tau = w.retrieve_zenith_opacity(53441.4,88e9,log=log)
-# print tau
-# tau = w.retrieve_zenith_opacity(53441.4,89e9,log=log,forcecalc=True)
-# print tau
-# cl_params.mapscans = list(np.linspace(113,136,136-113+1).astype('int'))
-# cl_params.refscans = [111,]
+#####
+# DEPRECATED -- Use gbtpipe.ArgusCal
+######
 
 
 def makelogdir():
@@ -273,7 +268,9 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                     log.doMessage('INFO', 'Feed: {0}, Tsys (K): {1}'.format(
                             thisfeed,
                             tsysStar))
-
+                    print('INFO', 'Feed: {0}, Tsys (K): {1}'.format(
+                            thisfeed,
+                            tsysStar))
                     for thisscan in cl_params.mapscans:
                         if verbose:
                             sys.stdout.flush()

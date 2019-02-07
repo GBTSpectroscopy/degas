@@ -8,7 +8,13 @@ import numpy as np
 from distutils.version import LooseVersion
 
 from . import catalogs
-from . import arguspipe
+from gbtpipe import ArgusCal
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+
+# Needed for spatial mask based offs
+import astropy.io.fits as fits
+import astropy.wcs as wcs
 
 def reduceAll(release='QA0',
               update=False,
@@ -251,7 +257,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                OptionDict = None,
                RawDataDir = None,
                Gains=None,
-               OffType='median',
+               OffType='linefit',
                OutputRoot = None, overwrite=False, **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
@@ -296,15 +302,28 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
                                           pkg_resources.get_distribution("degas").version,
                                           Project)
+    ObjectCatalog = catalogs.loadCatalog()
+    ThisGalaxy = ObjectCatalog[ObjectCatalog['NAME'] == Galaxy]
 
-    arguspipe.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
-                       start=StartScan,
-                       stop=EndScan,
-                       refscans=RefScans,
-                       outdir=OutputDirectory,
-                       OffType=OffType,
-                       suffix=suffixname)
-                                       
+    galaxy_center = SkyCoord(ThisGalaxy['RA'], ThisGalaxy['DEC'],
+                             unit=(u.hour, u.deg), frame='fk5')
+
+    #### Spatial Masking 
+    # hdulist = fits.open(Galaxy + '_mask.fits')
+    # w = wcs.WCS(hdulist[0].header)
+    # mask = ~(hdulist[0].data).astype(np.bool)
+    
+    ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
+                      start=StartScan,
+                      stop=EndScan,
+                      refscans=RefScans,
+                      outdir=OutputDirectory,
+                      OffSelector=ArgusCal.ZoneOfAvoidance,
+                      OffType=OffType,
+                      suffix=suffixname,
+                      center=galaxy_center,
+                      radius=1 * u.arcmin)
+    
     # Clean up permissions
     fl = glob.glob(OutputDirectory + '/*fits')
     for thisfile in fl:

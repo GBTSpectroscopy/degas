@@ -10,6 +10,7 @@ from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
 from astropy.io import fits
 from radio_beam import Beam
+import warnings
 
 def edgetrim(cube, wtsFile=None, weightCut=None):
     """

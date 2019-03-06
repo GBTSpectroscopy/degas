@@ -242,6 +242,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                 doPipeline(SessionNumber=observation['Astrid Session'],
                            StartScan=observation['Start Scan'],
                            EndScan=observation['End Scan'],
+                           BadScans=observation['Bad Scans'],
                            RefScans=refscans,
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
@@ -254,6 +255,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                Galaxy='NGC2903', Window='0',
                Project='17B-151',
                Setup='HCN/HCO+',
+               BadScans=None,
                OptionDict = None,
                RawDataDir = None,
                Gains=None,
@@ -310,13 +312,18 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
 
     #### Spatial Masking 
     # hdulist = fits.open(Galaxy + '_mask.fits')
-    # w = wcs.WCS(hdulist[0].header)
+    # w = wcs.WCS(hdulist[0].header)s
     # mask = ~(hdulist[0].data).astype(np.bool)
-    
+
+    if BadScans:
+        BadScanArray = np.array(BadScans.data.data[0].split(','),dtype=np.int)
+    else:
+        BadScanArray = []
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,
                       refscans=RefScans,
+                      badscans=BadScanArray,
                       outdir=OutputDirectory,
                       OffSelector=ArgusCal.ZoneOfAvoidance,
                       OffType=OffType,

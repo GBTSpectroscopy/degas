@@ -23,6 +23,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                datadir='/lustre/pipeline/scratch/DEGAS/',
                overwrite=True, release='QA1', edgetrim = 100,
                basebuff = 64, plotTimeSeries=True, PostprocOnly=False,
+               scanblorder=1, posblorder=3,
                **kwargs):
 
     pipeversion = pkg_resources.get_distribution("degas").version
@@ -40,6 +41,8 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
             os.chdir(OutputDirectory)
         except OSError:
             raise
+    else:
+        os.chdir(OutputDirectory)
     if '12CO' in setup:
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
@@ -55,8 +58,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                              flagRipple=True, pixPerBeam=4.0,
                              plotsubdir='timeseries',
                              outname=filename, **kwargs)
-        postprocess.cleansplit(OutputDirectory
-                               + filename + '.fits',
+        postprocess.cleansplit(filename + '.fits',
                                spectralSetup=setup,
                                HanningLoops=1,
                                spatialSmooth=1.3, **kwargs)
@@ -72,16 +74,14 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                                slice(1024-edgetrim-basebuff,
                                                      1024-basebuff,1)],
                              outdir=OutputDirectory,
-                             blorder=5,
                              flagRMS=True,  plotTimeSeries=plotTimeSeries,
                              flagRipple=True, pixPerBeam=4.0,
+                             blorder=scanblorder,
                              plotsubdir='timeseries',
                              outname=filename, **kwargs)
-
-        postprocess.cleansplit(OutputDirectory
-                               + filename + '.fits',
+        postprocess.cleansplit(filename + '.fits',
                                spectralSetup=setup,
-                               HanningLoops=1,
+                               HanningLoops=1, blorder=posblorder,
                                spatialSmooth=1.3, **kwargs)
         
 

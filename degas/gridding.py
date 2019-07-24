@@ -27,17 +27,18 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
 
     pipeversion = pkg_resources.get_distribution("degas").version
 
+    origDir = os.getcwd()
+
     filelist = glob.glob(os.path.join(datadir,galaxy,setup,"*.fits"))
     OutputDirectory = os.path.join(datadir,galaxy,"images")
-
-    origDir = os.getcwd()
 
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
-            os.chdir(OutputDirectory)
         except OSError:
             raise
+
+    os.chdir(OutputDirectory)
 
     if '12CO' in setup:
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
@@ -83,11 +84,15 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                              plotsubdir='timeseries',
                              outname=filename, **kwargs)
 
+            
         postprocess.cleansplit(os.path.join(OutputDirectory,filename + '.fits'),
                                spectralSetup=setup,
                                HanningLoops=1,
                                spatialSmooth=1.3, **kwargs)
         
 
+
+        
     
     os.chdir(origDir)
+    

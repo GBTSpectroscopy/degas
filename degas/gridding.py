@@ -27,19 +27,19 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
 
     pipeversion = pkg_resources.get_distribution("degas").version
 
+    origDir = os.getcwd()
 
-    # Note that we also use a few channels in the middle.
-
-    filelist = glob.glob(datadir + galaxy + '/' +
-                         setup + '/*fits')
-    OutputDirectory = datadir + galaxy + '/images/'
+    filelist = glob.glob(os.path.join(datadir,galaxy,setup,"*.fits"))
+    OutputDirectory = os.path.join(datadir,galaxy,"images")
 
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
-            os.chdir(OutputDirectory)
         except OSError:
             raise
+
+    os.chdir(OutputDirectory)
+
     if '12CO' in setup:
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
@@ -55,8 +55,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                              flagRipple=True, pixPerBeam=4.0,
                              plotsubdir='timeseries',
                              outname=filename, **kwargs)
-        postprocess.cleansplit(OutputDirectory
-                               + filename + '.fits',
+        postprocess.cleansplit(os.path.join(OutputDirectory,filename + '.fits'),
                                spectralSetup=setup,
                                HanningLoops=1,
                                spatialSmooth=1.3, **kwargs)
@@ -66,23 +65,34 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
             gbtpipe.griddata(filelist,
                              startChannel=edgetrim,
                              endChannel=1024-edgetrim,
-                             baselineRegion = [slice(edgetrim,
-                                                     edgetrim+basebuff,1),
-                                               slice(448,576,1),
-                                               slice(1024-edgetrim-basebuff,
-                                                     1024-basebuff,1)],
+                             # do whole region. May not work for
+                             # strong lines like 12CO.
+                             baselineRegion = [slice(edgetrim,1024-edgetrim,1)],
+                             #baselineRegion = [slice(edgetrim,
+                             #                        edgetrim+basebuff,1),
+                             #                  slice(448,576,1),
+                             #                  slice(1024-edgetrim-basebuff,
+                             #                        1024-edgetrim,1)],
                              outdir=OutputDirectory,
                              blorder=5,
-                             flagRMS=True,  plotTimeSeries=plotTimeSeries,
+                             flagSpike = True,
+                             spikeThresh=3.0,
+                             flagRMS=True,
+                             rippleThresh=2.0,
+                             plotTimeSeries=plotTimeSeries,
                              flagRipple=True, pixPerBeam=4.0,
                              plotsubdir='timeseries',
                              outname=filename, **kwargs)
 
-        postprocess.cleansplit(OutputDirectory
-                               + filename + '.fits',
+            
+        postprocess.cleansplit(os.path.join(OutputDirectory,filename + '.fits'),
                                spectralSetup=setup,
                                HanningLoops=1,
                                spatialSmooth=1.3, **kwargs)
         
 
+
+        
+    
+    os.chdir(origDir)
     

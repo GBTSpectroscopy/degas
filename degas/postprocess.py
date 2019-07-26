@@ -161,7 +161,7 @@ def cleansplit(filename, galaxy=None,
                                     baselineRegion=[slice(0,StartChan,1),
                                                     slice(EndChan,
                                                           ThisCube.shape[0],1)],
-                                    blorder=3)
+                                    blorder=blorder)
         ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
                                      '_rebase{0}'.format(blorder) + '.fits')
         # Smooth

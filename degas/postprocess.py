@@ -177,7 +177,7 @@ def cleansplit(filename, galaxy=None,
                     mask = maskLookup(coords[2].value,
                                       coords[1].value,
                                       spaxis)
-                    spectrum = robustBaseline(spectrum, blorder=maskblorder,
+                    spectrum = robustBaseline(spectrum, blorder=blorder,
                                               baselineIndex=~mask)
                     data[:, y, x] = spectrum
             ThisCube = SpectralCube(data, Cube.wcs, header=Cube.header)
@@ -192,7 +192,7 @@ def cleansplit(filename, galaxy=None,
                                         blorder=blorder)
         ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
                                      '_rebase{0}'.format(blorder) + '.fits')
-        Smooth
+        # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):
             ThisCube.spectral_smooth(Kern)

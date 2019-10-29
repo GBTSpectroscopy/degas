@@ -13,7 +13,20 @@ from radio_beam import Beam
 from gbtpipe.Preprocess import buildMaskLookup
 from gbtpipe.Baseline import robustBaseline
 import warnings
-def edgetrim(cube, wtsFile=None, weightCut=None):
+
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
+    wtvals = np.squeeze(fits.getdata(wtsFile))
+    badmask = ~(wtvals > (weightCut * wtvals.max()))
+    yy, xx = np.indices(wtvals.shape)
+    dist = (yy - y0)**2 + (xx - x0)**2
+    mindist = np.min(dist[badmask])
+    mask = dist < mindist
+    cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
+    cube = cube.with_mask(cubemask)
+    cube = cube.minimal_subcube()
+    return(cube)
+
+def edgetrim(cube, wtsFile, weightCut=None):
     """
     This trims off the edges of the cubes based on where the weights
     are lower than required to get a good signal.
@@ -42,8 +55,9 @@ def cleansplit(filename, galaxy=None,
                Vgalaxy = 300 * u.km / u.s,
                blorder=3, HanningLoops=0,
                maskfile=None,
-               edgeMask=True,
-               weightCut=None,
+               circleMask=True,
+               edgeMask=False,
+               weightCut=0.2,
                spectralSetup=None,
                spatialSmooth=1.0):
     """
@@ -100,6 +114,9 @@ def cleansplit(filename, galaxy=None,
                 galcoord.dec > DecBound[0]):
                 match[index] = True
         MatchRow = Catalog[match]
+        galcoord = SkyCoord(MatchRow['RA'],
+                            MatchRow['DEC'],
+                            unit=(u.hourangle, u.deg))
         Galaxy = MatchRow['NAME'].data[0]
         print("Catalog Match with " + Galaxy)
         V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
@@ -150,9 +167,17 @@ def cleansplit(filename, galaxy=None,
         LineList = ('12CO',)
 
     for ThisCube, ThisLine in zip(CubeList, LineList):
+        if circleMask:
+            x0, y0, _ = ThisCube.wcs.wcs_world2pix(galcoord.ra,
+                                                   galcoord.dec,
+                                                   0, 0)
+            ThisCube = circletrim(ThisCube,
+                                  filename.replace('.fits','_wts.fits'),
+                                  x0, y0,
+                                  weightCut=weightCut)
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
-                                wtsFile = filename.replace('.fits','_wts.fits'),
+                                filename.replace('.fits','_wts.fits'),
                                 weightCut=weightCut)
 
         # Trim each cube to the specified velocity range

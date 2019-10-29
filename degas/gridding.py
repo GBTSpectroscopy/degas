@@ -23,11 +23,14 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                datadir='/lustre/pipeline/scratch/DEGAS/',
                overwrite=True, release='QA1', edgetrim = 100,
                basebuff = 64, plotTimeSeries=True, PostprocOnly=False,
-               scanblorder=1, posblorder=3,
+               scanblorder=11, posblorder=3,
                **kwargs):
 
     pipeversion = pkg_resources.get_distribution("degas").version
 
+    setup_dict = {'13CO_C18O':'13co_c18o',
+                  'HCN_HCO+':'hcn_hcop',
+                  '12CO':'12co'}
 
     # Note that we also use a few channels in the middle.
 
@@ -52,7 +55,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                              outdir=OutputDirectory,
                              flagRMS=True, plotTimeSeries=plotTimeSeries,
                              flagRipple=True, pixPerBeam=4.0,
-                             plotsubdir='timeseries',
+                             plotsubdir='timeseries/',
                              outname=filename, **kwargs)
         postprocess.cleansplit(filename + '.fits',
                                spectralSetup=setup,
@@ -61,18 +64,22 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
     else:
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
+            
             gbtpipe.griddata(filelist,
                              startChannel=edgetrim,
                              endChannel=1024-edgetrim,
                              outdir=OutputDirectory,
-                             flagSpike=True, spikeThresh=4,
+                             flagSpike=True, spikeThresh=3,
                              flagRMS=True,  plotTimeSeries=plotTimeSeries,
                              flagRipple=True, pixPerBeam=4.0,
+                             rmsThresh=1.1,
+                             robust=False,
                              blorder=scanblorder,
-                             plotsubdir='timeseries',
+                             plotsubdir='timeseries/',
                              windowStrategy='cubemask',
-                             blorder=7,
-                             maskfile=galaxy + '_' + setup + '_mask.fits'
+                             maskfile=(datadir + '/masks/' + galaxy
+                                       + '.' + setup_dict[setup]
+                                       + '.mask.fits'),
                              outname=filename, **kwargs)
         postprocess.cleansplit(filename + '.fits',
                                spectralSetup=setup,

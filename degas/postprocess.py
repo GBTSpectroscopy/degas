@@ -10,7 +10,9 @@ from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
 from astropy.io import fits
 from radio_beam import Beam
-
+from gbtpipe.Preprocess import buildMaskLookup
+from gbtpipe.Baseline import robustBaseline
+import warnings
 def edgetrim(cube, wtsFile=None, weightCut=None):
     """
     This trims off the edges of the cubes based on where the weights
@@ -39,6 +41,8 @@ def cleansplit(filename, galaxy=None,
                Vwindow = 650 * u.km / u.s,
                Vgalaxy = 300 * u.km / u.s,
                blorder=3, HanningLoops=0,
+               maskfile=None,
+               maskblorder=11,
                edgeMask=True,
                weightCut=None,
                spectralSetup=None,
@@ -108,14 +112,35 @@ def cleansplit(filename, galaxy=None,
             Cube.spectral_axis.max() < 113 * u.GHz):
             warnings.warn("assuming 13CO/C18O spectral setup")
             spectralSetup = '13CO_C18O'
+            filestr = '13co_c18o'
         if (Cube.spectral_axis.max() > 82 * u.GHz and
             Cube.spectral_axis.max() < 90 * u.GHz):
             warnings.warn("assuming HCN/HCO+ spectral setup")
             spectralSetup = 'HCN_HCO+'
+            filestr = 'hcn_hcop'
         if (Cube.spectral_axis.max() > 113 * u.GHz):
             warnings.warn("assuming 12CO spectral setup")
             spectralSetup = '12CO'
+            filestr = '12co'
 
+    if maskfile is not None:
+        maskLookup = buildMaskLookup(maskfile)
+        shp = Cube.shape
+        spaxis = Cube.spectral_axis.to(u.Hz).value
+        data = Cube.filled_data[:].value
+        for y in np.arange(shp[1]):
+            for x in np.arange(shp[2]):
+                spectrum = data[:, y, x]
+                if np.any(np.isnan(spectrum)):
+                    continue
+                coords = Cube.world[:, y, x]
+                mask = maskLookup(coords[2].value,
+                                  coords[1].value,
+                                  spaxis)
+                spectrum = robustBaseline(spectrum, blorder=maskblorder,
+                                          baselineIndex=~mask)
+                data[:, y, x] = spectrum
+        Cube = SpectralCube(data, Cube.wcs, header=Cube.header)
     if spectralSetup == '13CO_C18O': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
                                              velocity_convention='radio',
@@ -156,13 +181,13 @@ def cleansplit(filename, galaxy=None,
         EndChan = ThisCube.closest_spectral_channel(V0 + Vgalaxy)
 
         # Rebaseline
-        gbtpipe.Baseline.rebaseline(Galaxy + '_' + ThisLine + '.fits',
-                                    baselineRegion=[slice(0,StartChan,1),
-                                                    slice(EndChan,
-                                                          ThisCube.shape[0],1)],
-                                    blorder=blorder)
-        ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
-                                     '_rebase{0}'.format(blorder) + '.fits')
+        # gbtpipe.Baseline.rebaseline(Galaxy + '_' + ThisLine + '.fits',
+        #                             baselineRegion=[slice(0,StartChan,1),
+        #                                             slice(EndChan,
+        #                                                   ThisCube.shape[0],1)],
+        #                             blorder=blorder)
+        # ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
+        #                              '_rebase{0}'.format(blorder) + '.fits')
         # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):

@@ -164,7 +164,9 @@ def cleansplit(filename, galaxy=None,
         if maskfile is not None:
             maskLookup = buildMaskLookup(maskfile)
             shp = ThisCube.shape
-            spaxis = ThisCube.spectral_axis.to(u.Hz).value
+            TmpCube = ThisCube.with_spectral_unit(u.Hz)
+            spaxis = TmpCube.spectral_axis
+            spaxis = spaxis.value
             data = ThisCube.filled_data[:].value
             for y in np.arange(shp[1]):
                 for x in np.arange(shp[2]):

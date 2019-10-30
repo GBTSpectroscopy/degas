@@ -233,6 +233,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                 doPipeline(SessionNumber=observation['Astrid Session'],
                            StartScan=startscan,
                            EndScan=endscan,
+                           BadScans=observation['Bad Scans'],
                            RefScans=refscans,
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
@@ -285,7 +286,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
             OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
 
     # Try to make the output directory
-    OutputDirectory = OutputRoot + Galaxy + '/' + Setup.replace('/','_')
+    OutputDirectory = os.path.join(OutputRoot,Galaxy,Setup.replace('/','_'))
 
     if not os.access(OutputDirectory,os.W_OK):
         try:
@@ -293,7 +294,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
             print('Made directory {0}'.format(OutputDirectory))
         except OSError:
             try:
-                os.mkdir('/'.join((OutputDirectory.split('/'))[0:-1]))
+                os.mkdir('/'.join((OutputDirectory.split('/'))[0:-1])) # there may be a safer what to do this with os.path.split
                 os.mkdir(OutputDirectory)
                 print('Made directory {0}'.format(OutputDirectory))
             except:
@@ -317,7 +318,15 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     # mask = ~(hdulist[0].data).astype(np.bool)
 
     if BadScans:
-        BadScanArray = np.array(BadScans.data.data[0].split(','),dtype=np.int)
+        # issue here is that single value is read as a int, but
+        # multiple values as string. Since we're going to change this,
+        # changing enough to get running.
+        if type(BadScans) is 'str':
+            # the below may or may not work. We'll find out!!!
+            BadScanArray = np.array(BadScans.data.data[0].split(','),dtype=np.int)
+        else:
+            BadScanArray = np.array([BadScans])
+
     else:
         BadScanArray = []
 

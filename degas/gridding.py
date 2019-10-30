@@ -32,16 +32,12 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                   'HCN_HCO+':'hcn_hcop',
                   '12CO':'12co'}
 
-    # Note that we also use a few channels in the middle.
-
-    filelist = glob.glob(datadir + galaxy + '/' +
-                         setup + '/*fits')
-    OutputDirectory = datadir + galaxy + '/images/'
+    filelist = glob.glob(os.path.join(datadir,galaxy,setup,"*.fits"))
+    OutputDirectory = os.path.join(datadir,galaxy,"images")
 
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
-            os.chdir(OutputDirectory)
         except OSError:
             raise
     else:
@@ -88,4 +84,8 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                spatialSmooth=1.3, **kwargs)
         
 
+
+        
+    
+    os.chdir(origDir)
     

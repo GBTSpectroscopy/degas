@@ -10,9 +10,23 @@ from astropy.convolution import Kernel1D
 import scipy.ndimage as nd
 from astropy.io import fits
 from radio_beam import Beam
+from gbtpipe.Preprocess import buildMaskLookup
+from gbtpipe.Baseline import robustBaseline
 import warnings
 
-def edgetrim(cube, wtsFile=None, weightCut=None):
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
+    wtvals = np.squeeze(fits.getdata(wtsFile))
+    badmask = ~(wtvals > (weightCut * wtvals.max()))
+    yy, xx = np.indices(wtvals.shape)
+    dist = (yy - y0)**2 + (xx - x0)**2
+    mindist = np.min(dist[badmask])
+    mask = dist < mindist
+    cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
+    cube = cube.with_mask(cubemask)
+    cube = cube.minimal_subcube()
+    return(cube)
+
+def edgetrim(cube, wtsFile, weightCut=None):
     """
     This trims off the edges of the cubes based on where the weights
     are lower than required to get a good signal.
@@ -40,8 +54,10 @@ def cleansplit(filename, galaxy=None,
                Vwindow = 650 * u.km / u.s,
                Vgalaxy = 300 * u.km / u.s,
                blorder=3, HanningLoops=0,
-               edgeMask=True,
-               weightCut=None,
+               maskfile=None,
+               circleMask=True,
+               edgeMask=False,
+               weightCut=0.2,
                spectralSetup=None,
                spatialSmooth=1.0):
     """
@@ -98,6 +114,9 @@ def cleansplit(filename, galaxy=None,
                 galcoord.dec > DecBound[0]):
                 match[index] = True
         MatchRow = Catalog[match]
+        galcoord = SkyCoord(MatchRow['RA'],
+                            MatchRow['DEC'],
+                            unit=(u.hourangle, u.deg))
         Galaxy = MatchRow['NAME'].data[0]
         print("Catalog Match with " + Galaxy)
         V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
@@ -109,13 +128,16 @@ def cleansplit(filename, galaxy=None,
             Cube.spectral_axis.max() < 113 * u.GHz):
             warnings.warn("assuming 13CO/C18O spectral setup")
             spectralSetup = '13CO_C18O'
+            filestr = '13co_c18o'
         if (Cube.spectral_axis.max() > 82 * u.GHz and
             Cube.spectral_axis.max() < 90 * u.GHz):
             warnings.warn("assuming HCN/HCO+ spectral setup")
             spectralSetup = 'HCN_HCO+'
+            filestr = 'hcn_hcop'
         if (Cube.spectral_axis.max() > 113 * u.GHz):
             warnings.warn("assuming 12CO spectral setup")
             spectralSetup = '12CO'
+            filestr = '12co'
 
     if spectralSetup == '13CO_C18O': 
         CEighteenO = Cube.with_spectral_unit(u.km / u.s,
@@ -145,9 +167,17 @@ def cleansplit(filename, galaxy=None,
         LineList = ('12CO',)
 
     for ThisCube, ThisLine in zip(CubeList, LineList):
+        if circleMask:
+            x0, y0, _ = ThisCube.wcs.wcs_world2pix(galcoord.ra,
+                                                   galcoord.dec,
+                                                   0, 0)
+            ThisCube = circletrim(ThisCube,
+                                  filename.replace('.fits','_wts.fits'),
+                                  x0, y0,
+                                  weightCut=weightCut)
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
-                                wtsFile = filename.replace('.fits','_wts.fits'),
+                                filename.replace('.fits','_wts.fits'),
                                 weightCut=weightCut)
 
         # Trim each cube to the specified velocity range
@@ -156,12 +186,35 @@ def cleansplit(filename, galaxy=None,
         StartChan = ThisCube.closest_spectral_channel(V0 - Vgalaxy)
         EndChan = ThisCube.closest_spectral_channel(V0 + Vgalaxy)
 
-        # Rebaseline
-        gbtpipe.Baseline.rebaseline(Galaxy + '_' + ThisLine + '.fits',
-                                    baselineRegion=[slice(0,StartChan,1),
-                                                    slice(EndChan,
-                                                          ThisCube.shape[0],1)],
-                                    blorder=blorder)
+        if maskfile is not None:
+            maskLookup = buildMaskLookup(maskfile)
+            shp = ThisCube.shape
+            TmpCube = ThisCube.with_spectral_unit(u.Hz)
+            spaxis = TmpCube.spectral_axis
+            spaxis = spaxis.value
+            data = ThisCube.filled_data[:].value
+            for y in np.arange(shp[1]):
+                for x in np.arange(shp[2]):
+                    spectrum = data[:, y, x]
+                    if np.any(np.isnan(spectrum)):
+                        continue
+                    coords = ThisCube.world[:, y, x]
+                    mask = maskLookup(coords[2].value,
+                                      coords[1].value,
+                                      spaxis)
+                    spectrum = robustBaseline(spectrum, blorder=blorder,
+                                              baselineIndex=~mask)
+                    data[:, y, x] = spectrum
+            ThisCube = SpectralCube(data, ThisCube.wcs, header=ThisCube.header)
+            ThisCube.write(Galaxy
+                           + '_' + ThisLine
+                           + '_rebase{0}.fits'.format(blorder), overwrite=True)
+        else:
+            gbtpipe.Baseline.rebaseline(Galaxy + '_' + ThisLine + '.fits',
+                                        baselineRegion=[slice(0,StartChan,1),
+                                                        slice(EndChan,
+                                                              ThisCube.shape[0],1)],
+                                        blorder=blorder)
         ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
                                      '_rebase{0}'.format(blorder) + '.fits')
         # Smooth

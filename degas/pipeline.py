@@ -244,6 +244,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            StartScan=observation['Start Scan'],
                            EndScan=observation['End Scan'],
                            BadScans=observation['Bad Scans'],
+                           BadFeeds=observation['Bad Feeds'],
                            RefScans=refscans,
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
@@ -328,11 +329,18 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
 
     else:
         BadScanArray = []
+
+    if BadFeeds:
+        BadFeedArray = np.array(BadFeeds.data.data[0].split(','),dtype=np.int)
+    else:
+        BadFeedArray = []
+        
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,
                       refscans=RefScans,
                       badscans=BadScanArray,
+                      badfeeds=BadFeedArray,
                       outdir=OutputDirectory,
                       OffSelector=ArgusCal.ZoneOfAvoidance,
                       OffType=OffType,

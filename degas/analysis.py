@@ -28,6 +28,7 @@ def cubemask(filename,low_cut,peak_cut):
         for t in d.trunk:
             #assemble channel masks
             mask[i,:,:] = mask[i,:,:] | t.get_mask()
+            mask[i,:,:] = ndimage.binary_fill_holes(mask[i,:,:]) #fill holes in the mask
   
     
     #create and export mask cube and masked datacube

@@ -205,7 +205,9 @@ def cleansplit(filename, galaxy=None,
                     spectrum = robustBaseline(spectrum, blorder=blorder,
                                               baselineIndex=~mask)
                     data[:, y, x] = spectrum
-            ThisCube = SpectralCube(data, ThisCube.wcs, header=ThisCube.header)
+            ThisCube = SpectralCube(data * ThisCube.unit,
+                                    ThisCube.wcs, header=ThisCube.header,
+                                    meta={'BUNIT':ThisCube.header['BUNIT']})
             ThisCube.write(Galaxy
                            + '_' + ThisLine
                            + '_rebase{0}.fits'.format(blorder), overwrite=True)

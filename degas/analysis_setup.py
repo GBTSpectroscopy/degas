@@ -9,7 +9,6 @@ from astropy import units as u
 from reproject import reproject_interp
 from astropy import wcs
 
-
 def fixBIMA(bimafile):
     '''
     The smoothed BIMA data doesn't have the outer regions
@@ -45,21 +44,37 @@ def fixHeaders(fitsimage):
     things to fix 
     -- 'velo' instead of 'vrad'
     -- empty BUNIT to K
+    -- km/s instead of m/s
     '''
 
+    # Using the astropy.io.fits to modify headers 
+    # since SpectralCube disapproves of modifying headers as far 
+    # as I can tell.
     f = fits.open(fitsimage)
 
-    if f[0].header['CTYPE3'] == 'VELO':
-        # The following might not be right for all data sets. This fixes
-        # BIMA headers
+    # Convert VELOCITY to VRAD for BIMA headers. Adam's version of BIMA is in VRAD.
+    if f[0].header['CTYPE3'] == 'VELOCITY':
         f[0].header['CTYPE3'] = 'VRAD' 
 
-
+    # Add BUNIT to BIMA headers
     if f[0].header['BUNIT'] == '':
-        # Again, check to make sure this is the right assumption
+
         f[0].header['BUNIT'] = 'K'
 
-    f.write_to(fitsimage.replace('.fits','_fixedheader.fits'))
+    # convert BIMA HEADERS to km/s
+    if 'CUNIT3' not in f[0].header:
+        f[0].header['CDELT3'] = (f[0].header['CDELT3']/1000.0)
+        f[0].header['CRVAL3'] = (f[0].header['CRVAL3']/1000.0)
+        f[0].header['CUNIT3'] = 'km/s'
+
+    # add CUNIT to RA and DEC axis for BIMA headers.
+    if 'CUNIT2' not in f[0].header:
+        f[0].header['CUNIT2'] = 'deg'
+
+    if 'CUNIT1' not in f[0].header:
+        f[0].header['CUNIT1'] = 'deg'
+
+    f.writeto(fitsimage.replace('.fits','_fixedheader.fits'),overwrite=True)
 
 def smoothCube(fitsimage,beam=15):
     '''
@@ -78,7 +93,7 @@ def smoothCube(fitsimage,beam=15):
     cube = SpectralCube.read(fitsimage)
     smoothCube = cube.convolve_to(newBeam)
     
-    smoothCube.write(newFits)
+    smoothCube.write(newFits,overwrite=True)
 
 def regridData(baseCubeFits, otherDataFits):
     '''
@@ -111,23 +126,21 @@ def regridData(baseCubeFits, otherDataFits):
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
         
         # interpolate the spatial axes
-        regridCube.reproject(baseCube.header)
-        
-        # write out regridded cube
-        regridCube.write(newFits,overwrite=True)
+        newCube = regridCube.reproject(baseCube.header)
+        newCube.write(newFits,overwrite=True)
 
     elif ndim == 2:
 
         # regrid image
-        regridImage = reproject_interp(otherDataFits,
-                                       output_projection=baseCube.wcs.dropaxis(2),
-                                       shape_out=baseCube.wcs.dropaxis(2).pixel_shape,
-                                       order='nearest-neighbor',
+        newcube = reproject_interp(otherDataFits,
+                                   output_projection=baseCube.wcs.dropaxis(2),
+                                   shape_out=baseCube.wcs.dropaxis(2).pixel_shape, ## Is this right might need to flip 
+                                   order='nearest-neighbor',
                      
-                                       return_footprint=False)
+                                   return_footprint=False)
 
         # write out regridded data
-        fits.writeto(newFits,regridImage,baseCube.wcs.dropaxis(2).to_header(),overwrite=True)
+        fits.writeto(newFits,newcube,baseCube.wcs.dropaxis(2).to_header(),overwrite=True)
         
 
     else:

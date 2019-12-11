@@ -333,7 +333,9 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         BadScanArray = []
 
     if BadFeeds:
-        BadFeedArray = np.array(BadFeeds.data.data[0].split(','),dtype=np.int)
+        ## Here it appears that the single value is read in as int64, not a string.
+        #BadFeedArray = np.array(BadFeeds.data.data[0].split(','),dtype=np.int)
+        BadFeedArray = np.array([BadFeeds])
     else:
         BadFeedArray = []
         

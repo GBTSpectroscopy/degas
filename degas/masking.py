@@ -27,6 +27,7 @@ def cubemask(filename,low_cut,peak_cut):
     from astrodendro import pruning as p
     from matplotlib import pyplot as plt
     from astropy.stats import mad_std
+    from scipy import ndimage
     
     #import datacube and info
     cube = fits.getdata(filename)
@@ -54,11 +55,14 @@ def cubemask(filename,low_cut,peak_cut):
   
     
     #create and export mask cube and masked datacube
+    cubehead['BUNIT'] = ''
     cubemask = fits.PrimaryHDU(mask.astype('short'), cubehead)
     cubemask.writeto(filename.replace('.fits','_mask.fits'),overwrite=True)
-    masked_cube = np.multiply(mask,cube)
-    newcube = fits.PrimaryHDU(masked_cube, cubehead)
-    newcube.writeto(filename.replace('.fits','_masked_data.fits'),overwrite=True)
+
+    # probably don't need to write the masked data
+    #masked_cube = np.multiply(mask,cube)
+    #newcube = fits.PrimaryHDU(masked_cube, cubehead)
+    #newcube.writeto(filename.replace('.fits','_masked_data.fits'),overwrite=True)
 
 
 def buildmasks(filename, nChan=2000, width=2e9):

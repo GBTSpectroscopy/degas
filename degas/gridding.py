@@ -61,29 +61,57 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
             
-            gbtpipe.griddata(filelist,
-                             startChannel=edgetrim,
-                             endChannel=1024-edgetrim,
-                             outdir=OutputDirectory,
-                             flagSpike=True, spikeThresh=3,
-                             flagRMS=True,  plotTimeSeries=plotTimeSeries,
-                             flagRipple=True, rippleThresh=1.2,
-                             pixPerBeam=4.0,
-                             rmsThresh=1.1,
-                             robust=False,
-                             blorder=scanblorder,
-                             plotsubdir='timeseries/',
-                             windowStrategy='cubemask',
-                             maskfile=(datadir + '/masks/' + galaxy
+            maskfile = (datadir + '/masks/' + galaxy
                                        + '.' + setup_dict[setup]
-                                       + '.mask.fits'),
-                             outname=filename, **kwargs)
-        postprocess.cleansplit(filename + '.fits',
-                               spectralSetup=setup,
-                               HanningLoops=1, blorder=posblorder,
-                               spatialSmooth=1.3, **kwargs)
-        
+                                       + '.mask.fits')
 
+            if os.path.exists(maskfile):
+
+                gbtpipe.griddata(filelist,
+                                 startChannel=edgetrim,
+                                 endChannel=1024-edgetrim,
+                                 outdir=OutputDirectory,
+                                 flagSpike=True, spikeThresh=3,
+                                 flagRMS=True,  plotTimeSeries=plotTimeSeries,
+                                 flagRipple=True, rippleThresh=1.2,
+                                 pixPerBeam=4.0,
+                                 rmsThresh=1.1,
+                                 robust=False,
+                                 blorder=scanblorder,
+                                 plotsubdir='timeseries/',
+                                 windowStrategy='cubemask',
+                                 maskfile=maskfile,
+                                 outname=filename, **kwargs)
+                
+                postprocess.cleansplit(filename + '.fits',
+                                       spectralSetup=setup,
+                                       HanningLoops=1, blorder=posblorder,
+                                       spatialSmooth=1.3, 
+                                       maskfile=maskfile,
+                                       **kwargs)
+            else:
+                
+                print("Mask file not found. Proceeding to grid without mask file")
+
+                gbtpipe.griddata(filelist,
+                                 startChannel=edgetrim,
+                                 endChannel=1024-edgetrim,
+                                 outdir=OutputDirectory,
+                                 flagSpike=True, spikeThresh=3,
+                                 flagRMS=True,  plotTimeSeries=plotTimeSeries,
+                                 flagRipple=True, rippleThresh=1.2,
+                                 pixPerBeam=4.0,
+                                 rmsThresh=1.1,
+                                 robust=False,
+                                 blorder=scanblorder,
+                                 plotsubdir='timeseries/',
+                                 outname=filename, **kwargs)
+                
+                postprocess.cleansplit(filename + '.fits',
+                                       spectralSetup=setup,
+                                       HanningLoops=1, blorder=posblorder,
+                                       spatialSmooth=1.3, 
+                                       **kwargs)
 
         
     

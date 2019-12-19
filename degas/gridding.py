@@ -114,6 +114,5 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                        **kwargs)
 
         
-    
-    os.chdir(origDir)
+                
     

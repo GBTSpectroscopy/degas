@@ -321,11 +321,10 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
 
     if BadScans:
         # issue here is that single value is read as a int, but
-        # multiple values as string. Since we're going to change this,
-        # changing enough to get running.
-        if type(BadScans) is 'str':
+        # multiple values as string. 
+        if BadScans.isascii():
             # the below may or may not work. We'll find out!!!
-            BadScanArray = np.array(BadScans.data.data[0].split(','),dtype=np.int)
+            BadScanArray = np.array(BadScans.split(','),dtype=np.int)
         else:
             BadScanArray = np.array([BadScans])
 
@@ -333,12 +332,15 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         BadScanArray = []
 
     if BadFeeds:
-        ## Here it appears that the single value is read in as int64, not a string.
-        #BadFeedArray = np.array(BadFeeds.data.data[0].split(','),dtype=np.int)
-        BadFeedArray = np.array([BadFeeds])
+        # issue here is that single value is read as a int, but
+        # multiple values as string. 
+        if BadFeeds.isascii():
+            BadFeedArray = np.array(BadFeeds.split(','),dtype=np.int)
+        else:           
+            BadFeedArray = np.array([BadFeeds])
     else:
         BadFeedArray = []
-        
+
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,

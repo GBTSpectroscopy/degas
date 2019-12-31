@@ -269,7 +269,8 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                RawDataDir = None,
                Gains=None,
                OffType='linefit',
-               OutputRoot = None, overwrite=False, **kwargs):
+               OutputRoot = None, overwrite=False, 
+               MaskName=None, **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
@@ -342,11 +343,11 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     else:
         BadFeedArray = []
 
-    if os.access(os.environ["DEGASDIR"] 
-                 + '/masks/{0}_mask.fits'.format(Galaxy.upper()), os.R_OK):
+    if MaskName is None:
+        MaskName = os.environ["DEGASDIR"] + '/masks/{0}_mask.fits'.format(Galaxy.upper())
+    if os.access(MaskName, os.R_OK):
         warnings.warn('Using spatial masking to set OFF positions')
-        maskhdu = fits.open(os.environ["DEGASDIR"] 
-                            + 'masks/{0}_mask.fits'.format(Galaxy.upper()))
+        maskhdu = fits.open(MaskName.format(Galaxy.upper()))
         mask = ~np.any(maskhdu[0].data, axis=0)
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialMask, mask=mask, wcs=w)

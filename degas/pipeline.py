@@ -16,6 +16,8 @@ import astropy.units as u
 import astropy.io.fits as fits
 import astropy.wcs as wcs
 
+import functools
+
 def reduceAll(release='QA0',
               update=False,
               overwrite=False,
@@ -152,6 +154,9 @@ def reduceSession(session=1, overwrite=False, release = 'QA0',
             except OSError:
                 os.mkdir(cwd+'/'+galaxy)
                 os.chdir(cwd+'/'+galaxy)
+            except FileNotFoundError:
+                os.mkdir(cwd+'/'+galaxy)
+                os.chdir(cwd+'/'+galaxy)
             LogRows = Log['Source'] == galaxy
             if np.any(LogRows):
                 wrapper(galaxy=galaxy, overwrite = overwrite,
@@ -264,7 +269,8 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                RawDataDir = None,
                Gains=None,
                OffType='linefit',
-               OutputRoot = None, overwrite=False, **kwargs):
+               OutputRoot = None, overwrite=False, 
+               MaskName=None, **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
@@ -314,11 +320,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     galaxy_center = SkyCoord(ThisGalaxy['RA'], ThisGalaxy['DEC'],
                              unit=(u.hour, u.deg), frame='fk5')
 
-    #### Spatial Masking 
-    # hdulist = fits.open(Galaxy + '_mask.fits')
-    # w = wcs.WCS(hdulist[0].header)s
-    # mask = ~(hdulist[0].data).astype(np.bool)
-
+    
     if BadScans:
         # issue here is that single value is read as a int, but
         # multiple values as string. 
@@ -341,6 +343,19 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     else:
         BadFeedArray = []
 
+    if MaskName is None:
+        MaskName = os.environ["DEGASDIR"] + '/masks/{0}_mask.fits'.format(Galaxy.upper())
+    if os.access(MaskName, os.R_OK):
+        warnings.warn('Using spatial masking to set OFF positions')
+        maskhdu = fits.open(MaskName.format(Galaxy.upper()))
+        mask = ~np.any(maskhdu[0].data, axis=0)
+        w = wcs.WCS(maskhdu[0].header)
+        offselect = functools.partial(ArgusCal.SpatialMask, mask=mask, wcs=w)
+    else:
+        offselect = functools.partial(ArgusCal.ZoneOfAvoidance,
+                                      center=galaxy_center)
+                                      
+
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,
@@ -348,7 +363,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                       badscans=BadScanArray,
                       badfeeds=BadFeedArray,
                       outdir=OutputDirectory,
-                      OffSelector=ArgusCal.ZoneOfAvoidance,
+                      OffSelector=offselect,
                       OffType=OffType,
                       suffix=suffixname,
                       center=galaxy_center,

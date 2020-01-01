@@ -5,6 +5,7 @@ import warnings
 from astropy.table import Table, join
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
+import sys
 
 def updateLogs(output='ObservationLog.csv',release=None):
     if release is None:

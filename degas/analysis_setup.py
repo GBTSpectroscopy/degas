@@ -11,9 +11,14 @@ from astropy import wcs
 
 def fixBIMA(bimafile):
     '''
+
+    Purpose: fix up the bima cubes
+
     The smoothed BIMA data doesn't have the outer regions
     appropriately masked. This routine copies the mask from the
-    original data to the smoothed data.
+    original data to the smoothed data. 
+
+    They also don't have all the header information correct.
 
     '''
 
@@ -21,7 +26,7 @@ def fixBIMA(bimafile):
     cube = fits.getdata(bimafile)[0,:,:,:]
     cubehead = fits.getheader(bimafile)
 
-    #get the non-smoothed data, bima cubes have 4 axess
+    #get the non-smoothed data, bima cubes have 4 axes
     oldfile = bimafile.replace('_gauss15.fits','_k.fits')
     oldcube = fits.getdata(oldfile)[0,:,:,:]
     oldmask = oldcube==0.0 #extract the original '0'valued pb mask
@@ -32,19 +37,36 @@ def fixBIMA(bimafile):
     cubehead.remove('CRPIX4')
     cubehead.remove('CRVAL4')
     cubehead.remove('CTYPE4')
-    
-    fixedcube = fits.PrimaryHDU(cube, cubehead)#fixed cube will have 3axes only
-    fixedcube.writeto(bimafile.replace('.fits','_fixedmask.fits'),overwrite=True)
 
-def fixHeaders(fitsimage):
+     # convert BIMA HEADERS from m/s to km/s
+    if 'CUNIT3' not in cubehead:
+        cubehead['CDELT3'] = (cubehead['CDELT3']/1000.0)
+        cubehead['CRVAL3'] = (cubehead['CRVAL3']/1000.0)
+        cubehead['CUNIT3'] = 'km/s'
+
+    # add CUNIT to RA and DEC axis for BIMA headers.
+    if 'CUNIT2' not in cubehead:
+        cubehead['CUNIT2'] = 'deg'
+
+    if 'CUNIT1' not in cubehead:
+        cubehead['CUNIT1'] = 'deg'
+
+    # Set BUNIT to appropriate value. Original in Jy/beam, but I think
+    # it's mis-labeled.
+    cubehead['BUNIT'] = 'K'
+
+    fixedcube = fits.PrimaryHDU(cube, cubehead)#fixed cube will have 3axes only
+    fixedcube.writeto(bimafile.replace('.fits','_fixed.fits'),overwrite=True)
+
+def fixHeracles(fitsimage):
     '''
+ 
+    [XXX IS THIS ROUTINE STILL USEFUL?]
+
     fixes up image headers for missing values etc so that we can
     process things appropriately en mass.
 
-    things to fix 
-    -- 'velo' instead of 'vrad'
-    -- empty BUNIT to K
-    -- km/s instead of m/s
+ 
     '''
 
     # Using the astropy.io.fits to modify headers 
@@ -52,31 +74,13 @@ def fixHeaders(fitsimage):
     # as I can tell.
     f = fits.open(fitsimage)
 
-    # Convert VELOCITY to VRAD for BIMA headers. Adam's version of BIMA is in VRAD.
+    # Convert VELOCITY to VRAD for Heracles headers.
     if f[0].header['CTYPE3'] == 'VELOCITY':
         f[0].header['CTYPE3'] = 'VRAD' 
 
-    # Add BUNIT to BIMA headers
-    if f[0].header['BUNIT'] == '':
+    f.writeto(fitsimage.replace('.fits','_fixed.fits'),overwrite=True)
 
-        f[0].header['BUNIT'] = 'K'
-
-    # convert BIMA HEADERS to km/s
-    if 'CUNIT3' not in f[0].header:
-        f[0].header['CDELT3'] = (f[0].header['CDELT3']/1000.0)
-        f[0].header['CRVAL3'] = (f[0].header['CRVAL3']/1000.0)
-        f[0].header['CUNIT3'] = 'km/s'
-
-    # add CUNIT to RA and DEC axis for BIMA headers.
-    if 'CUNIT2' not in f[0].header:
-        f[0].header['CUNIT2'] = 'deg'
-
-    if 'CUNIT1' not in f[0].header:
-        f[0].header['CUNIT1'] = 'deg'
-
-    f.writeto(fitsimage.replace('.fits','_fixedheader.fits'),overwrite=True)
-
-def smoothCube(fitsimage,beam=15):
+def smoothCube(fitsimage,beam=15.0):
     '''
     Smoothes input cube to given resolution
     

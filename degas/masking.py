@@ -8,8 +8,12 @@ from astropy.io import fits
 import os
 
 def cubemask(infile,outfile,
-             peak_cut=5.0,
-             low_cut=3.0,
+             peakCut=5.0,
+             lowCut=3.0, 
+             minBeamFrac = 1.0,
+             minNchan = 1.0,
+             skipChan = None,
+             threeD = False,
              outDir='./mask'):
     """ Creates a mask for a cube
     
@@ -22,10 +26,10 @@ def cubemask(infile,outfile,
     output file : str
           output file
 
-    low_cut : float
+    lowCut : float
           Minimum signal-to-noise to expand the initial mask down to
 
-    peak_cut : float
+    peakCut : float
           Minimum signal-to-noise for initial mask
 
     """
@@ -43,40 +47,49 @@ def cubemask(infile,outfile,
     noise = cube.mad_std().value # one value for whole cube. already scaled.
     
     #get combined mask from all parent structures
-    mask = np.zeros(cube.shape, dtype=bool)
+     mask = np.zeros(cube.shape, dtype=bool)
 
-    # for each channel
-    for i in range(nchan):
+    cubedata = cube.unmasked_data[:,:,:].value
 
-        slice = cube[i,:,:].value
+    if threeD:
         # compute dendrogram with a min threshold (input), 1sigma contrast, 
         # 1 beamsize as lower limit and a peak value lower limit(input)
-        # all distinct regions will need to have a peak value > 5sigma, 
+        # all distinct regions will need to have a peak value > peakCut*sigma, 
         # or else it will be merged
-        d = Dendrogram.compute(slice,
-                               min_value = low_cut*noise,
+        d = Dendrogram.compute(cubedata,
+                               min_value = lowCut*noise,
                                min_delta = 1.0*noise,
-                               min_npix = cube.pixels_per_beam,
-                               is_independent = p.min_peak(peak_cut*noise))
-
+                               min_npix = minBeamFrac * cube.pixels_per_beam * minNchan,
+                               is_independent = p.min_peak(peakCut*noise))
+        
         for t in d.trunk:
-            #assemble channel masks
-            mask[i,:,:] = mask[i,:,:] | t.get_mask()
-            mask[i,:,:] = ndimage.binary_fill_holes(mask[i,:,:]) # fill holes in the mask
-  
+            mask = mask | t.get_mask()
     
-    # export mask cube -- old method. Not sure this is right
-    #cubehead['BUNIT']='' # fix up header so mask is unitless.
-    #cubemask = fits.PrimaryHDU(mask.astype('short'), cubehead)
-    #cubemask.writeto(os.path.join(outDir,outfile),
-    #                 overwrite=True)
+    else:
+        for chan in np.arange(nchan):
+            d = Dendrogram.compute(cubedata[chan,:,:],
+                                   min_value = lowCut*noise,
+                                   min_delta = 1.0*noise,
+                                   min_npix = minBeamFrac * cube.pixels_per_beam,
+                                   is_independent = p.min_peak(peakCut*noise))
+        
+            for t in d.trunk:
+                mask[chan,:,:] = mask[chan,:,:] | t.get_mask()  
+    
+    # blank channels you want to skip
+    if skipChan:
+        for chan in skipChan:
+            mask[chan,:,:] = mask[chan,:,:]*0.0
+
+    # fill in holes in individual channels
+    for chan in np.arange(nchan):
+        mask[chan,:,:] = ndimage.binary_fill_holes(mask[chan,:,:]) # fill holes in the mask
 
     maskhead = cube.header
     maskhead['BUNIT'] = ''
     cubemask = SpectralCube(data=mask.astype('short'),wcs=cube.wcs,header=maskhead)
     cubemask.write(os.path.join(outDir,outfile),format='fits',overwrite=True)
     
-
 
 def buildmasks(filename, nChan=2000, width=2e9):
     """Builds masks for use in DEGAS imaging pipeline. 

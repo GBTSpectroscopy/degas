@@ -224,13 +224,13 @@ def cubemask(infile,outfile,
     # calculate noise
     if noise3D:
         noise = noise_cube(cubedata, box=9, spec_box=3, nThresh=30,bandpass_smooth_order=1)
-        SpectralCube(noise, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_noise.fits'),format='fits',overwrite=True)
+        #SpectralCube(noise, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_noise.fits'),format='fits',overwrite=True)
     else: 
         noise = cube.mad_std().value # one value for whole cube. already scaled.
 
     sncube = cubedata / noise  # operate on the S/N cube to make everything easier
 
-    SpectralCube(sncube, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_sncube.fits'),format='fits',overwrite=True)
+    #SpectralCube(sncube, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_sncube.fits'),format='fits',overwrite=True)
 
     if threeD:
         # compute dendrogram with a min threshold (input), 1sigma contrast, 

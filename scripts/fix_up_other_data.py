@@ -8,14 +8,21 @@
 
 import os
 import glob
+import re
+
 from degas.analysis_setup import fixBIMA
 from degas.analysis_setup import fixHeracles
+from degas.analysis_setup import fixOVRO
+from degas.analysis_setup import fixNRO
+from degas.analysis_setup import fixExtraHERA
 from degas.analysis_setup import smoothCube
-import os
-import glob
+
 from radio_beam import Beam
 import astropy.units as u
 from spectral_cube import SpectralCube
+from astropy.io import fits
+from astropy.convolution import Box1DKernel
+import numpy as np
 
 # set up the relevant directories
 otherDataDir = os.environ['OTHERDATA']
@@ -44,19 +51,29 @@ for image in bima_list:
 
 ovro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*.co.cmmsk.fits'))
 for image in ovro_list:
+    fixOVRO(image,beam=beam)
 
-    # open image
-    cube = SpectralCube.read(image)    
-    # convert to K
-    kcube = cube.to(u.K)
+## fix up IC0342 12CO data from Jialu
+# -----------------------------------
 
-    # smooth
-    newBeam = Beam(beam*u.arcsec)
-    smoothCube = kcube.convolve_to(newBeam)
+image = os.path.join(otherDataDir,'jialu','ic0342_regrid_12co_cube_Tmb_8arcsec.fits')
 
-    # write out
-    smoothCube.write(image.replace('.fits','_gauss15_fixed.fits'),
-                     overwrite=True)
+# open image
+cube = SpectralCube.read(image)    
+
+# chop off bad edge
+subcube = cube.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
+
+# add beam
+beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
+
+# smooth
+newBeam = Beam(beam*u.arcsec)
+smoothCube = beamcube.convolve_to(newBeam)
+
+# write out
+smoothCube.write(image.replace('8arcsec.fits','gauss15.fits'),
+                 overwrite=True)
 
 ## fix up NRO data 
 ## ---------------
@@ -67,25 +84,64 @@ for image in ovro_list:
 ## coordinates are weird (RA---GLS and DEC--GLS)
 nro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*RD.FITS'))
 for image in nro_list:
-    cube = SpectralCube.read(image)
-    # add beam
-    beam_cube = cube.with_beam(Beam(15.0*u.arcsec))
-    beam_cube.write(image.replace('.FITS','_fixed.fits'),overwrite=True)
+    fixNRO(image)
+
+## fix up every HERA data from Andreas
+## ---------------------------------------------------------
+
+# NGC3631 and NGC4030 are the same cubes as from adam below.
+
+### NEED TO ADD EFFICIENCY CORRECTIONS. ####
+
+extra_hera_list = glob.glob(os.path.join(otherDataDir,'co_from_andreas','*hera_co21.cube.fits'))
+
+for image in extra_hera_list:
+    fixExtraHERA(image,beam=beam)
 
 
 ## NGC4038
 ## -------
-image = os.path.join(otherDataDir,'temp_co','ngc4038_bigiel_carma_co.fits')
+
+# ALMA 7m from Chris Wilson
+
+image = os.path.join(otherDataDir,'ngc4038_from_chris','ngc_4038_4039_7m_co10.fits')
 cube = SpectralCube.read(image)
 
-newBeam = Beam(beam*u.arcsec)
+cube.beam
+#Beam: BMAJ=15.044642430220799 arcsec BMIN=7.606865194646399 arcsec BPA=-86.90099904919 deg
+ 
+newBeam = Beam(15.1*u.arcsec) ## beam is slightly too big in one
+                              ## direction to smooth to 15.0, so
+                              ## making the smoothing slightly larger.
 smoothCube = cube.convolve_to(newBeam)
 smoothCube.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
 
-## NGC4030
-## -------
+# ## fix up NGC3631 and NGC4030 HERA data from Adam
+# ## ----------------------------------------------
 
-# Beam: BMAJ=17.399999999998798 arcsec BMIN=17.399999999998798 
+# # PI of proposal is Andreas Schruba. Instrument HERA, so should have properties similar ot Heracles data.
 
-# So maybe want to smooth our DEGAS data to this?? this is our largest
-# resolution.
+# ## ADAM ADDED EFFICIENCY CORRECTIONS TO THESE IMAGES.
+
+# extra_hera_list = [os.path.join(otherDataDir,'extra_co_from_adam',image) for image in ['ngc3631_hera_co21_native.fits','ngc4030_hera_co21_native.fits']]
+
+# for image in extra_hera_list:
+
+#     f = fits.open(image)
+
+#     f[0].header['CUNIT3'] = 'm/s'
+#     newimage = image.replace('.fits','_fixed.fits')
+#     f.writeto(newimage,overwrite=True)
+#     f.close()
+
+#     # open image
+#     cube = SpectralCube.read(newimage)    
+    
+#     # smooth
+#     newBeam = Beam(beam*u.arcsec)
+#     smoothCube = cube.convolve_to(newBeam)
+    
+#     # write out
+#     smoothCube.write(newimage.replace('.fits','_gauss15.fits'),
+#                      overwrite=True)
+

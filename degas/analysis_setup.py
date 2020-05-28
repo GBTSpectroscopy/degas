@@ -2,12 +2,17 @@ import glob
 import os
 import numpy as np
 
-from spectral_cube import SpectralCube
 from astropy.io import fits
 from astropy import units as u
 
+from spectral_cube import SpectralCube
+from radio_beam import Beam
+from astropy.convolution import Box1DKernel
+
 from reproject import reproject_interp
 from astropy import wcs
+
+import re
 
 def fixBIMA(bimafile):
     '''
@@ -79,6 +84,81 @@ def fixHeracles(fitsimage):
         f[0].header['CTYPE3'] = 'VRAD' 
 
     f.writeto(fitsimage.replace('.fits','_fixed.fits'),overwrite=True)
+
+def fixOVRO(fitsimage,beam=15.0):
+    '''
+    fix up OVRO data.
+    '''
+    
+    # open image
+    cube = SpectralCube.read(fitsimage)    
+    
+    # convert to K
+    kcube = cube.to(u.K)
+    
+    # smooth
+    newBeam = Beam(beam*u.arcsec)
+    smoothCube = kcube.convolve_to(newBeam)
+    
+    # write out
+    smoothCube.write(fitsimage.replace('.fits','_gauss15_fixed.fits'),
+                     overwrite=True)
+    
+
+def fixNRO(fitsimage):
+    '''
+    fix up NRO data
+    '''
+    
+    cube = SpectralCube.read(fitsimage)
+    # add beam
+    beam_cube = cube.with_beam(Beam(15.0*u.arcsec))
+    beam_cube.write(fitsimage.replace('.FITS','_fixed.fits'),overwrite=True)
+    
+
+def fixExtraHERA(fitsimage,beam=15.0):
+    '''
+    Fix the extra heracles data.
+
+    TBD: need to add an efficiency correction to these data.
+    '''
+    
+    f = fits.open(fitsimage)
+    f[0].header['CUNIT3'] = 'm/s'
+    newimage = fitsimage.replace('.fits','_fixed.fits')
+    f.writeto(newimage,overwrite=True)
+    f.close()
+    
+    # open image
+    cube = SpectralCube.read(newimage)    
+    
+    if re.search('ngc3631',newimage):
+        # extra channels with data
+        subCube = cube[72:379,:,:]
+    elif re.search('ngc4030',newimage):
+        subCube = cube[78:384,:,:]
+    else:
+        subCube = cube[:,:,:]
+
+    # smooth
+    newBeam = Beam(beam*u.arcsec)
+    smoothCube = subCube.convolve_to(newBeam)
+    
+    # smooth velocity
+    smoothFactor = 4.0
+    spSmoothCube = smoothCube.spectral_smooth(Box1DKernel(smoothFactor))
+
+    # Interpolate onto a new axis
+    spec_axis = spSmoothCube.spectral_axis
+    chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+
+    interpCube = spSmoothCube.spectral_interpolate(new_axis,
+                                                   suppress_smooth_warning=True)
+
+    # write out
+    interpCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),
+                     overwrite=True)
 
 def smoothCube(fitsimage,beam=15.0):
     '''

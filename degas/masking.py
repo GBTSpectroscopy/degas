@@ -223,7 +223,8 @@ def cubemask(infile,outfile,
 
     # calculate noise
     if noise3D:
-        noise = noise_cube(cubedata, box=9, spec_box=3, nThresh=30,bandpass_smooth_order=1)
+        # inputs based on PHANGS defaults.
+        noise = noise_cube(cubedata, box=40, spec_box=5,bandpass_smooth_order=2,iterations=3)
         #SpectralCube(noise, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_noise.fits'),format='fits',overwrite=True)
     else: 
         noise = cube.mad_std().value # one value for whole cube. already scaled.

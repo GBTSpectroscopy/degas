@@ -10,6 +10,7 @@ import numpy as np
 from importlib import reload
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+import math
 
 #----------------------------------------------------------------------
 #                           read in data base
@@ -41,7 +42,7 @@ header = '''\\begin{deluxetable}{rrrrrrrcrrr}
         \colhead{Distance} & 
         \colhead{Inclination} &
         \colhead{Position Angle} & 
-        \colhead{Ref for Incl.} &
+        \colhead{} &
         \colhead{R$_{25}$ } & 
         \colhead{$\log$ M$_*$} &
         \colhead{$\log$ SFR} \\\\ 
@@ -51,7 +52,7 @@ header = '''\\begin{deluxetable}{rrrrrrrcrrr}
         \colhead{Mpc} & 
         \colhead{$\degr$} &
         \colhead{$\degr$} &
-        \colhead{and P.A.} &
+        \colhead{Ref.} &
         \colhead{$\\arcmin$} &
         \colhead{M$_\odot$} &
         \colhead{M$_\odot$ yr$^{-1}$}
@@ -80,38 +81,41 @@ for galaxy in degas[idx]:
     c = SkyCoord(ra=galaxy['RA_DEG']*u.degree,dec=galaxy['DEC_DEG']*u.degree,
                  frame='fk5')
 
-    if galaxy['REF_INCL'][0].decode('ascii') == 'HERACLESVALUE':
+    if galaxy['REF_INCL'] == 'HERACLESVALUE':
         refno = '1'
-    elif galaxy['REF_INCL'][0].decode('ascii') == 'LEDA':
+    elif galaxy['REF_INCL'] == 'LEDA':
         refno = '2'
-    elif galaxy['REF_INCL'][0].decode('ascii') == 'LANGMEIDT19':
+    elif galaxy['REF_INCL'] == 'LANGMEIDT19':
         refno = '3'
-    elif galaxy['REF_INCL'][0].decode('ascii') == 'DEBLOK08':
+    elif galaxy['REF_INCL'] == 'DEBLOK08':
         refno = '4'
     else:
         print("I don't recognize the literature source for the inclination")
-    
-    datastr = "{0} & {1:02d}:{2:02d}:{3:06.3f}  &  {4:= 03d}:{5:02d}:{6:05.2f} &   ${8:4.1f}\pm{9:4.1f}$ & ${11:5.2f}\pm{12:5.2f}$ &   ${14:5.2f}\pm{15:5.2f}$ & {16:s} &   ${17:5.2f}\pm{18:5.2f}$  &  ${20:5.2f}\pm{21:5.2f}$ &   ${20:5.2f}\pm{21:5.2f}$ \\\\ \n".format(galaxy['NAME'], #0
+
+    ## should this code be in degas_base??
+    dist_err = (10**galaxy['E_DIST_DEX'] - 1.0) * galaxy['DIST_MPC']
+
+    datastr = "{0} & {1:02d}:{2:02d}:{3:06.3f}  &  {4:= 03d}:{5:02d}:{6:05.2f} &   ${8:4.1f}\pm{9:4.1f}$ & ${11:5.1f}\pm{12:5.1f}$ &   ${14:5.1f}\pm{15:5.1f}$ & {16:s} &   ${17:5.2f}\pm{18:5.2f}$  &  ${20:5.1f}\pm{21:5.1f}$ &   ${20:5.1f}\pm{21:5.1f}$ \\\\ \n".format(galaxy['NAME'], #0
                                                        int(c.ra.hms[0]), # 1
                                                        int(c.ra.hms[1]), # 2
                                                        c.ra.hms[2], #3
                                                        int(c.dec.dms[0]), #4
                                                        abs(int(c.dec.dms[1])), #5
                                                        abs(c.dec.dms[2]), # 6
-                                                       galaxy['REF_POS'][0].decode('ascii'), #7
+                                                       galaxy['REF_POS'], #7
                                                        galaxy['DIST_MPC'], #8
-                                                       10**galaxy['E_DIST_DEX'], ## 9; CHECK ON THIS
-                                                       galaxy['REF_DIST'][0].decode('ascii'), #10
-                                                       galaxy['INCL_DEG'], #11
-                                                       galaxy['E_INCL'], #12
-                                                       galaxy['REF_INCL'][0].decode('ascii'), #13
-                                                       galaxy['POSANG_DEG'], #14
-                                                       galaxy['E_POSANG'], #15
+                                                       dist_err, ## 9; 
+                                                       galaxy['REF_DIST'], #10
+                                                       round(galaxy['INCL_DEG'],1), #11
+                                                       round(galaxy['E_INCL'],1), #12
+                                                       galaxy['REF_INCL'], #13
+                                                       round(galaxy['POSANG_DEG'],1), #14
+                                                       round(galaxy['E_POSANG'],1), #15
                                                        #galaxy['REF_POSANG'][0].decode('ascii'), #16
                                                        refno, #16
                                                        galaxy['R25_DEG']*60.0, #17 deg to arcmin
                                                        galaxy['E_R25']*60.0, #18; deg to arcmin
-                                                       galaxy['REF_R25'][0].decode('ascii'), #19
+                                                       galaxy['REF_R25'], #19
                                                        galaxy['LOGMSTAR'], #20
                                                        galaxy['E_LOGMSTAR'], #21
                                                        galaxy['LOGSFR'],  #22

@@ -68,6 +68,7 @@ from astropy import units as u
 import numpy as np
 from astropy.table import Table
 import os
+import math
 
 databaseDir = os.environ['DATABASEDIR']
 scriptDir = os.environ['SCRIPTDIR']
@@ -102,7 +103,20 @@ for line in degas:
     idx = gal_base['PGC'] == galaxy['PGC'] 
     if np.any(idx):
         for col in gal_base_cols:
-            galaxy[col] = gal_base[idx][col]
+            galaxy[col] = gal_base[idx][col].data[0]
+
+    # fix up missing position angle and inclination information
+    if math.isnan(galaxy['INCL_DEG']):
+        galaxy['INCL_DEG'] = 0.0
+
+    if math.isnan(galaxy['E_INCL']):
+        galaxy['E_INCL'] = 10.0
+
+    if math.isnan(galaxy['POSANG_DEG']):
+        galaxy['POSANG_DEG'] = 0.0
+
+    if math.isnan(galaxy['E_POSANG']):
+        galaxy['E_POSANG'] = 10.0
 
     # get info from z0mgs
     idx = z0mgs['PGC'] == galaxy['PGC']

@@ -170,7 +170,7 @@ for galaxy in degas_table[idx_dr1]:
                  outDir=maskDir,
                  peakCut=peakCut,lowCut=lowCut)       
 
-        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] == 'OVRO'
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'OVRO'
 
     ##
     elif galaxy['NAME'] == 'NGC4038':
@@ -182,7 +182,7 @@ for galaxy in degas_table[idx_dr1]:
                  outDir=maskDir,
                  peakCut=peakCut, lowCut=lowCut)
         
-        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] == 'WILSON'
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'ALMA'
 
     
     else:

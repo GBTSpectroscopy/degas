@@ -29,9 +29,7 @@ if 'MASK' in degas_table.colnames:
     degas_table.remove_column('MASK')
 degas_table.add_column(Column(np.full_like(degas_table['NAME'],''),dtype='S15'),name='MASK')
 
-#idx_dr1 = degas_table['DR1'] == 1
-# for testing
-idx_dr1 = degas_table['NAME'] == 'IC0342'
+idx_dr1 = degas_table['DR1'] == 1
 
 # Extract list of galaxies via fancy list comprehension
 
@@ -60,6 +58,10 @@ for galaxy in degas_table[idx_dr1]:
                  threeD=True,
                  minBeamFrac=1.5,
                  minNchan=5.0)
+
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'GBT'
+    
+        
     ## use heracles first
     elif galaxy['NAME'] in heracles_list:
 

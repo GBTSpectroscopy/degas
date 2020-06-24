@@ -1,1 +1,15 @@
-This is where we will put random analysis scripts.
+This directory holds analysis scripts and the central DEGAS
+database. The analyssi scripts assume that you have the following
+paths set in a shell script.
+
+# Data Reduction
+export DEGASDIR=/lustre/cv/users/akepley/degas/reduction
+export GBTWEATHER=/lustre/cv/users/akepley/degas/reduction/GBTWeather/
+
+# Analysis
+export MASKDIR=/lustre/cv/users/akepley/degas/reduction/masks
+export OTHERDATA=/lustre/cv/users/akepley/degas/ancillary_data
+export DATABASEDIR=/lustre/cv/users/akepley/degas/database
+export SCRIPTDIR=/lustre/cv/users/akepley/degas/reduction/code/degas/scripts
+export PLOTDIR=/lustre/cv/users/akepley/degas/plots
+export TABLEDIR=/lustre/cv/users/akepley/degas/tables

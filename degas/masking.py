@@ -5,20 +5,203 @@ import numpy as np
 import copy
 import astropy.wcs as wcs
 from astropy.io import fits
+import os
 
-def cubemask(filename,low_cut,peak_cut):
+mad_to_std_fac = 1.482602218505602
+
+def mad_zero_centered(data, mask=None):
+
+    # Taken from PHANGS pipeline. I believe what this does is use the
+    # data less than zero to estimate the mad under the assumption
+    # that it's symmetric. Then it uses that to cut out what is
+    # significant and estimate the noise based on the remaining
+    # data. Basically it's a way to estimate the noise in a signal
+    # filled FOV. It assumes no absorption (or not significant
+    # absorption). For cases where there is little emission should be
+    # very similar or the same as a regular mad.
+
+    import scipy.stats as ss
+    from astropy.stats import mad_std
+    
+    # ignore FOV masks
+    where_data_valid = np.logical_and(~np.isnan(data), np.isfinite(data))
+
+    if mask is None:
+        sig_false = ss.norm.isf(0.5 / data.size) # greater than 0.5 probability that you get a false detection?
+        data_lt_zero = np.less(data, 0,
+                               where=where_data_valid,
+                               out=np.full(where_data_valid.shape,
+                                           False, dtype=bool))
+        mad1 = mad_to_std_fac * np.abs(np.median(data[data_lt_zero])) #not quite sure I understand the math here.
+     
+        data_lt_mad1 = np.less(data, sig_false * mad1,
+                               where=where_data_valid,
+                               out=np.full(where_data_valid.shape,
+                                           False, dtype=bool))
+        mad2 = mad_to_std_fac * np.abs(np.median(np.abs(data[data_lt_mad1])))
+    else:
+        nData = mask.sum()
+        if nData == 0:
+            logger.info('No data in mask. Returning NaN, which will now break things')
+            return(np.nan)
+        sig_false = ss.norm.isf(0.5 / nData)
+        data_lt_zero = np.logical_and(np.less(data, 0, 
+                                      where=where_data_valid,
+                                      out=np.full(where_data_valid.shape,
+                                                  False, dtype=bool)), mask)
+        mad1 = mad_to_std_fac * np.abs(np.median(data[data_lt_zero]))
+        data_lt_mad1 = np.logical_and(np.less(data, (sig_false * mad1),
+                                      where=where_data_valid,
+                                      out=np.full(where_data_valid.shape,
+                                                  False, dtype=bool)), mask)
+        mad2 = mad_to_std_fac * np.abs(np.median(np.abs(data[data_lt_mad1])))
+    return(mad2)
+
+def noise_cube(data, mask=None, box=None, spec_box=None,
+               nThresh=30, iterations=1,
+               bandpass_smooth_window=None,
+               bandpass_smooth_order=3):
+    """
+
+    # Taken from PHANGS pipeline
+
+    Makes an empirical estimate of the noise in a cube assuming that it 
+    is normally distributed.
+    
+    Parameters:
+    -----------
+    
+    data : np.array
+        Array of data (floats)
+    
+    Keywords:
+    ---------
+    
+    mask : np.bool
+        Boolean array with False indicating where data can be 
+        used in the noise estimate. (i.e., True is Signal)
+    
+    box : int
+        Spatial size of the box over which noise is calculated (correlation 
+        scale).  Default: no box
+    
+    spec_box : int
+        Spectral size of the box overwhich the noise is calculated.  Default:
+        no box
+    
+    nThresh : int
+        Minimum number of data to be used in a noise estimate.
+    
+    iterations : int
+        Number of times to iterate the noise solution to force Gaussian 
+        statistics.  Default: no iterations.
+    
+    bandpass_smooth_window : int
+        Number of channels used in bandpass smoothing kernel.  Defaults to 
+        nChan / 4 where nChan number of channels.  Set to zero to suppress 
+        smoothing. Uses Savitzky-Golay smoothing
+        
+    bandpass_smooth_order : int
+        Polynomial order used in smoothing kernel.  Defaults to 3.
+    
+    """
+
+    from astropy.convolution import convolve, Gaussian2DKernel
+    from scipy.signal import savgol_coeffs
+    
+    noisemask = np.isfinite(data)
+    if mask is not None:
+        noisemask[mask] = False
+    step = 1
+    boxr = step // 2 # floor division
+    if box is not None:
+        step = np.floor(box/2.5).astype(np.int)
+        boxr = int(box // 2)
+    if spec_box is not None:
+        spec_step = np.floor(spec_box / 2).astype(np.int)
+        boxv = int(spec_box // 2)
+    else:
+        boxv = 0
+
+    noise_cube_out = np.ones_like(data)
+
+    if bandpass_smooth_window is None:
+        bandpass_smooth_window = 2 * (data.shape[0] // 8) + 1
+        
+    for i in np.arange(iterations):
+        noise_map = np.zeros(data.shape[1:]) + np.nan
+        noise_spec = np.zeros(data.shape[0]) + np.nan
+        xx = np.arange(data.shape[2])
+        yy = np.arange(data.shape[1])
+        zz = np.arange(data.shape[0])
+        for x in xx[boxr::step]:
+            for y in yy[boxr::step]:
+                spec = data[:, (y-boxr):(y+boxr+1),
+                            (x-boxr):(x+boxr+1)]
+                spec_mask = noisemask[:, (y-boxr):(y+boxr+1),
+                                      (x-boxr):(x+boxr+1)]
+                if np.sum(spec_mask) > nThresh:
+                    noise_map[y, x] = mad_zero_centered(spec, mask=spec_mask)
+
+        if boxr > 0:
+            data_footprint = np.any(np.isfinite(data), axis=0)
+            kernel = Gaussian2DKernel(box / np.sqrt(8 * np.log(2)))
+            wt_map = np.isfinite(noise_map).astype(np.float)
+            noise_map[np.isnan(noise_map)] = 0.0
+            noise_map = convolve(noise_map, kernel)
+            wt_map = convolve(wt_map, kernel)
+            noise_map /= wt_map
+            noise_map[~data_footprint] = np.nan
+
+        for z in zz:
+            lowz = np.clip(z - boxv, 0, data.shape[0])
+            hiz = np.clip(z + boxv + 1, 0, data.shape[0])
+            plane = data[lowz:hiz, :, :] / noise_map[np.newaxis, :, :]
+            plane_mask = noisemask[lowz:hiz, :, :]
+            noise_spec[z] = mad_zero_centered(plane, mask=plane_mask)
+        # Smooth spectral shape
+        if bandpass_smooth_window > 0:
+            kernel = savgol_coeffs(int(bandpass_smooth_window),
+                                   int(bandpass_smooth_order))
+            noise_spec = convolve(noise_spec, kernel, boundary='extend')
+        noise_spec /= np.nanmedian(noise_spec)
+        noise_cube = np.ones_like(data)
+        noise_cube *= (noise_map[np.newaxis, :]
+                       * noise_spec[:, np.newaxis, np.newaxis])
+        if iterations == 1:
+            return(noise_cube)
+        else:
+            data = data / noise_cube
+            noise_cube_out *= noise_cube
+    return(noise_cube_out)
+
+
+
+
+def cubemask(infile,outfile,
+             peakCut=5.0,
+             lowCut=3.0, 
+             minBeamFrac = 1.0,
+             minNchan = 1.0,
+             skipChan = None,
+             threeD = False,
+             noise3D = False,
+             outDir='./mask'):
     """ Creates a mask for a cube
     
     Parameters
     ----------
 
-    filename : str
-          FITS filename of the cube
+    infile : str
+          input file
 
-    low_cut : float
+    output file : str
+          output file
+
+    lowCut : float
           Minimum signal-to-noise to expand the initial mask down to
 
-    peak_cut : float
+    peakCut : float
           Minimum signal-to-noise for initial mask
 
     """
@@ -26,43 +209,68 @@ def cubemask(filename,low_cut,peak_cut):
     from astrodendro import Dendrogram
     from astrodendro import pruning as p
     from matplotlib import pyplot as plt
-    from astropy.stats import mad_std
     from scipy import ndimage
-    
-    #import datacube and info
-    cube = fits.getdata(filename)
-    cubehead = fits.getheader(filename)
-    
-    nchan = cubehead['NAXIS3'] #number of channels
-    bmaj = cubehead['BMAJ'] # degree
-    bmin = cubehead['BMIN'] # degree
-    pxscale = np.abs(cubehead['CDELT1']) # degree per pixel
-    beampx = (np.pi*bmaj*bmin/(4*np.log(2)))/pxscale**2 #gaussian beamsize in pixels
-    madstd = mad_std(cube,ignore_nan=True) #rms estimated from MAD
-    
-    #get combined mask from all parent structures
-    mask = np.zeros(cube.shape, dtype=bool)
-    for i in range(nchan):
-        #for each channel map
-        slice = cube[i,:,:]
-        #compute dendrogram with a min threshold (input), 1sigma contrast, 1 beamsize as lower limit and a peak value lower limit(input)
-        #all distinct regions will need to have a peak value > 5sigma, or else it will be merged
-        d = Dendrogram.compute(slice,min_value=low_cut*madstd,min_delta=1*madstd,min_npix=beampx,is_independent=p.min_peak(peak_cut*madstd))
-        for t in d.trunk:
-            #assemble channel masks
-            mask[i,:,:] = mask[i,:,:] | t.get_mask()
-            mask[i,:,:] = ndimage.binary_fill_holes(mask[i,:,:]) #fill holes in the mask
-  
-    
-    #create and export mask cube and masked datacube
-    cubehead['BUNIT'] = ''
-    cubemask = fits.PrimaryHDU(mask.astype('short'), cubehead)
-    cubemask.writeto(filename.replace('.fits','_mask.fits'),overwrite=True)
 
-    # probably don't need to write the masked data
-    #masked_cube = np.multiply(mask,cube)
-    #newcube = fits.PrimaryHDU(masked_cube, cubehead)
-    #newcube.writeto(filename.replace('.fits','_masked_data.fits'),overwrite=True)
+    # read in the data.
+    cube = SpectralCube.read(infile)
+
+    # set up cube and initialize mask
+    cubedata = cube.unmasked_data[:,:,:].value
+    mask = np.zeros(cube.shape, dtype=bool)
+
+    # get info about cube
+    nchan = cube.spectral_axis.size #number of channels
+
+    # calculate noise
+    if noise3D:
+        # inputs based on PHANGS defaults.
+        noise = noise_cube(cubedata, box=40, spec_box=5,bandpass_smooth_order=2,iterations=3)
+        #SpectralCube(noise, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_noise.fits'),format='fits',overwrite=True)
+    else: 
+        noise = cube.mad_std().value # one value for whole cube. already scaled.
+
+    sncube = cubedata / noise  # operate on the S/N cube to make everything easier
+
+    #SpectralCube(sncube, cube.wcs, beam=cube.beam).write(os.path.join(outDir,outfile).replace('.fits','_sncube.fits'),format='fits',overwrite=True)
+
+    if threeD:
+        # compute dendrogram with a min threshold (input), 1sigma contrast, 
+        # 1 beamsize as lower limit and a peak value lower limit(input)
+        # all distinct regions will need to have a peak value > peakCut*sigma, 
+        # or else it will be merged
+        d = Dendrogram.compute(sncube,
+                               min_value = lowCut,
+                               min_delta = 1.0,
+                               min_npix = minBeamFrac * cube.pixels_per_beam * minNchan,
+                               is_independent = p.min_peak(peakCut))
+        
+        for t in d.trunk:
+            mask = mask | t.get_mask()
+    
+    else:
+        for chan in np.arange(nchan):
+            d = Dendrogram.compute(sncube[chan,:,:],
+                                   min_value = lowCut,
+                                   min_delta = 1.0,
+                                   min_npix = minBeamFrac * cube.pixels_per_beam,
+                                   is_independent = p.min_peak(peakCut))
+        
+            for t in d.trunk:
+                mask[chan,:,:] = mask[chan,:,:] | t.get_mask()  
+    
+    # blank channels you want to skip
+    if skipChan:
+        for chan in skipChan:
+            mask[chan,:,:] = mask[chan,:,:]*0.0
+
+    # fill in holes in individual channels
+    for chan in np.arange(nchan):
+        mask[chan,:,:] = ndimage.binary_fill_holes(mask[chan,:,:]) # fill holes in the mask
+
+    maskhead = cube.header
+    maskhead['BUNIT'] = ''
+    cubemask = SpectralCube(data=mask.astype('short'),wcs=cube.wcs,header=maskhead)
+    cubemask.write(os.path.join(outDir,outfile),format='fits',overwrite=True)
 
 
 def buildmasks(filename, nChan=2000, width=2e9):

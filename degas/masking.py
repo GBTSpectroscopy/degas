@@ -94,7 +94,8 @@ def buildmasks(filename, nChan=2000, width=2e9):
     # Read in original cube, ensure in velocity space
     s = SpectralCube.read(filename)
     s = s.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-    
+    vmid = s.spectral_axis[len(s.spectral_axis)//2].value
+    c = 299792.458
     # HCN_HCO+
     # Build a mask with a spectral width of 2 GHz and the same spatial 
     # dimensions as the original mask
@@ -106,7 +107,7 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr = s_hcn.wcs.to_header()
     hdr['CRPIX3'] = 1000
     hdr['CDELT3'] = width / nChan
-    hdr['CRVAL3'] = (89.188518 + 88.631847) / 2 * 1e9
+    hdr['CRVAL3'] = (89.188518 + 88.631847) / 2 * 1e9 * (1 - vmid / c)
     hdr['NAXIS'] = 3
     hdr['NAXIS1'] = mask.shape[0]
     hdr['NAXIS2'] = mask.shape[1]
@@ -114,6 +115,9 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr['SIMPLE'] = 'T'
     hdr['BITPIX'] = 8
     hdr['EXTEND'] = 'T'
+    for kw in ['CDELT4','CRPIX4','CRVAL4','CTYPE4']:
+        if kw in hdr:
+            del hdr[kw]
     w = wcs.WCS(hdr)
     maskcube = SpectralCube(mask, w, header=hdr)
     for zz in range(nChan):
@@ -133,7 +137,9 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    maskcube.write(filename.replace('.fits', '.hcn_hcop_mask.fits'),
+    galname = filename.split('_')[0]
+    
+    maskcube.write(galname+'.hcn_hcop.mask.fits',
                    overwrite=True)
 
     # C18O/13CO
@@ -147,7 +153,7 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr = s_13co.wcs.to_header()
     hdr['CRPIX3'] = 1000
     hdr['CDELT3'] = width / nChan
-    hdr['CRVAL3'] = (110.20135 + 109.78217) / 2 * 1e9
+    hdr['CRVAL3'] = (110.20135 + 109.78217) / 2 * 1e9 * (1 - vmid / c)
     hdr['NAXIS'] = 3
     hdr['NAXIS1'] = mask.shape[0]
     hdr['NAXIS2'] = mask.shape[1]
@@ -174,9 +180,9 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    maskcube.write(filename.replace(
-        '.fits', '.13co_c18o_mask.fits'), overwrite=True)
-
+    maskcube.write(galname + '.13co_c18o.mask.fits',
+                   overwrite=True)
+    
     # 12CO
     # Build a mask with a spectral width of 2 GHz and the same spatial
     # dimensions as the original mask
@@ -208,5 +214,4 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    maskcube.write(filename.replace(
-        '.fits', '.12co_mask.fits'), overwrite=True)
+    maskcube.write(galname+'.12co.mask.fits', overwrite=True)

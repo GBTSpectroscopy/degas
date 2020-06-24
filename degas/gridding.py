@@ -61,9 +61,9 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
             
-            maskfile = (datadir + '/masks/' + galaxy
-                                       + '.' + setup_dict[setup]
-                                       + '.mask.fits')
+            maskfile= (datadir + '/masks/' + galaxy
+                       + '.' + setup_dict[setup]
+                       + '.mask.fits')
 
             if os.path.exists(maskfile):
 

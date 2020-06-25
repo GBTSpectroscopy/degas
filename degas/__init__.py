@@ -16,3 +16,4 @@ if not _ASTROPY_SETUP_:
     from .postprocess import *
     from .pipeline import *
     from .gridding import *
+    from .masking import *

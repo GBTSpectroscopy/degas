@@ -6,6 +6,7 @@ import copy
 import astropy.wcs as wcs
 from astropy.io import fits
 import os
+import glob
 
 mad_to_std_fac = 1.482602218505602
 
@@ -273,7 +274,21 @@ def cubemask(infile,outfile,
     cubemask.write(os.path.join(outDir,outfile),format='fits',overwrite=True)
 
 
-def buildmasks(filename, nChan=2000, width=2e9):
+def deduplicate_keywords(hdr):
+    for kw in ['CDELT4','CRPIX4','CRVAL4','CTYPE4']:
+        if kw in hdr:
+            hdr.remove(kw, ignore_missing=True)
+
+    klist = [k for k in hdr.keys()]
+    duplicates = [k for k in klist if klist.count(k) > 1]
+    for kw in duplicates:
+        val = hdr[kw]
+        hdr.remove(kw, ignore_missing=True)
+        hdr[kw] = val
+    return(hdr)
+
+
+def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
     """Builds masks for use in DEGAS imaging pipeline. 
 
     Parameters
@@ -296,8 +311,29 @@ def buildmasks(filename, nChan=2000, width=2e9):
         Spectral width in Hz of the resulting mask.  This should be
         larger than the GBT bandwidth used (usually 1.5 GHz for DEGAS)
 
+    outdir : str
+        Directory for output masks to be stored in
     """
 
+
+    if outdir is None:
+       outdir = os.environ['DEGASDIR'] + 'masks/'
+       
+    if not os.access(outdir,os.W_OK):
+        try:
+            os.mkdir(outdir)
+            print('Made directory {0}'.format(outdir))
+        except OSError:
+            try:
+                os.mkdir('/'.join((outdir.split('/'))[0:-1])) # there may be a safer what to do this with os.path.split
+                os.mkdir(outdir)
+                print('Made directory {0}'.format(outdir))
+            except:
+                warnings.warn('Unable to make output directory '+outdir)
+                raise
+        except:
+            warnings.warn('Unable to make output directory '+outdir)
+            raise
 
     # Read in original cube, ensure in velocity space
     s = SpectralCube.read(filename)
@@ -323,9 +359,8 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr['SIMPLE'] = 'T'
     hdr['BITPIX'] = 8
     hdr['EXTEND'] = 'T'
-    for kw in ['CDELT4','CRPIX4','CRVAL4','CTYPE4']:
-        if kw in hdr:
-            del hdr[kw]
+
+    hdr = deduplicate_keywords(hdr)
     w = wcs.WCS(hdr)
     maskcube = SpectralCube(mask, w, header=hdr)
     for zz in range(nChan):
@@ -345,9 +380,9 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    galname = filename.split('_')[0]
+    galname = os.path.split(filename)[1].split('_')[0]
     
-    maskcube.write(galname+'.hcn_hcop.mask.fits',
+    maskcube.write(outdir + galname+'.hcn_hcop.mask.fits',
                    overwrite=True)
 
     # C18O/13CO
@@ -370,6 +405,8 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr['BITPIX'] = 8
     hdr['EXTEND'] = 'T'
     w = wcs.WCS(hdr)
+    hdr = deduplicate_keywords(hdr)
+    
     maskcube = SpectralCube(mask, w, header=hdr)
     for zz in range(nChan):
         nu = maskcube.spectral_axis[zz]
@@ -388,7 +425,7 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    maskcube.write(galname + '.13co_c18o.mask.fits',
+    maskcube.write(outdir + galname + '.13co_c18o.mask.fits',
                    overwrite=True)
     
     # 12CO
@@ -411,6 +448,8 @@ def buildmasks(filename, nChan=2000, width=2e9):
     hdr['BITPIX'] = 8
     hdr['EXTEND'] = 'T'
     w = wcs.WCS(hdr)
+    hdr = deduplicate_keywords(hdr)
+    
     maskcube = SpectralCube(mask, w, header=hdr)
     for zz in range(nChan):
         nu = maskcube.spectral_axis[zz]
@@ -422,4 +461,11 @@ def buildmasks(filename, nChan=2000, width=2e9):
             mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
                                       dtype=np.bool)
     maskcube = SpectralCube(mask, w, header=hdr)
-    maskcube.write(galname+'.12co.mask.fits', overwrite=True)
+    maskcube.write(outdir + galname+'.12co.mask.fits', overwrite=True)
+
+def build_setup_masks():
+    OutputRoot = os.environ["DEGASDIR"]
+    fl = glob.glob(OutputRoot + 'masks/NGC????_mask.fits')
+    fl += glob.glob(OutputRoot + 'masks/IC????_mask.fits')
+    for thisfile in fl:
+        buildmasks(thisfile)

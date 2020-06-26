@@ -2,6 +2,46 @@ from degas.gridding import gridGalaxy
 
 datadir='/mnt/bigdata/erosolow/surveys/DEGAS/'
 
+HCNgals = ['NGC4038',
+           'NGC2146',
+           'NGC6946',
+           'NGC7331',
+           'NGC5248',
+           'NGC2903',
+           'NGC4321',
+           'NGC5055',
+           'NGC4501',
+           'NGC3147',
+           'NGC3521',
+           'NGC4414',
+           'NGC0337']
+
+COgals = ['NGC4038',
+          'NGC2146',
+          'NGC7331',
+          'NGC2903',
+          'NGC4321',
+          'NGC5055',
+          'NGC4501',
+          'NGC3147',
+          'NGC0337',
+          'NGC4569']
+
+
+for gal in HCNgals:
+    gridGalaxy(galaxy=gal, setup='HCN_HCO+',
+               release='QA0', datadir=datadir)
+
+for gal in COgals:
+    gridGalaxy(galaxy=gal, setup='13CO_C18O',
+               release='QA0', datadir=datadir)
+
+
+# gridGalaxy(galaxy='NGC5055', setup='13CO_C18O', release='QA0', datadir=datadir)
+# gridGalaxy(galaxy='NGC5055', setup='HCN_HCO+', release='QA0', datadir=datadir)
+
+
+
 #gridGalaxy(galaxy='NGC7331', setup='HCN_HCO+',
 #           release='QA0', datadir=datadir)
 
@@ -13,7 +53,7 @@ datadir='/mnt/bigdata/erosolow/surveys/DEGAS/'
 # gridGalaxy(galaxy='NGC4501', setup='13CO_C18O', release='QA0', datadir=datadir)
 # gridGalaxy(galaxy='NGC4501', setup='HCN_HCO+', release='QA0', datadir=datadir)
 
-gridGalaxy(galaxy='NGC4414', setup='13CO_C18O', release='QA0', datadir=datadir)
+# gridGalaxy(galaxy='NGC4414', setup='13CO_C18O', release='QA0', datadir=datadir)
 # gridGalaxy(galaxy='NGC4414', setup='HCN_HCO+', release='QA0', datadir=datadir)
 
 # gridGalaxy(galaxy='NGC4321', setup='HCN_HCO+', release='QA0', datadir=datadir)

@@ -95,6 +95,7 @@ def reduceAll(release='QA0',
                     # Assume we need all 16 files to be there for this
                     # to work
                     filesIntact = (matchdata.sum() >= 16)
+
                 # Kill off files that are going to be overwritten
                 if overwrite and filesIntact:
                     gottaGo = np.array(ExtantFiles)[matchdata]

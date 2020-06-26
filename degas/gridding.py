@@ -2,6 +2,7 @@ import gbtpipe
 import glob
 import os
 import pkg_resources
+import warnings
 from . import catalogs
 from . import postprocess
 
@@ -66,6 +67,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                        + '.mask.fits')
 
             if os.path.exists(maskfile):
+                warnings.warn("Gridding with mask {0}".format(maskfile))
 
                 gbtpipe.griddata(filelist,
                                  startChannel=edgetrim,
@@ -91,7 +93,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                        **kwargs)
             else:
                 
-                print("Mask file not found. Proceeding to grid without mask file")
+                warnings.warn("Mask file not found. Proceeding to grid without mask file")
 
                 gbtpipe.griddata(filelist,
                                  startChannel=edgetrim,

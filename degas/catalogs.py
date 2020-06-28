@@ -26,6 +26,29 @@ def loadCatalog(release=None):
     Catalog = Table.read(CatalogFile, format='ascii')
     return(Catalog)
 
+def validateScanNumbers(catalog, release='QA0'):
+
+    for observation in catalog:
+        if ('Map' in observation['Scan Type']) and (observation[release]):
+            Nscans = observation['End Scan'] - observation['Start Scan'] + 1
+            if Nscans - observation['Nrows'] == 4:
+                warnings.warn("Assuming Vane Cal at start and end")
+                refscans = [observation['Start Scan'],
+                            observation['End Scan'] -1]
+                startscan = observation['Start Scan'] + 2
+                endscan = observation['End Scan'] - 2
+            elif Nscans - observation['Nrows'] == 2:
+                warnings.warn("Assuming Vane Cal at start only")
+                refscans = [observation['Start Scan']]
+                startscan = observation['Start Scan'] + 2
+                endscan = observation['End Scan']
+            elif Nscans - observation['Nrows'] == 0:
+                warnings.warn("Number of scans = Number of Mapped Rows: no VaneCal")
+            else:
+                warnings.warn("Inconsistent number of scan rows")
+                print(observation)
+                raise
+            
 def parseLog(logfile='ObservationLog.csv'):
     """
     Ingests a CSV log file into an astropy table
@@ -63,4 +86,5 @@ def parseLog(logfile='ObservationLog.csv'):
                 last = int(row['Last Row Mapped'])
             except:
                 print(row)
+    validateScanNumbers(t)
     return(t)

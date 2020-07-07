@@ -39,6 +39,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
+            os.chdir(OutputDirectory)
         except OSError:
             raise
     else:

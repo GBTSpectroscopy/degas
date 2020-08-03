@@ -59,10 +59,12 @@ for image in ovro_list:
 image = os.path.join(otherDataDir,'jialu','ic0342_regrid_12co_cube_Tmb_8arcsec.fits')
 
 # open image
-cube = SpectralCube.read(image)    
+cube = SpectralCube.read(image)   
+
+cube_ms = cube.with_spectral_unit(u.m / u.s) 
 
 # chop off bad edge
-subcube = cube.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
+subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
 
 # add beam
 beamcube = subcube.with_beam(Beam(8.0*u.arcsec))

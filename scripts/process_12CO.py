@@ -22,6 +22,8 @@ analysisDir = os.environ['ANALYSISDIR']
 scriptDir = os.environ['SCRIPTDIR']
 
 maskDir = os.path.join(analysisDir,'CO')
+if not os.path.exists(maskDir):
+    os.mkdir(maskDir)
 
 otherDataDir = os.path.join(analysisDir,'ancillary_data')
 #otherDataDir = os.environ['OTHERDATA']
@@ -240,22 +242,26 @@ for galaxy in degas_table[idx_dr1]:
         # Mom0
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
+                baseName=galaxy['NAME'],
                 maptype='moment',order=0)
         
         # peakInt
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
+                baseName=galaxy['NAME'],
                 maptype='peakIntensity')
 
         # moment 1
         makeMap(cubeFile, maskDir,
                 maskFile = os.path.join(maskDir,outName),
+                baseName=galaxy['NAME'],
                 maptype='moment',order=1)
 
         # peak Vel -- yiqing is putting in code to do this.
-        #makeMap(cubeFile,maskDir,
-        #        maskFile = os.path.join(maskDir,outName),
-        #        maptype='peakVelocity')
+        makeMap(cubeFile,maskDir,
+                maskFile = os.path.join(maskDir,outName),
+                baseName=galaxy['NAME'],
+                maptype='peakVelocity')
 
     
 # write out degas data base table with the mask used.

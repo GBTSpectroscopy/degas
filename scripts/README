@@ -13,3 +13,25 @@ export DATABASEDIR=/lustre/cv/users/akepley/degas/database
 export SCRIPTDIR=/lustre/cv/users/akepley/degas/reduction/code/degas/scripts
 export PLOTDIR=/lustre/cv/users/akepley/degas/plots
 export TABLEDIR=/lustre/cv/users/akepley/degas/tables
+
+The full analysis is:
+
+# set up data base and sample
+get_fid_params.py
+make_sample_table.py
+plot_sample_v2.py
+
+# set up CO 
+fix_up_other_data.py
+
+make_masks.py -- ADD CO mom0, peakInt, mom1, and peakVel to this? I
+think this will make the process easier than doing in other
+scripts. Otherwise, I'm going to have to coordinate the order in the
+make_masks.py and CO processing script, which could lead to subtle
+bug.s
+
+# diagnostics for reduced data
+make_diagnostic_moment_maps.py
+
+# set up data for analysis
+setup_analysis.py -- a whole bunch of regridding, etc for analysis.

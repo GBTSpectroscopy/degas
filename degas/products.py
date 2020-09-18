@@ -46,6 +46,13 @@ def makeMap(cubeFile, maskFile='',maptype='peakIntensity',order=0):
     elif maptype is 'moment':
         mymap = maskedCube.moment(order=order)
         outname = cubeFile.replace('.fits','_mom'+str(order)+'.fits')
+    elif maptype is 'peakVelocity':
+        velocity = cube.spectral_axis
+        peakind = maskedCube.argmax(axis=0)
+        pealvel = velocity[peakind]
+        peakvel[peakvel==velocity[0]] = np.nan
+        mymap = peakvel
+        outname = cubeFile.replace('.fits', '_peakVelocity.fits')
     else:
         print('Map type unknown. Options are peakIntensity, linewidth, moment')
         return

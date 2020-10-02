@@ -2,7 +2,7 @@ import subprocess
 import glob
 import os
 import warnings
-from astropy.table import Table, join
+from astropy.table import Table, join, Column
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
 import sys
@@ -26,6 +26,29 @@ def loadCatalog(release=None):
     Catalog = Table.read(CatalogFile, format='ascii')
     return(Catalog)
 
+def validateScanNumbers(catalog, release='QA0'):
+
+    for observation in catalog:
+        if ('Map' in observation['Scan Type']) and (observation[release]):
+            Nscans = observation['End Scan'] - observation['Start Scan'] + 1
+            if Nscans - observation['Nrows'] == 4:
+                warnings.warn("Assuming Vane Cal at start and end")
+                refscans = [observation['Start Scan'],
+                            observation['End Scan'] -1]
+                startscan = observation['Start Scan'] + 2
+                endscan = observation['End Scan'] - 2
+            elif Nscans - observation['Nrows'] == 2:
+                warnings.warn("Assuming Vane Cal at start only")
+                refscans = [observation['Start Scan']]
+                startscan = observation['Start Scan'] + 2
+                endscan = observation['End Scan']
+            elif Nscans - observation['Nrows'] == 0:
+                warnings.warn("Number of scans = Number of Mapped Rows: no VaneCal")
+            else:
+                warnings.warn("Inconsistent number of scan rows")
+                print(observation)
+                raise
+            
 def parseLog(logfile='ObservationLog.csv'):
     """
     Ingests a CSV log file into an astropy table
@@ -38,11 +61,30 @@ def parseLog(logfile='ObservationLog.csv'):
     t = Table.read(logfile)
 
     # Cull to full rows
-    idx = ~t['Project'].mask
-    t = t[idx]
+    # idx = ~t['Project'].mask
+    # t = t[idx]
 
     # Convert from Google Booleans to Python Booleans
-    for drkey in ['QA1','QA0']:
-        t[drkey] = t[drkey].data.data=='TRUE'
 
+    qa0 = np.zeros(len(t), dtype=np.bool)
+    dr1 = np.zeros(len(t), dtype=np.bool)
+    for idx, row in enumerate(t):
+        qa0[idx] = ('TRUE' in row['QA0'])
+        dr1[idx] = ('TRUE' in row['DR1'])
+    qa0col = Column(qa0, dtype=np.bool, name='QA0')
+    dr1col = Column(dr1, dtype=np.bool, name='DR1')
+
+    t.replace_column('QA0', qa0col)
+    t.replace_column('DR1', dr1col)
+
+    for row in t:
+        if (('Map' in row['Scan Type'])
+            and ('science' in row['Source Type'])
+            and (row['QA0'])):
+            try:
+                first = int(row['First Row Mapped'])
+                last = int(row['Last Row Mapped'])
+            except:
+                print(row)
+    validateScanNumbers(t)
     return(t)

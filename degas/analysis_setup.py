@@ -218,7 +218,7 @@ def regridData(baseCubeFits, otherDataFits):
         # regrid image
         newcube = reproject_interp(otherDataFits,
                                    output_projection=baseCube.wcs.dropaxis(2),
-                                   shape_out=baseCube.wcs.dropaxis(2).pixel_shape, ## Is this right might need to flip 
+                                   shape_out=baseCube.wcs.dropaxis(2).array_shape
                                    order='nearest-neighbor',
                      
                                    return_footprint=False)

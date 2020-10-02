@@ -27,7 +27,7 @@ idx = degas['DR1'] == 1
 #                               prep table
 #----------------------------------------------------------------------
 
-outfile = os.path.join(os.environ['TABLEDIR'],'sample_table.tex')
+outfile = os.path.join(os.environ['ANALYSISDIR'],'tables','sample_table.tex')
 
 header = '''\\begin{deluxetable}{rrrrrrrcrrr}
 %\\rotate

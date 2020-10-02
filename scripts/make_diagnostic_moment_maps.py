@@ -11,17 +11,25 @@ import glob
 import aplpy
 import matplotlib.pyplot as plt
 
-releaseDir = os.environ['RELEASEDIR']
+releaseDir = os.path.join(os.environ['ANALYSISDIR'],'IR5')
 
-fitsList = glob.glob(os.path.join(releaseDir,"*.fits"))
+fitsList = glob.glob(os.path.join(releaseDir,"*hanning1.fits"))
+
+mom0Dir = os.path.join(releaseDir,'mom0')
+if not os.path.exists(mom0Dir):
+    os.mkdir(mom0Dir)
+
+peakDir = os.path.join(releaseDir,'peak')
+if not os.path.exists(peakDir):
+    os.mkdir(peakDir)
 
 for myfits in fitsList:
     # not doing any masking -- mostly for diagnostic purposes.
-    makeMap(myfits,maptype='peakIntensity')
-    makeMap(myfits,maptype='moment',order=0)
+    makeMap(myfits,peakDir,maptype='peakIntensity')
+    makeMap(myfits,mom0Dir, maptype='moment',order=0)
 
 
-mom0List = glob.glob(os.path.join(releaseDir, "*_mom0.fits"))
+mom0List = glob.glob(os.path.join(mom0Dir, "*_mom0.fits"))
 
 for mom0 in mom0List:
     fig = aplpy.FITSFigure(mom0)
@@ -32,7 +40,7 @@ for mom0 in mom0List:
     fig.save(mom0.replace(".fits",".png"))
     plt.close()
 
-peakList = glob.glob(os.path.join(releaseDir, "*_peakInt.fits"))
+peakList = glob.glob(os.path.join(peakDir, "*_peakInt.fits"))
 
 for peak in peakList:
     fig = aplpy.FITSFigure(peak)

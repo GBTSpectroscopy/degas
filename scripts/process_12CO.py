@@ -12,6 +12,7 @@ from degas.products import makeMap
 from astropy.table import Table, Column
 import glob
 import numpy as np
+from spectral_cube import SpectralCube
 
 # set desired mask parameters
 peakCut = 5.0
@@ -41,7 +42,7 @@ idx_dr1 = degas_table['DR1'] == 1
 # Extract list of galaxies via fancy list comprehension
 
 # heracles
-heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15.fits'))]
+heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15_fixed.fits'))]
 
 # bima song
 bima_list = [ os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'bima_song','*gauss15_fixed.fits'))]
@@ -55,13 +56,14 @@ ovro_list = [ os.path.basename(image).split('.')[0].upper() for image in glob.gl
 for galaxy in degas_table[idx_dr1]:
 
     generateMoments = True
-    outName = galaxy['NAME']+'_mask.fits'
+    outName = galaxy['NAME']+'_12CO_mask.fits'
 
     #for IC 0342 use Jialu's 12CO
     if galaxy['NAME'] == 'IC0342':
 
         cubeFile = os.path.join(otherDataDir,'jialu',
-                                'ic0342_regrid_12co_cube_Tmb_gauss15.fits')
+                                'ic0342_regrid_12co_cube_Tmb_10kms_gauss15.fits')
+
         cubemask(cubeFile,
                  outName,
                  outDir=maskDir,
@@ -76,7 +78,7 @@ for galaxy in degas_table[idx_dr1]:
     elif galaxy['NAME'] in heracles_list:
 
         cubeFile = os.path.join(otherDataDir,'heracles',
-                                  galaxy['NAME']+'_heracles_gauss15.fits')
+                                  galaxy['NAME']+'_heracles_gauss15_fixed.fits')
 
         if galaxy['NAME'] == 'NGC0337':
             cubemask(cubeFile,
@@ -89,7 +91,7 @@ for galaxy in degas_table[idx_dr1]:
         else:
 
             cubeFile = os.path.join(otherDataDir,'heracles',
-                                  galaxy['NAME']+'_heracles_gauss15.fits')
+                                  galaxy['NAME']+'_heracles_gauss15_fixed.fits')
   
             cubemask(cubeFile,
                      outName,
@@ -239,28 +241,36 @@ for galaxy in degas_table[idx_dr1]:
 
         
     if generateMoments:
+
+        # copy cube over to 12CO directory. Potentially could just do
+        # this via a copy command. Doing it via sectral cube so I can
+        # add other features in and to make sure that the header is
+        # sanitized.
+        cube = SpectralCube.read(cubeFile)
+        cube.write(os.path.join(maskDir,galaxy['NAME']+'_12CO.fits'),overwrite=True)
+        
         # Mom0
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME'],
+                baseName=galaxy['NAME']+'_12CO',
                 maptype='moment',order=0)
         
         # peakInt
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME'],
+                baseName=galaxy['NAME']+'_12CO',
                 maptype='peakIntensity')
 
         # moment 1
         makeMap(cubeFile, maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME'],
+                baseName=galaxy['NAME']+'_12CO',
                 maptype='moment',order=1)
 
         # peak Vel -- yiqing is putting in code to do this.
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME'],
+                baseName=galaxy['NAME']+'_12CO',
                 maptype='peakVelocity')
 
     

@@ -10,12 +10,7 @@ import os
 import glob
 import re
 
-from degas.analysis_setup import fixBIMA
-from degas.analysis_setup import fixHeracles
-from degas.analysis_setup import fixOVRO
-from degas.analysis_setup import fixNRO
-from degas.analysis_setup import fixExtraHERA
-from degas.analysis_setup import smoothCube
+from degas.analysis_setup import fixBIMA, fixHeracles, fixOVRO, fixNRO, fixExtraHERA, smoothCube
 
 from radio_beam import Beam
 import astropy.units as u
@@ -25,13 +20,19 @@ from astropy.convolution import Box1DKernel
 import numpy as np
 
 # set up the relevant directories
-otherDataDir = os.environ['OTHERDATA']
+otherDataDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data')
 
 # common beam
 beam = 15.0 #arcsec
 
+#12CO rest frequency
+rest_freq_12co = 115.27120180*u.GHz
+
+
 ## fix BIMA data
 ##----------------
+
+print("processing BIMA data")
 
 bima_list = glob.glob(os.path.join(otherDataDir,'bima_song','*_gauss15.fits'))
 
@@ -41,13 +42,16 @@ for image in bima_list:
 ## fix heracles images 
 ## ---------------------
 
-## -- what needs to be done here?? They look okay for masks, but
-## probably also need want to check the regridding to make sure
-## everything works out properly.
+print("processing heracles data")
 
+heracles_list = glob.glob(os.path.join(otherDataDir,'heracles','*_gauss15.fits'))
+for image in heracles_list:
+    fixHeracles(image)
 
 ## fix up OVRO data
 ## -----------------
+
+print("processing OVRO data")
 
 ovro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*.co.cmmsk.fits'))
 for image in ovro_list:
@@ -56,12 +60,30 @@ for image in ovro_list:
 ## fix up IC0342 12CO data from Jialu
 # -----------------------------------
 
+print("processing IC342 12CO from Jialu")
+
 image = os.path.join(otherDataDir,'jialu','ic0342_regrid_12co_cube_Tmb_8arcsec.fits')
+
+f = fits.open(image)
+
+f[0].header['BUNIT'] = 'K'
+f[0].header['RESTFRQ'] = float(rest_freq_12co.to(u.Hz).value)    
+
+f.writeto(image.replace('.fits','_fixed.fits'), overwrite=True)
+
+image =  image.replace('.fits','_fixed.fits')
 
 # open image
 cube = SpectralCube.read(image)   
 
+# focusing this work. meta['RESTFREQ'] only puts it in as a string
+#cube._header['RESTFRQ'] = float(rest_freq_12co.to(u.Hz).value)    
+
+#cube.meta['BUNIT'] = 'K'
+
 cube_ms = cube.with_spectral_unit(u.m / u.s) 
+
+#, rest_value=rest_freq_12co
 
 # chop off bad edge
 subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
@@ -73,12 +95,25 @@ beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
 newBeam = Beam(beam*u.arcsec)
 smoothCube = beamcube.convolve_to(newBeam)
 
+# smooth spectrally.
+smoothFactor = 3.0
+spSmoothCube = smoothCube.spectral_smooth(Box1DKernel(smoothFactor))
+spec_axis = spSmoothCube.spectral_axis
+chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
+new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+
+interpCube = spSmoothCube.spectral_interpolate(new_axis,
+                                               suppress_smooth_warning=False)
+
+
 # write out
-smoothCube.write(image.replace('8arcsec.fits','gauss15.fits'),
+interpCube.write(image.replace('8arcsec_fixed.fits','10kms_gauss15.fits'),
                  overwrite=True)
 
 ## fix up NRO data 
 ## ---------------
+
+print("processing NRO data")
 
 ## From https://www.nro.nao.ac.jp/~nro45mrt/html/COatlas/?  Website says
 ## see Kuno et al. 2007, PASJ 59, 117 for details.  Beam size is given
@@ -93,6 +128,8 @@ for image in nro_list:
 
 # NGC3631 and NGC4030 are the same cubes as from adam below.
 
+print("processing extra HERA data from Andreas")
+
 ### NEED TO ADD EFFICIENCY CORRECTIONS. ####
 
 extra_hera_list = glob.glob(os.path.join(otherDataDir,'co_from_andreas','*hera_co21.cube.fits'))
@@ -103,6 +140,8 @@ for image in extra_hera_list:
 
 ## NGC4038
 ## -------
+
+print("Processing NGC4038 data from  Chris Wilson.")
 
 # ALMA 7m from Chris Wilson
 

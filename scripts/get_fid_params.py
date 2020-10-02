@@ -70,7 +70,7 @@ from astropy.table import Table
 import os
 import math
 
-databaseDir = os.environ['DATABASEDIR']
+databaseDir = os.path.join(os.environ['ANALYSISDIR'],'database')
 scriptDir = os.environ['SCRIPTDIR']
 
 degas = ascii.read(os.path.join(databaseDir,'dense_survey.cat'))

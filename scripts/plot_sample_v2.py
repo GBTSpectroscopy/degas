@@ -8,7 +8,7 @@ from scipy.ndimage import gaussian_filter
 #----------------------------------------------------------------------
 #                           read in files
 #----------------------------------------------------------------------
-databaseDir = os.environ['DATABASEDIR']
+databaseDir = os.path.join(os.environ['ANALYSISDIR'],'database')
 scriptDir = os.environ['SCRIPTDIR']
 z0mgs = Table.read(os.path.join(databaseDir,'apjsab3925t4_mrt.txt'),format='cds')
 degas = Table.read(os.path.join(scriptDir,'degas_base.fits'),format='fits')
@@ -77,7 +77,7 @@ plt.legend(loc='upper right')
 plt.xlabel(r'$\log$ M$_*$ [$M_\odot$]')
 plt.ylabel(r'$\log$ SFR/M$_*$ [yr$^{-1}$]')
 
-plt.savefig(os.path.join(os.environ['PLOTDIR'],'sample_degas_dr1_only_v2.pdf'),pad_inches=0.2,bbox_inches='tight')
+plt.savefig(os.path.join(os.environ['ANALYSISDIR'],'plots','sample_degas_dr1_only_v2.pdf'),pad_inches=0.2,bbox_inches='tight')
 
 plt.plot(degas[idxout]['LOGMSTAR'],
          degas[idxout]['LOGSFR']-degas[idxout]['LOGMSTAR'],
@@ -87,12 +87,12 @@ plt.plot(degas[idxout]['LOGMSTAR'],
 
 plt.legend(loc='upper right')
 
-plt.savefig(os.path.join(os.environ['PLOTDIR'],'sample_degas_all_v2.pdf'),pad_inches=0.2,bbox_inches='tight')
+plt.savefig(os.path.join(os.environ['ANALYSISDIR'],'plots','sample_degas_all_v2.pdf'),pad_inches=0.2,bbox_inches='tight')
 
 for i in np.arange(len(degas['NAME'])):
     plt.annotate(degas['NAME'][i], (degas['LOGMSTAR'][i],(degas['LOGSFR']-degas['LOGMSTAR'])[i]),zorder=3)
 
 
-plt.savefig(os.path.join(os.environ['PLOTDIR'],'sample_degas_all_withnames_v2.pdf'), pad_inches=0.2,bbox_inches='tight')
+plt.savefig(os.path.join(os.environ['ANALYSISDIR'],'plots','sample_degas_all_withnames_v2.pdf'), pad_inches=0.2,bbox_inches='tight')
 
 plt.close()

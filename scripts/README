@@ -6,10 +6,33 @@ paths set in a shell script.
 export DEGASDIR=/lustre/cv/users/akepley/degas/reduction
 export GBTWEATHER=/lustre/cv/users/akepley/degas/reduction/GBTWeather/
 
-# Analysis
-export MASKDIR=/lustre/cv/users/akepley/degas/reduction/masks
-export OTHERDATA=/lustre/cv/users/akepley/degas/ancillary_data
-export DATABASEDIR=/lustre/cv/users/akepley/degas/database
 export SCRIPTDIR=/lustre/cv/users/akepley/degas/reduction/code/degas/scripts
-export PLOTDIR=/lustre/cv/users/akepley/degas/plots
-export TABLEDIR=/lustre/cv/users/akepley/degas/tables
+
+# Analysis
+export ANALYSISDIR=/lustre/cv/users/akepley/degas
+## CO -- masks, mom0, mom1, peakInt, peakVel for 12CO -- not transformed
+## ancillary_data -- outside data collection
+## database -- outside databases
+## plots -- plots for paper
+## tables -- tables for paper
+## IR5 -- release
+## IR5_regrid -- regridded data for IR5?
+
+The full analysis is:
+
+#ipython --pylab
+
+# set up data base and sample
+%run get_fid_params.py
+%run make_sample_table.py
+%run plot_sample_v2.py
+
+# set up CO 
+%run fix_up_other_data.py
+%run process_12CO.py
+
+# diagnostics for reduced data
+%run make_diagnostic_moment_maps.py
+
+# set up data for analysis
+%run align_to_degas.py # -- a whole bunch of regridding, etc for analysis.

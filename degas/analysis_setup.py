@@ -37,13 +37,13 @@ def fixBIMA(bimafile):
     oldmask = oldcube==0.0 #extract the original '0'valued pb mask
     cube[oldmask] = np.nan #where the '0' mask was, mask as nan
 
-    #now data is 3d delete info on 4th axies ('stokes')
+    #now data is 3d delete info on 4th axis ('stokes')
     cubehead.remove('CDELT4')
     cubehead.remove('CRPIX4')
     cubehead.remove('CRVAL4')
     cubehead.remove('CTYPE4')
 
-     # convert BIMA HEADERS from m/s to km/s
+    # convert BIMA HEADERS from m/s to km/s
     if 'CUNIT3' not in cubehead:
         cubehead['CDELT3'] = (cubehead['CDELT3']/1000.0)
         cubehead['CRVAL3'] = (cubehead['CRVAL3']/1000.0)
@@ -61,16 +61,27 @@ def fixBIMA(bimafile):
     cubehead['BUNIT'] = 'K'
 
     fixedcube = fits.PrimaryHDU(cube, cubehead)#fixed cube will have 3axes only
-    fixedcube.writeto(bimafile.replace('.fits','_fixed.fits'),overwrite=True)
+    fixedcube.writeto(bimafile.replace('.fits','_fixhdr.fits'),overwrite=True)
+
+    # Now trying to change VOPT to VRADIO via SpectralCube
+    cube2 = SpectralCube.read(bimafile.replace('.fits','_fixhdr.fits'))
+   
+    ## change to frequency and interpolate to equal frequency intervals
+    cube2freq = cube2.with_spectral_unit(u.GHz,rest_value=115.27120180*u.GHz)
+    freq_axis = cube2freq.spectral_axis
+    chan_width = np.mean(freq_axis[0:-2] - freq_axis[1:-1])
+    new_freq_axis = freq_axis[0] - chan_width * np.arange(0,len(freq_axis))
+    cubenewfreq = cube2freq.spectral_interpolate(new_freq_axis)
+    
+    # convert to radio
+    cube2radio = cubenewfreq.with_spectral_unit(u.km/u.s,rest_value=115.27120180*u.GHz,velocity_convention='radio')
+    cube2radio.write(bimafile.replace('.fits','_fixed.fits'),overwrite=True)
 
 def fixHeracles(fitsimage):
     '''
- 
-    [XXX IS THIS ROUTINE STILL USEFUL?]
 
     fixes up image headers for missing values etc so that we can
-    process things appropriately en mass.
-
+    regrid appropriately.
  
     '''
 
@@ -160,7 +171,7 @@ def fixExtraHERA(fitsimage,beam=15.0):
     interpCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),
                      overwrite=True)
 
-def smoothCube(fitsimage,beam=15.0):
+def smoothCube(fitsimage,outDir, beam=15.0):
     '''
     Smoothes input cube to given resolution
     
@@ -170,7 +181,7 @@ def smoothCube(fitsimage,beam=15.0):
 
     from radio_beam import Beam
 
-    newFits = fitsimage.replace(".fits","_smooth.fits")
+    newFits = os.path.join(outDir,os.path.basename(fitsimage).replace(".fits","_smooth.fits"))
 
     newBeam = Beam(beam*u.arcsec)
     
@@ -178,8 +189,9 @@ def smoothCube(fitsimage,beam=15.0):
     smoothCube = cube.convolve_to(newBeam)
     
     smoothCube.write(newFits,overwrite=True)
+    return newFits
 
-def regridData(baseCubeFits, otherDataFits):
+def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     '''
     regrids one data set to match the wcs of the base data set, which
     is assumed to be a cube. The regridded data set can be either 2d
@@ -198,7 +210,7 @@ def regridData(baseCubeFits, otherDataFits):
     f.close()
 
     # output image name
-    newFits = otherDataFits.replace('.fits','_regrid.fits')
+    newFits = os.path.join(outDir,os.path.basename(otherDataFits).replace('.fits','_regrid.fits'))
 
     # now regrid images appropriately
     if ndim == 3:
@@ -208,23 +220,45 @@ def regridData(baseCubeFits, otherDataFits):
 
         # interpolate velocity axis. This needs to be done first.
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
-        
-        # interpolate the spatial axes
+                
         newCube = regridCube.reproject(baseCube.header)
-        newCube.write(newFits,overwrite=True)
+
+        if mask:
+            # if greater than 0.0 set value to 1. otherwise 0.
+            newdata = np.where(newCube.unitless_filled_data[:,:,:] > 0.0, 
+                               1, 0)  
+            finalCube = SpectralCube(newdata,newCube.wcs,
+                                     mask=baseCube.mask)
+        
+        else:
+            newdata = newCube.filled_data[:,:,:]
+            finalCube = SpectralCube(newdata,newCube.wcs,mask=baseCube.mask)
+            
+        finalCube.write(newFits,overwrite=True)
 
     elif ndim == 2:
 
         # regrid image
         newcube = reproject_interp(otherDataFits,
                                    output_projection=baseCube.wcs.dropaxis(2),
-                                   shape_out=baseCube.wcs.dropaxis(2).array_shape
-                                   order='nearest-neighbor',
-                     
-                                   return_footprint=False)
+                                   shape_out=baseCube.wcs.dropaxis(2).array_shape, 
+                                   order='nearest-neighbor',                     
+                                   return_footprint=False)        
 
+        if mask:
+            # set to 1 where greater than 0.0.
+            newdata = np.where(newcube > 0.0,1,0)
+        else:
+            newdata = newcube
+
+        # get mask on original data
+        baseMask = baseCube.get_mask_array()
+        totalBaseMask = baseMask.max(axis=0)
+        
+        newdata[np.invert(totalBaseMask)] = np.nan
+        
         # write out regridded data
-        fits.writeto(newFits,newcube,baseCube.wcs.dropaxis(2).to_header(),overwrite=True)
+        fits.writeto(newFits,newdata,baseCube.wcs.dropaxis(2).to_header(),overwrite=True)
         
 
     else:

@@ -242,8 +242,7 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         newcube = reproject_interp(otherDataFits,
                                    output_projection=baseCube.wcs.dropaxis(2),
                                    shape_out=baseCube.wcs.dropaxis(2).array_shape, 
-                                   order='nearest-neighbor',
-                     
+                                   order='nearest-neighbor',                     
                                    return_footprint=False)        
 
         if mask:

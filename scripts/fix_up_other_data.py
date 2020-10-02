@@ -76,14 +76,10 @@ image =  image.replace('.fits','_fixed.fits')
 # open image
 cube = SpectralCube.read(image)   
 
-# focusing this work. meta['RESTFREQ'] only puts it in as a string
-#cube._header['RESTFRQ'] = float(rest_freq_12co.to(u.Hz).value)    
-
-#cube.meta['BUNIT'] = 'K'
-
 cube_ms = cube.with_spectral_unit(u.m / u.s) 
 
-#, rest_value=rest_freq_12co
+## This should set header
+#cube_ms = cube.with_spectral_unit(u.m / u.s, rest_value=rest_freq_12co)
 
 # chop off bad edge
 subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)

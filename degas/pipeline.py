@@ -5,7 +5,7 @@ import warnings
 from astropy.time import Time
 import pkg_resources
 import numpy as np
-from distutils.version import LooseVersion
+from packaging import version
 
 from . import catalogs
 from gbtpipe import ArgusCal
@@ -41,6 +41,7 @@ def reduceAll(release='QA0',
         
     """
     currentVersion = pkg_resources.get_distribution("degas").version
+    currentVersion = version.parse(currentVersion)
     catalogs.updateLogs(release=release)
     ObjectCatalog = catalogs.loadCatalog()
     Log = catalogs.parseLog()
@@ -82,17 +83,19 @@ def reduceAll(release='QA0',
                         dataStart = int(pieces[startplace + 1])
                         dataEnd = int(pieces[startplace + 2])
                         feed = int(pieces[startplace + 4][-1])
-                        version = pieces[-1]
-                        version = LooseVersion(version[0:-5]) # Cut off .fits
+                        versionstr = pieces[-1]
+                        dataVersion = version.parse(versionstr[0:-5])
+                        # Cut off .fits
                         if ((dataStart >= row['Start Scan']) and
                             (dataEnd <= row['End Scan'])):
                             if not update:
                                 matchdata[idx] = True
-                            if update and version >= currentVersion:
+                            if update and dataVersion >= currentVersion:
                                 matchdata[idx] = True
                     # Assume we need all 16 files to be there for this
                     # to work
                     filesIntact = (matchdata.sum() >= 16)
+
                 # Kill off files that are going to be overwritten
                 if overwrite and filesIntact:
                     gottaGo = np.array(ExtantFiles)[matchdata]

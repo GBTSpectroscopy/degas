@@ -2,6 +2,7 @@ import gbtpipe
 import glob
 import os
 import pkg_resources
+import warnings
 from . import catalogs
 from . import postprocess
 
@@ -38,6 +39,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
     if not os.access(OutputDirectory, os.W_OK):
         try:
             os.mkdir(OutputDirectory)
+            os.chdir(OutputDirectory)
         except OSError:
             raise
     else:
@@ -61,11 +63,12 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
         filename = galaxy + '_' + setup + '_v{0}'.format(pipeversion)
         if not PostprocOnly:
             
-            maskfile = (datadir + '/masks/' + galaxy
-                                       + '.' + setup_dict[setup]
-                                       + '.mask.fits')
+            maskfile= (datadir + '/masks/' + galaxy
+                       + '.' + setup_dict[setup]
+                       + '.mask.fits')
 
             if os.path.exists(maskfile):
+                warnings.warn("Gridding with mask {0}".format(maskfile))
 
                 gbtpipe.griddata(filelist,
                                  startChannel=edgetrim,
@@ -91,7 +94,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                        **kwargs)
             else:
                 
-                print("Mask file not found. Proceeding to grid without mask file")
+                warnings.warn("Mask file not found. Proceeding to grid without mask file")
 
                 gbtpipe.griddata(filelist,
                                  startChannel=edgetrim,

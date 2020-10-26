@@ -19,6 +19,7 @@ import astropy.wcs as wcs
 import functools
 
 def reduceAll(release='QA0',
+              galaxyList=None,
               update=False,
               overwrite=False,
               outputDir=None,
@@ -53,9 +54,14 @@ def reduceAll(release='QA0',
         cwd = os.getcwd()
     else:
         cwd = outputDir
+    
+    if not galaxyList:
+        galaxyList = uniqSrc
+
     # TODO: Take out the [::-1]; just there for debug
-    for galaxy in uniqSrc[::-1]:
-        if galaxy != 'none':
+    for galaxy in uniqSrc:
+        if ((galaxy != 'none') and (galaxy in galaxyList)):
+            print('Reducing galaxy: '+galaxy+'\n')
             try:
                 os.chdir(cwd+'/'+galaxy)
             except OSError:
@@ -119,6 +125,9 @@ def reduceAll(release='QA0',
             #             project=Log[LogRows][-1]['Project'],
             #             **kwargs)
             os.chdir(cwd)
+
+
+
 
 
 def reduceSession(session=1, overwrite=False, release = 'QA0', 
@@ -347,14 +356,18 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         BadFeedArray = []
 
     if MaskName is None:
-        MaskName = os.environ["DEGASDIR"] + '/masks/{0}_mask.fits'.format(Galaxy.upper())
+        # AAK: Modified to add 12CO to the mask names since that's
+        # what my code generates.
+        MaskName = os.environ["DEGASDIR"] + '/masks/{0}_12CO_mask.fits'.format(Galaxy.upper())
     if os.access(MaskName, os.R_OK):
+        print('Using spatial masking to set OFF positions: '+ MaskName)
         warnings.warn('Using spatial masking to set OFF positions')
         maskhdu = fits.open(MaskName.format(Galaxy.upper()))
         mask = ~np.any(maskhdu[0].data, axis=0)
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialMask, mask=mask, wcs=w)
     else:
+        warnings.warn('No mask found. Using zone of avoidance masking')
         offselect = functools.partial(ArgusCal.ZoneOfAvoidance,
                                       center=galaxy_center)
                                       

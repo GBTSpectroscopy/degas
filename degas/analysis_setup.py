@@ -247,7 +247,7 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
         if mask:
             # set to 1 where greater than 0.0.
-            newdata = np.where(newcube > 0.0,1,0)
+            newdata = np.where(newcube > 0.0,1.0,0.0)
         else:
             newdata = newcube
 

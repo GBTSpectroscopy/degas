@@ -267,11 +267,16 @@ for galaxy in degas_table[idx_dr1]:
                 baseName=galaxy['NAME']+'_12CO',
                 maptype='moment',order=1)
 
-        # peak Vel -- yiqing is putting in code to do this.
+        # peak Vel 
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
                 baseName=galaxy['NAME']+'_12CO',
                 maptype='peakVelocity')
+
+        # 2D mask
+        makeMap(os.path.join(maskDir,outName), maskDir,
+                baseName = galaxy['NAME']+'_12CO',
+                maptype='mask2D')
 
     
 # write out degas data base table with the mask used.

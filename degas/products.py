@@ -7,7 +7,7 @@ from astropy.io import fits
 from astropy import units as u
 
 
-def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',order=0):
+def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',order=0 ):
     """ Create peak intensity map from a cube
 
     Parameters
@@ -23,7 +23,8 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
         cube. If not use routines in analysis_setup.py to regrid.
 
     maptype: str
-        type of map to make. Options are peakIntensity, linewidth, and moment.
+        type of map to make. Options are peakIntensity, peakVelocity, linewidth, 
+        moment, and mask2D.
 
     order: int
         order for moment map
@@ -47,6 +48,10 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
     if maptype is 'peakIntensity':
         mymap = kmsCube.max(axis=0)
         outname = baseName+'_peakInt.fits'
+
+    elif maptype is 'mask2D':
+        mymap = kmsCube.max(axis=0)
+        outname = baseName+'_mask2D.fits'
 
     elif maptype is 'linewidth':
         mymap = kmsCube.linewidth_fwhm()

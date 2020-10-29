@@ -36,7 +36,6 @@ for hcn in hcnlist:
     hcop_smooth = smoothCube(hcop,releaseDir,beam=beam)
     regridData(hcn_smooth,hcop_smooth,regridDir) # HCN and HCO+ taken at same time, so not need to check for existance first.
     
-
     print("processing " + name + " 13CO")
 
     # process 13CO -- smooth and regrid
@@ -61,10 +60,10 @@ for hcn in hcnlist:
         regridData(hcn_smooth,co,regridDir)
 
     # process CO products -- regrid only -- already smoothed.
-    for product in ['mask','mom0','mom1','peakInt','peakVelocity']:
+    for product in ['mask','mask2D','mom0','mom1','peakInt','peakVelocity']:
         coproduct = os.path.join(coDir,name+'_12CO_'+product+'.fits')
         if os.path.exists(coproduct):
-            if product is 'mask':
+            if ((product is 'mask') or (product is 'mask2D')):
                 regridData(hcn_smooth,coproduct,regridDir,mask=True)
             else:
                 regridData(hcn_smooth,coproduct,regridDir)
@@ -76,14 +75,20 @@ for hcn in hcnlist:
     if os.path.exists(os.path.join(z0mgsDir,sfr)):
         regridData(hcn_smooth,os.path.join(z0mgsDir,sfr),regridDir)
 
-    print("** processing " + name + "Mstar **")
+    sfr = name+'_w4fuv_sfr.fits' # this name may change with final distribution of data to me by Adam.
+    if os.path.exists(os.path.join(z0mgsDir,sfr)):
+        regridData(hcn_smooth,os.path.join(z0mgsDir,sfr),regridDir)
+    
+
+
+    print("** processing " + name + " Mstar **")
 
     # process stellar mass -- regrid only -- already smoothed
     mstar = name+'_w1_stellarmass.fits' # this name may change with final distribution of data to me by Adam.
     if os.path.exists(os.path.join(z0mgsDir,mstar)):
         regridData(hcn_smooth,os.path.join(z0mgsDir,mstar),regridDir)
 
-    # w1mask = name+'_w1_gauss15_stars.fits'
-    # if os.path.exists(os.path.join(z0mgsDir,w1mask)):
-    #     regridData(hcn_smooth,os.path.join(z0mgsDir,w1mask),regridDir)
+    w1mask = name+'_w1_gauss15_stars.fits'
+    if os.path.exists(os.path.join(z0mgsDir,w1mask)):
+         regridData(hcn_smooth,os.path.join(z0mgsDir,w1mask),regridDir, mask=True)
 

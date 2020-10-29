@@ -1,5 +1,6 @@
 from spectral_stack import stacking #need to make sure Erik's code is installed
 from spectral_cube import SpectralCube, Projection
+from makeMaps import mapSN, mapSFR, mapStellar
 import numpy as np
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -8,27 +9,37 @@ from matplotlib import colors
 import aplpy
 from astropy.table import Table, Column,vstack,hstack
 import re
+import glob 
 from astropy.wcs import WCS
+import os
+
+scriptDir='/lustre/cv/users/akepley/degas/code/degas/scripts/'
+regridDir='/lustre/cv/users/akepley/degas/IR5_regrid/'
+outDir='/lustre/cv/users/ysong/degas/testdir_out/'
 
 #main function: assemble a master fitstable from table output of each galaxy
 #TO DO: change fits file name once code is officially working
-def makeFits(files, vtype, tabdir='./'):
+def makeFits(vtype, scriptDir, regridDir, outDir):
     tablelist=[]
+    files=glob.glob(os.path.join(regridDir,'*_12CO_regrid.fits')) #get CO cube files for all galaxies
     for f in files:
-        full_tab, meta=makeTable(f, vtype)
+        full_tab, meta=makeTable(f, vtype, scriptDir, regridDir, outDir)
         tablelist.append(full_tab)
     table=vstack(tablelist)
     table.meta=meta
-    table.write(tabdir+'test_'+vtype+'_horizontal.fits',overwrite=True)
+    table.write(outDir+'test_'+vtype+'_horizontal.fits',overwrite=True)
     return table
     
 #make fitstable containing all lines from stacking results for each galaxy
-def makeTable(cubefile, vtype):
-    galaxy=cubefile.split('_')[0]
-    linelist=['CO','HCN','HCOp','13CO','C18O']
+def makeTable(cofile, vtype, scriptDir, regridDir, outDir):
+    galaxy=os.path.basename(cofile).split('_')[0]
+    if galaxy =='NGC6946':
+        linelist=['CO','HCN','HCOp']
+    else:
+        linelist=['CO','HCN','HCOp','13CO','C18O']
     galtabs=[]
     for line in linelist: #for each line
-        full_stack, stack_meta=makeStack(cubefile, vtype, line) #get the full stack result for each line
+        full_stack, stack_meta=makeStack(cofile, vtype, line, scriptDir, regridDir, outDir) #get the full stack result for each line
         linetabs=[]
         for i in range(len(full_stack)):
             stack=full_stack[i] #pick out stack for each bin type of this line
@@ -73,110 +84,55 @@ def readStack(stack,line):
     return tab
 
 
-#make stacks for all lines and ancillary data
+#make stacks for all lines and ancillary data for one galaxy
 #output python dictionaries
-def makeStack(co_file, vtype, line, datadir='./'):
-    galaxy=datadir+co_file.split('_')[0]
-    co_cube = SpectralCube.read(co_file)
-    co_cube = co_cube.with_spectral_unit(u.km / u.s)
-    mask=SpectralCube.read(co_file.replace('.fits','_mask.fits'))
-    #make SN map & sigma-clipped mom0 & 2D masked cube
-    sn_map,mom0cut, masked_co, sn_mask = mapSN(galaxy, co_cube,mask) 
-    stellarmap=mapStellar(galaxy,mom0cut)
-    sfrmap=mapSFR(galaxy,mom0cut)
-      
+def makeStack(cofile, vtype, line, scriptDir, regridDir, outDir):
+    galaxy=os.path.basename(cofile).split('_')[0]
+    #make SN map & sigma-clipped mom0 & 2D masked cube --move to separate script
+    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir) 
+    stellarmap=mapStellar(galaxy,mom0cut, regridDir, outDir)
+    sfrmap=mapSFR(galaxy,mom0cut, regridDir, outDir)
+    #import mom1 or  peakvel fits for stacking velocity
+    velocity_file=galaxy+'_12CO_'+vtype+'_regrid.fits' #need to change
+    vhdu=fits.open(os.path.join(regridDir,velocity_file))
+    vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
+    velocity=Projection.from_hdu(vhdu)
+
+    table=Table.read(os.path.join(scriptDir,'degas_base.fits'))
+
+    stack_meta={}
+    stack_meta['spectra_axis_unit']=masked_co.spectral_axis.unit.to_string()
+    stack_meta['stacked_profile_unit']=masked_co.unit.to_string()
+    stack_meta['stacksum_unit']=masked_co.unit.to_string()+masked_co.spectral_axis.unit.to_string()
+    stack_meta['sfr_unit']='Msun/yr/kpc^2'
+    stack_meta['bin_area']='kpc^2'
     #all linecubes have been smoothed and regridded at this point
     if line=='CO':
-        linecube=co_cube
         masked_line=masked_co
         sfr=sfrmap
+    elif line=='HCN':
+        linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
+        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
+        masked_line=linecube.with_mask(sn_mask)
+        sfr=None
     else:
-        linefile=galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits'
-        linecube=SpectralCube.read(linefile)
-        linecube=linecube.with_spectral_unit(u.km/u.s)
+        linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
         masked_line=linecube.with_mask(sn_mask)
         sfr=None
 
-    r_intensity=stack(line,masked_line,galaxy, vtype, mom0cut,'mom0', 'intensity',sfr) 
 
-    r_stellarmass=stack(line,masked_line,galaxy, vtype, stellarmap,'stellarmass','stellarmass',sfr)
+    r_intensity=stack(line,masked_line,galaxy, vtype, velocity, mom0cut,'mom0', 'intensity', table, regridDir, outDir, sfrmap=sfr) 
 
-    r_radius=stack(line,masked_line, galaxy, vtype, mom0cut,'mom0','radius',sfr)
+    r_stellarmass=stack(line,masked_line,galaxy, vtype,  velocity,  stellarmap, 'stellarmass','stellarmass',table, regridDir, outDir, sfrmap=sfr)
+
+    r_radius=stack(line,masked_line, galaxy, vtype,  velocity, mom0cut,'mom0', 'radius', table, regridDir, outDir, sfrmap=sfr)
 
     full_stack=[r_intensity, r_stellarmass, r_radius]
 
-    stack_meta={}
-    stack_meta['spectra_axis_unit']=linecube.spectral_axis.unit.to_string()
-    stack_meta['stacked_profile_unit']=linecube.unit.to_string()
-    stack_meta['stacksum_unit']=linecube.unit.to_string()+linecube.spectral_axis.unit.to_string()
-    stack_meta['sfr_unit']='Msun/yr/kpc^2'
-    stack_meta['bin_area']='kpc^2'
-   
-    #plotSpectra(galaxy.upper(),cube,mom0cut) #plot some central spectra
     return full_stack, stack_meta
 
-#make stellarmass map
-#TO DO: update once get new ancillary data from Sarah
-def mapStellar(galaxy,mom0cut,plotdir='./',stellardatadir='./'):
-    stellarhdu=fits.open(stellardatadir+galaxy+'_w1_stellarmass_regrid.fits')[0]
-    starmask=fits.getdata(stellardatadir+galaxy+'_w1_gauss15_stars_regrid.fits')
-    stellar=stellarhdu.data
-    stellar[starmask==1.0]=np.nan
-    stellar[np.isnan(mom0cut)]=np.nan
-    w=WCS(stellarhdu.header)
-    stellarhdu.header['BUNIT']='Msun/pc^2' #not the correct unit!!
-    stellarmap=Projection(stellar,header=stellarhdu.header,wcs=w) 
-    stellarmap.quicklook()
-    plt.savefig(plotdir+galaxy+'_stellarmass.png')
-    plt.clf()
-    plt.close()
-    return stellarmap
-
-#import sfr map from W4+FUV
-def mapSFR(galaxy,mom0cut,plotdir='./',sfrdatadir='./'):
-    sfrhdu=fits.open(sfrdatadir+galaxy+'_w4fuv_sfr_regrid.fits')[0]
-    starmask_fuv=fits.getdata(sfrdatadir+galaxy+'_fuv_gauss15_stars_regrid.fits')
-    starmask_nuv=fits.getdata(sfrdatadir+galaxy+'_nuv_gauss15_stars_regrid.fits')
-    sfr=sfrhdu.data
-    sfr[starmask_fuv==1.0]=np.nan #mask out stars from fuv and nuv
-    sfr[starmask_nuv==1.0]=np.nan
-    sfr[np.isnan(mom0cut)]=np.nan
-    w=WCS(sfrhdu.header)
-    sfrhdu.header['BUNIT']='MSUN/YR/KPC^2'  
-    sfrmap=Projection(sfr,header=sfrhdu.header,wcs=w) 
-    sfrmap.quicklook()
-    plt.savefig(plotdir+galaxy+'_sfr.png')
-    plt.clf()
-    plt.close()
-    return sfrmap
-
-
-#make S/N map using MAD from cube and mask
-def mapSN(galaxy, cube, mask, datadir='./', plotdir='./'):
-    madstd=cube.mad_std(how='cube') #K #raw cube
-    chanwidth=np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
-    masksum=mask.sum(axis=0) #map number of unmasked pixels 
-    noise=np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s
-    #mask datacube
-    masked_cube=cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
-    mom0 = masked_cube.moment(order=0)
-    snmap=mom0/noise #should be unitless #mom0 is from masked cube
-    snmap[snmap==np.inf]=np.nan #convert division by zero to nan
-    snmap.write(datadir+galaxy.upper()+'_SNmap.fits', overwrite=True)
-    snmap.quicklook()
-    plt.savefig(plotdir+galaxy.upper()+'_SNmap.png')
-    plt.close()
-    plt.clf()
-    #get rid of parts of mom0 where S/N<3
-    mom0cut=mom0.copy()
-    sn=np.nan_to_num(snmap.value)
-    mom0cut[sn<3.0]=np.nan #blank out low sn regions
-    #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
-    mom0mask=~np.isnan(mom0cut)
-    masked_cube=cube.with_mask(mom0mask) #use for stacking later
-    return snmap, mom0cut, masked_cube, mom0mask
-
-def makeBins(galaxy, basemap,  bintype):
+def makeBins(galaxy, basemap,  bintype, table, outDir):
     if bintype=='intensity' or bintype=='stellarmass':
         #Bin the basemap by brightness
         binnum=int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
@@ -184,7 +140,7 @@ def makeBins(galaxy, basemap,  bintype):
         bins = np.digitize(basemap.value, binedge) #this will automatically add an extra bin in the end for nan values
         binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
     elif bintype=='radius':
-        R_arcmin, R_kpc, R_r25=mapGCR(galaxy,basemap) #can choose from 3 different  Rmaps
+        R_arcmin, R_kpc, R_r25=mapGCR(galaxy, table, basemap) #can choose from 3 different  Rmaps
         binnum=5
         binedge = np.zeros(binnum+1)
         binedge[1:]=np.logspace(-1, np.log10(0.5), num=binnum,base=10)#create bins based on r25
@@ -196,10 +152,10 @@ def makeBins(galaxy, basemap,  bintype):
     bins[bins==len(binedge)] = 0 
     # make bins map 
     binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(datadir+galaxy.upper()+'_binsby'+bintype+'.fits', overwrite=True)
+    binmap.write(os.path.join(outDir,galaxy.upper()+'_binsby'+bintype+'.fits'), overwrite=True)
     return binmap, binedge, binlabels
 
-def plotBins(galaxy, binmap, binedge, binlabels, bintype,plotdir='./'):
+def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
    #visualize binning 
     cmap= plt.cm.viridis
     cmaplist=[cmap(i) for i in range(cmap.N)]
@@ -212,15 +168,14 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype,plotdir='./'):
     cbar=plt.colorbar(heatmap)
     cbar.ax.set_yticklabels(binlabels) 
     cbar.ax.text(1.5,1.0/(2*len(binedge)),'NaN') 
-    plt.savefig(plotdir+galaxy.upper()+'_binsby'+bintype+'.png')
+    plt.savefig(os.path.join(outDir,galaxy.upper()+'_binsby'+bintype+'.png'))
     plt.clf()
     plt.close()
     return cmap
 
-def mapGCR(galaxy,basemap,degasdir='./'):
+def mapGCR(galaxy, table, basemap):
     w=basemap.wcs
     #import basic property, center, inclination, pa
-    table=Table.read(degasdir+'degas_base.fits')
     table=table[table['NAME']==galaxy.upper()]
     ra=table['RA_DEG'][0]
     dec=table['DEC_DEG'][0]
@@ -242,23 +197,17 @@ def mapGCR(galaxy,basemap,degasdir='./'):
     R_r25=R_arcmin/r25
     return R_arcmin, R_kpc, R_r25 #map of galactocentric radius in unit of kpc, arcmin, in r25
 
-def stack(line,cube, galaxy, vtype, basemap, basetype, bintype, sfrmap=None, weightmap=None,degasdir='./',datadir='./'):
-    #create bins by intensity or radius
-    #base map is the map used to create bins, i.e. mom0 or stellarmass
-    #import mom1 or  peakvel fits for stacking velocity
-    table=Table.read(degasdir+'degas_base.fits')
+def stack(line, cube, galaxy, vtype, velocity, basemap, basetype, bintype, table, regridDir, outDir, sfrmap):
     table=table[table['NAME']==galaxy.upper()]
     Dmpc=table['DIST_MPC'][0]
     pix_area=(np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
     nchan=cube.shape[0]
-    velocity_file=galaxy+'_'+vtype+'.fits'
-    vhdu=fits.open(datadir+velocity_file)
-    velocity=Projection.from_hdu(vhdu)
-    vtype=velocity_file.split('_')[1].split('.')[0] #mom1 or peakvel
-    binmap, binedge,binlabels=makeBins(galaxy, basemap, bintype)
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, bintype) #plot binmap
+
+     #base map is the map used to create bins, i.e. mom0 or stellarmass
+    binmap, binedge,binlabels=makeBins(galaxy, basemap, bintype, table, outDir)   #create bins by intensity or radius
+    cmap=plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir) #plot binmap
     stack, labelvals = stacking.BinByLabel(cube, binmap.value, velocity,
-                                           weight_map=weightmap)
+                                           weight_map=None)
     xunit={'intensity':'K km/s','radius':'R25','stellarmass':'Msun/pc^2'}#unit for stellarmass needs to be updated!!
     colors=cmap(np.linspace(0,1,len(stack)+1))
     bin_mean=np.zeros(len(stack))

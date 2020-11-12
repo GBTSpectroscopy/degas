@@ -1,6 +1,6 @@
 from spectral_stack import stacking #need to make sure Erik's code is installed
 from spectral_cube import SpectralCube, Projection
-from makeMaps import mapSN, mapSFR, mapStellar
+from degas.makeMaps import mapSN, mapSFR, mapStellar
 import numpy as np
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -13,21 +13,51 @@ import glob
 from astropy.wcs import WCS
 import os
 
-scriptDir='/lustre/cv/users/akepley/degas/code/degas/scripts/'
-regridDir='/lustre/cv/users/akepley/degas/IR5_regrid/'
-outDir='/lustre/cv/users/ysong/degas/testdir_out/'
+def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test'):
+    '''
 
-#main function: assemble a master fitstable from table output of each galaxy
-#TO DO: change fits file name once code is officially working
-def makeFits(vtype, scriptDir, regridDir, outDir):
+    Calculate stacking results for each galaxy and make a fits table
+    of the results.
+
+    Inputs:
+        vtype: velocity type. Options are 'mom1' and 'peakVelocity'. Default: 'mom1'
+    
+        scriptDir: directory with DEGAS data base
+
+        regridDir: directory containing regridded data
+
+        outDir: directory for output results.
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    10/30/2020  A.A. Kepley     Added comments and clarified inputs.
+
+    '''
+
+
+    
+    # TODO: CHANGE THIS FROM A GLOB TO A LIST OF DR1 GALAXIES.
+    # get list of CO files     
     tablelist=[]
     files=glob.glob(os.path.join(regridDir,'*_12CO_regrid.fits')) #get CO cube files for all galaxies
+
+    # go though each file, create a table, and attend it to the list of tables.
     for f in files:
         full_tab, meta=makeTable(f, vtype, scriptDir, regridDir, outDir)
         tablelist.append(full_tab)
+
+    # stack all the tables together
     table=vstack(tablelist)
+
+    # I'm not quite sure what this does
     table.meta=meta
-    table.write(outDir+'test_'+vtype+'_horizontal.fits',overwrite=True)
+
+    # Write out the table -- may remove horizontal form the name below.
+    #table.write(outDir+'test_'+vtype+'_horizontal.fits',overwrite=True)
+    table.write(os.path.join(outDir,outname+'_'+vtype+'_horizontal.fits'),overwrite=True)
+
+    # also return the table for convenience. -- may not need to do this.
     return table
     
 #make fitstable containing all lines from stacking results for each galaxy
@@ -47,7 +77,7 @@ def makeTable(cofile, vtype, scriptDir, regridDir, outDir):
             linetabs.append(tab)
         full_tab=vstack(linetabs) #vertically merge the stacks of all bintypes for each line
         galtabs.append(full_tab)
-    galtable=hstack(galtabs) #merge different lines toegther horizontally
+    galtable=hstack(galtabs) #merge different lines together horizontally
     galtable['galaxy']=galaxy.upper() #add galaxy name
     return galtable, stack_meta
 
@@ -183,6 +213,7 @@ def mapGCR(galaxy, table, basemap):
     pa=np.radians(table['POSANG_DEG'][0])
     r25=table['R25_DEG'][0]*60 #arcmin
     Dmpc=table['DIST_MPC'][0]
+
     x0,y0=w.all_world2pix(ra,dec,0,ra_dec_order=True)
     y=np.arange(0,np.shape(basemap)[0],1)
     x=np.arange(0,np.shape(basemap)[1],1)
@@ -195,6 +226,7 @@ def mapGCR(galaxy, table, basemap):
     R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
     R_arcmin=np.degrees(R*pxscale)*60 # map of GCR in arcmin
     R_r25=R_arcmin/r25
+
     return R_arcmin, R_kpc, R_r25 #map of galactocentric radius in unit of kpc, arcmin, in r25
 
 def stack(line, cube, galaxy, vtype, velocity, basemap, basetype, bintype, table, regridDir, outDir, sfrmap):

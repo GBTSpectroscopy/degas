@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from matplotlib import colors
 import aplpy
-from astropy.table import Table, Column,vstack,hstack
+from astropy.table import Table, Column, vstack, hstack
 import re
 import glob 
 from astropy.wcs import WCS
@@ -46,7 +46,7 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
     for galaxy in degas[release]:
-        full_tab, meta=makeTable(galaxy, vtype, scriptDir, regridDir, outDir)
+        full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
         tablelist.append(full_tab)
 
     # stack all the tables together
@@ -94,7 +94,7 @@ def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
     for line in linelist: 
 
         #get the full stack result for each line
-        full_stack, stack_meta=makeStack(galaxy, vtype, line, scriptDir, regridDir, outDir) 
+        full_stack, stack_meta=makeStack(galaxy, vtype, line, regridDir, outDir) 
 
         # combine the individual line stacks.
         linetabs=[]
@@ -160,7 +160,7 @@ def readStack(stack,line):
     return tab
 
 
-def makeStack(galaxy, vtype, line, scriptDir, regridDir, outDir):
+def makeStack(galaxy, vtype, line, regridDir, outDir):
     '''
     
     make stacks for all lines and ancillary data for one galaxy
@@ -172,9 +172,6 @@ def makeStack(galaxy, vtype, line, scriptDir, regridDir, outDir):
     
     line: line we are stacking on
     
-    scriptDir: script directory -- if I already have read in
-    degas_base.fits do I need to keep passing this along?
-
     regridDir: directory with all the regridded data
 
     outDir: directory with all the output data.

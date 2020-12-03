@@ -13,63 +13,98 @@ import glob
 from astropy.wcs import WCS
 import os
 
-def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test'):
+def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1'):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
     of the results.
 
     Inputs:
-        vtype: velocity type. Options are 'mom1' and 'peakVelocity'. Default: 'mom1'
-    
-        scriptDir: directory with DEGAS data base
 
         regridDir: directory containing regridded data
 
+        scriptDir: directory with DEGAS data base
+
         outDir: directory for output results.
+
+        vtype: velocity type. Options are 'mom1' and 'peakVelocity'. Default: 'mom1'
+    
+        outname: basename for output fits table.
+
 
     Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
-    10/30/2020  A.A. Kepley     Added comments and clarified inputs.
+    10/30/2020  A.A. Kepley     Added comments and clarified inputs
+    12/3/2020   A.A. Kepley     Modified to pull list of galaxies from degas base table.
 
     '''
-
-
     
     # TODO: CHANGE THIS FROM A GLOB TO A LIST OF DR1 GALAXIES.
     # get list of CO files     
-    tablelist=[]
-    files=glob.glob(os.path.join(regridDir,'*_12CO_regrid.fits')) #get CO cube files for all galaxies
+    
+    # get list of dr1 galaxies
+    degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
+    release = degas[release] == 1
+
+    #    files=glob.glob(os.path.join(regridDir,'*_12CO_regrid.fits')) #get CO cube files for all galaxies
 
     # go though each file, create a table, and attend it to the list of tables.
-    for f in files:
-        full_tab, meta=makeTable(f, vtype, scriptDir, regridDir, outDir)
+    tablelist=[]
+    for galaxy in degas[release]:
+        full_tab, meta=makeTable(galaxy, vtype, scriptDir, regridDir, outDir)
         tablelist.append(full_tab)
 
     # stack all the tables together
     table=vstack(tablelist)
 
-    # I'm not quite sure what this does
+    # AAK: Looks like the meta data comes from the last galaxy
+    # processed. Is this going to be okay?
     table.meta=meta
 
-    # Write out the table -- may remove horizontal form the name below.
-    #table.write(outDir+'test_'+vtype+'_horizontal.fits',overwrite=True)
-    table.write(os.path.join(outDir,outname+'_'+vtype+'_horizontal.fits'),overwrite=True)
+    # Write out the table 
+    table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
 
-    # also return the table for convenience. -- may not need to do this.
-    return table
+def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
+    '''
+
+    make fitstable containing all lines from stacking results for each galaxy
+
+    galaxy: data for galaxy we are processing from degas_base.fits
+
+    vtype: velocity type that we are stacking on
     
-#make fitstable containing all lines from stacking results for each galaxy
-def makeTable(cofile, vtype, scriptDir, regridDir, outDir):
-    galaxy=os.path.basename(cofile).split('_')[0]
-    if galaxy =='NGC6946':
+    scriptDir: script directory -- AAK: if I read in degas_base.fits early,
+    so I still need to pass this down.?
+    
+    regridDir: regrid directory
+    
+    outDir: output directory
+
+    
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added comments
+
+    '''
+
+    # get name of galaxy we are processing.
+    name = galaxy['NAME']
+    
+    # For NGC6946, skip 13CO/C18O since that data was never taken.
+    if name =='NGC6946':
         linelist=['CO','HCN','HCOp']
     else:
         linelist=['CO','HCN','HCOp','13CO','C18O']
+
+    # for each line stack the data.
     galtabs=[]
-    for line in linelist: #for each line
-        full_stack, stack_meta=makeStack(cofile, vtype, line, scriptDir, regridDir, outDir) #get the full stack result for each line
+    for line in linelist: 
+        #get the full stack result for each line
+        full_stack, stack_meta=makeStack(galaxy, vtype, line, scriptDir, regridDir, outDir) 
+
+        # combine the individual line stacks.
         linetabs=[]
         for i in range(len(full_stack)):
             stack=full_stack[i] #pick out stack for each bin type of this line
@@ -77,12 +112,30 @@ def makeTable(cofile, vtype, scriptDir, regridDir, outDir):
             linetabs.append(tab)
         full_tab=vstack(linetabs) #vertically merge the stacks of all bintypes for each line
         galtabs.append(full_tab)
-    galtable=hstack(galtabs) #merge different lines together horizontally
-    galtable['galaxy']=galaxy.upper() #add galaxy name
+
+    # merge different lines together horizontally
+    galtable=hstack(galtabs) 
+
+    # add the name of the galaxy.
+    galtable['galaxy']= name
+
     return galtable, stack_meta
 
-#read stacking results (dictionary output) for each galaxy and each line
+
 def readStack(stack,line):
+    '''
+    read stacking results (dictionary output) for each galaxy and each line
+
+    stack: stack result
+    line: line name
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments
+
+    '''
+
     cols=[]
     nrow=len(stack[line+'_stack_sum'])
     rows=[]
@@ -116,48 +169,92 @@ def readStack(stack,line):
 
 #make stacks for all lines and ancillary data for one galaxy
 #output python dictionaries
-def makeStack(cofile, vtype, line, scriptDir, regridDir, outDir):
-    galaxy=os.path.basename(cofile).split('_')[0]
-    #make SN map & sigma-clipped mom0 & 2D masked cube --move to separate script
-    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir) 
-    stellarmap=mapStellar(galaxy,mom0cut, regridDir, outDir)
-    sfrmap=mapSFR(galaxy,mom0cut, regridDir, outDir)
+def makeStack(galaxy, vtype, line, scriptDir, regridDir, outDir):
+    '''
+    
+    make stacks for all lines and ancillary data for one galaxy
+    output python dictionaries
+
+    galaxy: degas_base.fits entry for galaxy we are processing
+    
+    vtype: type of map we are stacking on
+    
+    line: line we are stacking on
+    
+    scriptDir: script directory -- if I already have read in
+    degas_base.fits do I need to keep passing this along?
+
+    regridDir: directory with all the regridded data
+
+    outDir: directory with all the output data.
+
+    ASSUMPTIONS: 
+
+    We are assuming that all linecubes have been smoothed 
+    and regridded at this point, so the coordinate systems match.
+
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
+                                use the degas table 
+
+    '''
+
+    cofile = os.path.join(regridDir,galaxy['NAME']+'_12CO_regrid.fits')
+    name = galaxy['NAME']
+
+    #make SN map & sigma-clipped mom0 & 2D masked cube --move to separate script. AAK: only needs to be done once not every time we stack?
+    mom0cut, masked_co, sn_mask = mapSN(name, regridDir, outDir)  ## AAK: probably should add in here a keyword to control the mom0cut.
+    stellarmap=mapStellar(name,mom0cut, regridDir, outDir)
+    sfrmap=mapSFR(name,mom0cut, regridDir, outDir)
+    # AAK: add radius map here too?
+
+    # Read in the line file for stacking
+    if line=='CO':
+        masked_line=masked_co
+        sfr=sfrmap
+    else:
+        if line=='HCN':
+            linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
+        else:
+            linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        sfr=None
+        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
+        masked_line=linecube.with_mask(sn_mask)
+
     #import mom1 or  peakvel fits for stacking velocity
-    velocity_file=galaxy+'_12CO_'+vtype+'_regrid.fits' #need to change
+    velocity_file=name+'_12CO_'+vtype+'_regrid.fits' #need to change
     vhdu=fits.open(os.path.join(regridDir,velocity_file))
     vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
     velocity=Projection.from_hdu(vhdu)
 
+    ## AAK: NOW I CAN JUST PASS THE RELEVANT TABLE DONE DOWN THE STACKING CODE BELOW???
     table=Table.read(os.path.join(scriptDir,'degas_base.fits'))
 
+    ## filling in the meta information for the stack.
     stack_meta={}
     stack_meta['spectra_axis_unit']=masked_co.spectral_axis.unit.to_string()
     stack_meta['stacked_profile_unit']=masked_co.unit.to_string()
     stack_meta['stacksum_unit']=masked_co.unit.to_string()+masked_co.spectral_axis.unit.to_string()
     stack_meta['sfr_unit']='Msun/yr/kpc^2'
     stack_meta['bin_area']='kpc^2'
-    #all linecubes have been smoothed and regridded at this point
-    if line=='CO':
-        masked_line=masked_co
-        sfr=sfrmap
-    elif line=='HCN':
-        linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
-        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
-        masked_line=linecube.with_mask(sn_mask)
-        sfr=None
-    else:
-        linefile=os.path.join(regridDir,galaxy+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
-        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
-        masked_line=linecube.with_mask(sn_mask)
-        sfr=None
 
+    # actually do the stack!
 
+    # AAK: DO I ACTUALLY WANT TO CALCULATE THE STACKING BINS HERE WHEN I STACK?
+    
+    # Stack on line intensity
     r_intensity=stack(line,masked_line,galaxy, vtype, velocity, mom0cut,'mom0', 'intensity', table, regridDir, outDir, sfrmap=sfr) 
 
+    # stack on stellar mass
     r_stellarmass=stack(line,masked_line,galaxy, vtype,  velocity,  stellarmap, 'stellarmass','stellarmass',table, regridDir, outDir, sfrmap=sfr)
 
+    # stack on radius
     r_radius=stack(line,masked_line, galaxy, vtype,  velocity, mom0cut,'mom0', 'radius', table, regridDir, outDir, sfrmap=sfr)
 
+    # put the individual stack together.
     full_stack=[r_intensity, r_stellarmass, r_radius]
 
     return full_stack, stack_meta

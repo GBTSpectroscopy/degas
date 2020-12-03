@@ -171,6 +171,352 @@ def fixExtraHERA(fitsimage,beam=15.0):
     interpCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),
                      overwrite=True)
 
+#----------------------------------------------------------------------
+
+def calc_stellar_mass(iracFile, MtoLFile, outFile):
+
+    '''
+    Calculate the stellar mass surface density for a given IRAC image
+    and MtoL image.
+    '''
+    
+    # open IRAC data file
+    irac = fits.open(iracFile)
+    iracData = irac[0].data
+    iracHdr = irac[0].header
+        
+    # open MtoL data file
+    MtoL = fits.open(MtoLFile)
+    MtoL_regrid = reproject_interp(MtoL,output_projection=iracHdr,
+                                   hdu_in=0,
+                                   order='nearest-neighbor',
+                                   return_footprint=False)
+    irac.close()
+    MtoL.close()
+
+    # Equation 8 from Leroy+ 2019 (z0mgs paper)
+    mstarirac1 = 3.5e2 * (MtoL_regrid / 0.5) * (iracData)
+        
+    # create output file
+    outHdr = iracHdr
+    outHdr['BUNIT']= 'MSUN/PC^2'
+    outfits = fits.PrimaryHDU(data=mstarirac1,header=outHdr)
+    outfits.writeto(outFile, overwrite=True)        
+
+# ----------------------------------------------------------------------
+
+def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None):
+    '''
+    Calculate LTIR based on the calibration in Galametz+ 2013.
+    '''
+
+    import math
+
+    # useful constants
+    Lsun = 3.826e33 # erg/s
+    c = 2.99792458e10 #cm/s
+
+    # Units for input data are MJy/sr and units for Galametz+2013
+    # constants are W/kpc^2, so I need to do a conversation. 
+
+    # unit conversion factor to go from MJy/sr to W/kpc^2. Needs to be
+    # multiplied by nu to get final answer.
+    unitfactor = 1e6 * 1e-26 * 4.0 * math.pi * (3.0861e16*1000.0)**2
+   
+    # now put together the various combinations of data.
+    if (b24 and b70 and b100 and b160):
+        print('calculating LTIR using 24, 70, 100, and 160 micron data')
+
+        # coefficients from Table 3 in Galametz+ 2013
+        c24 = 2.051
+        c70 = 0.521
+        c100 = 0.294
+        c160 = 0.934
+        
+        # read in each image
+        f24 = fits.open(b24)
+        f70 = fits.open(b70)
+        f100 = fits.open(b100)
+        f160 = fits.open(b160)
+        
+        # regrid data to same grid (use 24micron as base) and 
+        # convert from MJy/sr to W/kpc^2
+        basehdr = f24[0].header
+
+        data24freq = c / (24.0*1e-4)
+        data24 = f24[0].data * unitfactor * data24freq
+
+        data70freq = c / (70.0*1e-4)
+        data70_regrid = reproject_interp(f70,output_projection=basehdr,
+                                         hdu_in=0,
+                                         order='nearest-neighbor',
+                                         return_footprint=False)
+        data70_regrid = data70_regrid * unitfactor * data70freq
+
+        data100freq = c /(100.0*1e-4)
+        data100_regrid = reproject_interp(f100,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data100_regrid = data100_regrid * unitfactor * data100freq
+        
+
+        data160freq = c/(160.0*1e-4)
+        data160_regrid = reproject_interp(f160,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data160_regrid = data160_regrid * unitfactor * data160freq
+        
+        
+        f24.close()
+        f70.close()
+        f100.close()
+        f160.close()
+
+        # calculate LTIR using coefficients from Table 3 in Galametz+ 213
+        STIR_Wkpc2 = c24*data24 + c70*data70_regrid+c100*data100_regrid + \
+                     c160*data160_regrid
+
+        # convert from W/kpc^2 to Lsun/pc^2 (which is what we typically plot)
+        # W/kpc^2 * 1e7 = erg/s/kpc^2
+        # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
+        STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    elif (b70 and b100 and b160):
+        print('calculating LTIR using 70, 100, and 160 micron data')
+
+        # coefficients from Table 3 in Galametz+ 2013
+        c70 = 0.789
+        c100 = 0.387
+        c160 = 0.960
+        
+        # read in each image
+        f70 = fits.open(b70)
+        f100 = fits.open(b100)
+        f160 = fits.open(b160)
+        
+        # regrid data to same grid (use 24micron as base) and 
+        # convert from MJy/sr to W/kpc^2
+        basehdr = f70[0].header
+
+        data70freq = c / (70.0*1e-4)
+        data70 = f70[0].data * unitfactor * data70freq
+        
+        data100freq = c /(100.0*1e-4)
+        data100_regrid = reproject_interp(f100,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data100_regrid = data100_regrid * unitfactor * data100freq
+        
+
+        data160freq = c/(160.0*1e-4)
+        data160_regrid = reproject_interp(f160,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data160_regrid = data160_regrid * unitfactor * data160freq
+        
+        
+        f70.close()
+        f100.close()
+        f160.close()
+
+        # calculate LTIR using coefficients from Table 3 in Galametz+ 213
+        STIR_Wkpc2 = c70*data70 + c100*data100_regrid + c160*data160_regrid
+
+        # convert from W/kpc^2 to Lsun/pc^2 (which is what we typically plot)
+        # W/kpc^2 * 1e7 = erg/s/kpc^2
+        # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
+        STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+        
+    elif (b24 and b100 and b160): ## COLOR TERM?
+        print('calculating LTIR using 24, 100, and 160 micron data')
+
+        # coefficients from Table 3 in Galametz+ 2013
+        c24 = 2.708
+        c100 = 0.734
+        c160 = 0.739
+        
+        # read in each image
+        f24 = fits.open(b24)
+        f100 = fits.open(b100)
+        f160 = fits.open(b160)
+        
+        # regrid data to same grid (use 24micron as base) and 
+        # convert from MJy/sr to W/kpc^2
+        basehdr = f24[0].header
+
+        data24freq = c / (24.0*1e-4)
+        data24 = f24[0].data * unitfactor * data24freq
+
+        data100freq = c /(100.0*1e-4)
+        data100_regrid = reproject_interp(f100,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data100_regrid = data100_regrid * unitfactor * data100freq
+        
+
+        data160freq = c/(160.0*1e-4)
+        data160_regrid = reproject_interp(f160,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data160_regrid = data160_regrid * unitfactor * data160freq
+        
+        
+        f24.close()        
+        f100.close()
+        f160.close()
+
+        # calculate LTIR using coefficients from Table 3 in Galametz+ 213
+        STIR_Wkpc2 = c24*data24 + c100*data100_regrid + \
+                     c160*data160_regrid
+
+        # convert from W/kpc^2 to Lsun/pc^2 (which is what we typically plot)
+        # W/kpc^2 * 1e7 = erg/s/kpc^2
+        # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
+        STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    elif (b100 and b160): ## COLOR TERM?
+        print('calculating LTIR using 24, 100, and 160 micron data')
+
+        # coefficients from Table 3 in Galametz+ 2013
+        c100 = 1.239
+        c160 = 0.620
+        
+        # read in each image
+        f100 = fits.open(b100)
+        f160 = fits.open(b160)
+        
+        # regrid data to same grid (use 24micron as base) and 
+        # convert from MJy/sr to W/kpc^2
+        basehdr = f100[0].header
+
+        data100freq = c /(100.0*1e-4)
+        data100 = f100[0].data * unitfactor * data100freq
+        
+
+        data160freq = c/(160.0*1e-4)
+        data160_regrid = reproject_interp(f160,output_projection=basehdr,
+                                          hdu_in=0,
+                                          order='nearest-neighbor',
+                                          return_footprint=False)
+        data160_regrid = data160_regrid * unitfactor * data160freq
+        
+
+        f100.close()
+        f160.close()
+
+        # calculate LTIR using coefficients from Table 3 in Galametz+ 213
+        STIR_Wkpc2 =  c100*data100 + c160*data160_regrid
+
+        # convert from W/kpc^2 to Lsun/pc^2 (which is what we typically plot)
+        # W/kpc^2 * 1e7 = erg/s/kpc^2
+        # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
+        STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    elif (b24): ## monochromatic. :-(
+        
+        print('calculating LTIR using 24 micron data')
+
+        # coefficients from Table 2 in Galametz+ 2013
+        a = 0.919
+        b = 3.786
+
+        # read in each image
+        f24 = fits.open(b24)
+        
+        # convert from MJy/sr to W/kpc^2
+        basehdr = f24[0].header
+
+        data24freq = c / (24.0*1e-4)
+        data24 = f24[0].data * unitfactor * data24freq
+
+        f24.close()   
+
+         # calculate LTIR using coefficients from Table 3 in Galametz+ 213
+        STIR_Wkpc2 = 10**(a * np.log10(data24) + b)
+
+        # convert from W/kpc^2 to Lsun/pc^2 (which is what we typically plot)
+        # W/kpc^2 * 1e7 = erg/s/kpc^2
+        # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
+        STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    elif (w3): 
+
+        print('calculating LTIR using WISE band 3 data')
+
+        ## use wise band 3 to calculate LTIR.  
+
+        ## Cluver+2017 bootstraps off the SINGS/KINGFISH data to show
+        ## that the relationship between LTIR and L12micron(W3) is
+        ## tighter and more linear than LTIR and L23micron (w4)
+        
+        ## Equation in Cluver+ 2017 
+        ## (Figure 3, equation 1; See erratum for correct equation.).
+        a = 0.889
+        b = 2.21
+
+        # read in each image
+        f12 = fits.open(w3)
+        
+        basehdr = f12[0].header
+
+        ## input unit is MJy/sr for W3 data, which is a surface brightness.
+        # convert from MJy/sr to W/kpc^2, then to Lsun/pc^2
+        data12freq = c / (12.0*1e-4)
+        data12 = f12[0].data * unitfactor * data12freq
+        data12 = (data12 * 1e7) / Lsun / (1000.0**2) 
+
+        f12.close()   
+
+         # calculate LTIR using coefficients above
+        STIR_Lsunpc2 = 10**(a * np.log10(data12) + b)
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    else:
+        print("Inappropriate combination of images to calculate LTIR.")
+        
+#----------------------------------------------------------------------
+
 def smoothCube(fitsimage,outDir, beam=15.0):
     '''
     Smoothes input cube to given resolution
@@ -263,3 +609,8 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")
+
+
+
+
+

@@ -3,12 +3,13 @@ from degas.analysis_setup import regridData, smoothCube
 import glob
 import os
 import shutil
+from astropy.table import Table
 
 release = 'IR5'
 
 releaseDir = os.path.join(os.environ['ANALYSISDIR'],release)
 coDir = os.path.join(os.environ['ANALYSISDIR'],'CO')
-z0mgsDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','z0mgs')
+multiDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','multiwavelength')
 
 regridDir = os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
 
@@ -70,25 +71,37 @@ for hcn in hcnlist:
 
     print("** processing " + name + " SFR **")
 
-    # process SFR -- regrid only -- already smoothed
-    sfr = name+'_w4nuv_sfr.fits' # this name may change with final distribution of data to me by Adam.
-    if os.path.exists(os.path.join(z0mgsDir,sfr)):
-        regridData(hcn_smooth,os.path.join(z0mgsDir,sfr),regridDir)
+    # process SFR -- regrid only -- already smoothed to 15arcsec
+    sfr = name +'_sfr_fuvw4_gauss15.fits' 
+    inFile = os.path.join(multiDir,'data','sfr',sfr)
+    if os.path.exists(inFile):
+        regridData(hcn_smooth,inFile,regridDir)
 
-    sfr = name+'_w4fuv_sfr.fits' # this name may change with final distribution of data to me by Adam.
-    if os.path.exists(os.path.join(z0mgsDir,sfr)):
-        regridData(hcn_smooth,os.path.join(z0mgsDir,sfr),regridDir)
-    
+    sfr = name+'_sfr_nuvw4_gauss15.fits' 
+    inFile = os.path.join(multiDir,'data','sfr',sfr)
+    if os.path.exists(inFile):
+        regridData(hcn_smooth,inFile,regridDir)
 
+    sfr = name+'_sfr_fuvw3_gauss15.fits' 
+    inFile = os.path.join(multiDir,'data','sfr',sfr)
+    if os.path.exists(inFile):
+        regridData(hcn_smooth,inFile,regridDir)
 
+    sfr = name+'_sfr_nuvw3_gauss15.fits' 
+    inFile = os.path.join(multiDir,'data','sfr',sfr)
+    if os.path.exists(inFile):
+        regridData(hcn_smooth,inFile,regridDir)
+
+    # process the stellar mass data
     print("** processing " + name + " Mstar **")
 
-    # process stellar mass -- regrid only -- already smoothed
-    mstar = name+'_w1_stellarmass.fits' # this name may change with final distribution of data to me by Adam.
-    if os.path.exists(os.path.join(z0mgsDir,mstar)):
-        regridData(hcn_smooth,os.path.join(z0mgsDir,mstar),regridDir)
+    mstar = name + "_mstar_gauss15.fits"
+   
+    if os.path.exists(os.path.join(multiDir,'data','mstarirac1',mstar)):
+        regridData(hcn_smooth, os.path.join(multiDir,'data','mstarirac1',mstar), regridDir)
+    elif os.path.exists(os.path.join(multiDir,'data','mstarw1',mstar)):
+        regridData(hcn_smooth, os.path.join(multiDir,'data','mstarw1',mstar), regridDir)
+    else:
+        print("No stellar mass map found!")
 
-    w1mask = name+'_w1_gauss15_stars.fits'
-    if os.path.exists(os.path.join(z0mgsDir,w1mask)):
-         regridData(hcn_smooth,os.path.join(z0mgsDir,w1mask),regridDir, mask=True)
-
+   

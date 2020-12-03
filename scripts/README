@@ -27,12 +27,17 @@ The full analysis is:
 %run make_sample_table.py
 %run plot_sample_v2.py
 
+# calculate stellar mass
+%run calc_irac1_mstar.py
+
+# calculate LTIR
+%run calc_LIR.py
+
 # set up CO 
 %run fix_up_other_data.py
 %run process_12CO.py
 
-# calculate stellar mass
-%run calc_irac1_mstar.py
+## RUN  DEGAS REDUCTION
 
 # diagnostics for reduced data
 %run make_diagnostic_moment_maps.py

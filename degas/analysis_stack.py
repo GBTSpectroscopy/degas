@@ -41,11 +41,11 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     
     # get list of dr1 galaxies
     degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
-    release = degas[release] == 1
+    idx = degas[release] == 1
 
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
-    for galaxy in degas[release]:
+    for galaxy in degas[idx]:
         full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
         tablelist.append(full_tab)
 
@@ -84,7 +84,7 @@ def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
     '''
 
     # For NGC6946, skip 13CO/C18O since we don't have that data.
-    if galaxy['NAME'] =='NGC6946':
+    if galaxy['NAME'] is 'NGC6946':
         linelist=['CO','HCN','HCOp']
     else:
         linelist=['CO','HCN','HCOp','13CO','C18O']
@@ -206,6 +206,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
         masked_line=linecube.with_mask(sn_mask)
 
     #import mom1 or  peakvel fits for stacking velocity
+    ## TODO: this looks complicated. Can't i just open the velocity file?
     velocity_file=galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' #need to change
     vhdu=fits.open(os.path.join(regridDir,velocity_file))
     vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()

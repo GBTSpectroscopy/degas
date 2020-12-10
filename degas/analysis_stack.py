@@ -187,6 +187,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
                                 use the degas table 
+    12/10/2020  A.A. Kepley     Added LTIR
 
     '''
 
@@ -197,6 +198,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
     stellarmap = mapStellar(galaxy,mom0cut, regridDir, outDir)
     sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
+    ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
     R_arcmin, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
 
 
@@ -204,12 +206,15 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     if line=='CO':
         masked_line=masked_co
         sfr=sfrmap
+        ltir=ltirmap
     else:
         if line=='HCN':
             linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
         else:
             linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
         sfr=None
+        ltir=None
+
         linecube=SpectralCube.read(os.path.join(regridDir,linefile))
         masked_line=linecube.with_mask(sn_mask)
 
@@ -219,8 +224,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     vhdu=fits.open(os.path.join(regridDir,velocity_file))
     vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
     velocity=Projection.from_hdu(vhdu)
-
-
+ 
     ## filling in the meta information for the stack.
     stack_meta={}
     stack_meta['spectra_axis_unit']=masked_co.spectral_axis.unit.to_string()
@@ -235,8 +239,8 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     # do intensity stack
     r_intensity=stack(line, masked_line, galaxy, velocity, 
-                      binmap, binedge, binlabels,'intensity','K km/s',
-                      sfrmap=sfr) 
+                      binmap, binedge, 'intensity','K km/s',
+                      sfrmap=sfr, ltirmap=ltir) 
 
     ## create stellar mass bin
     binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
@@ -244,8 +248,8 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     ## do stellar mass stack
     r_stellarmass=stack(line, masked_line, galaxy, velocity,  
-                        binmap, binedge, binlabels, 'stellarmass', 'Msun/pc^2',
-                        sfrmap=sfr)
+                        binmap, binedge,  'stellarmass', 'Msun/pc^2',
+                        sfrmap=sfr,ltirmap=ltir)
 
     ## create radius bins
     binmap, binedge, binlabels = makeBins(galaxy, R_r25, 'radius', outDir) 
@@ -253,8 +257,8 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     # stack on radius
     r_radius=stack(line, masked_line, galaxy, velocity,
-                   binmap, binedge, binlabels, 'radius', 'R25',
-                   sfrmap=sfr)
+                   binmap, binedge,  'radius', 'R25',
+                   sfrmap=sfr,ltirmap=ltir)
                  
     # put the individual stack together.
     full_stack=[r_intensity, r_stellarmass, r_radius]
@@ -317,6 +321,7 @@ def mapSN(galaxy, regridDir, outDir, sncut=3.0):
     #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
     mom0mask=~np.isnan(mom0cut)
     masked_cube=cube.with_mask(mom0mask) #use for stacking later
+
     return mom0cut, masked_cube, mom0mask
 
 def mapStellar(galaxy, mom0cut, regridDir, outDir):
@@ -358,6 +363,40 @@ def mapStellar(galaxy, mom0cut, regridDir, outDir):
     plt.close()
 
     return stellarmap
+
+def mapLTIR(galaxy, mom0cut, regridDir, outDir):
+    '''
+    make LTIR map
+
+    
+    galaxy: line from degas_base.fits table with galaxy information
+
+    mom0cut: S/N cut on mom0
+
+    regridDir: input data directory with all regridded data
+
+    outDir: output data directory
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    12/10/2020  A.A. Kepley      Original code based on mapStellar
+
+    '''
+
+    hdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_LTIR_gauss15_regrid.fits'))[0]
+
+    data=hdu.data
+
+    data[np.isnan(mom0cut)]=np.nan #apply SN mask (SN >3)
+
+    LTIRmap=Projection(data,header=hdu.header,wcs=WCS(hdu.header)) 
+    LTIRmap.quicklook()
+
+    plt.savefig(os.path.join(outDir,galaxy['NAME']+'_LTIR.png'))
+    plt.clf()
+    plt.close()
+
+    return LTIRmap
 
 def mapSFR(galaxy, mom0cut, regridDir, outDir):
     '''
@@ -511,8 +550,8 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     return cmap
 
 def stack(line, cube, galaxy, velocity, 
-          binmap, binedge, binlabels, bintype, binunit,
-          sfrmap=None, LTIRmap=None,
+          binmap, binedge, bintype, binunit,
+          sfrmap=None, ltirmap=None,
           maxAbsVel = 250.0):
 
     '''
@@ -524,9 +563,21 @@ def stack(line, cube, galaxy, velocity,
 
     galaxy: line from degas_base.fits table with galaxy information.
     
-    vtype: velocity type ('mom0' or 'peakVelocity')
+    velocity: velocity map to stack data using
+
+    binmap: bin map
+
+    binedge: bin edges
     
-    basemap: map to use to stack the data
+    binlabel: bin labels
+    
+    bintype: type of bin
+    
+    binunit: units on bin [CAN I GET THIS FROM BINMAP?]
+
+    sfrmap: star formation rate map
+
+    ltirmap: LTIR map
 
     maxAbsVel: absolute maximum velocity to include in spectral in km/s. 
     Assumes line is centered at zero (which should be true for stacking).
@@ -536,6 +587,7 @@ def stack(line, cube, galaxy, velocity,
     10/29/2020  Yiqing Song     Original Code
     12/03/2020  A.A. Kepley     Added comments and moved bin creation up 
                                 a level to simplify code.
+    12/10/2020  A.A. Kepley     added LTIR calculation
 
     '''
 
@@ -543,72 +595,77 @@ def stack(line, cube, galaxy, velocity,
     Dmpc=galaxy['DIST_MPC']
     pix_area=(np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
     nchan=cube.shape[0]
-  
+
     # do the stack
     stack, labelvals = stacking.BinByLabel(cube, binmap.value, velocity,
                                            weight_map=None)
     
     # set up the results output
-    bin_mean=np.zeros(len(stack))
-    stacksum=np.zeros(len(stack))
-    stacked_profile=np.zeros((len(stack),len(stack[0]['spectral_axis'])))
-    binlabel=np.zeros(len(stack))
-    bin_mean=np.zeros(len(stack))
-    bin_lower=np.zeros(len(stack))
-    bin_upper=np.zeros(len(stack))
-    stacknoise=np.zeros(len(stack))
-    sfr_mean=np.zeros(len(stack))
-    bin_area=np.zeros(len(stack))
+    bin_mean = np.zeros(len(stack))
+    stacksum = np.zeros(len(stack))
+    stacked_profile = np.zeros((len(stack),len(stack[0]['spectral_axis'])))
+    binlabel = np.zeros(len(stack))
+    bin_mean = np.zeros(len(stack))
+    bin_lower = np.zeros(len(stack))
+    bin_upper = np.zeros(len(stack))
+    stacknoise = np.zeros(len(stack))
+    sfr_mean = np.zeros(len(stack))
+    sfr_total = np.zeros(len(stack))
+    ltir_mean = np.zeros(len(stack))
+    ltir_total = np.zeros(len(stack))
+    bin_area = np.zeros(len(stack))
 
     # now put together the stacking results
     for i in range(len(stack)):
 
-        d=stack[i]
+        d = stack[i]
         
         # profile
-        stacked_profile[i,:]=d['spectrum']
+        stacked_profile[i,:] = d['spectrum']
 
         # integrated profile
-        integral=np.abs(np.trapz(y=d['spectrum'],x=d['spectral_axis']) )#sum intensity under curve, K km/s
-        stacksum[i]=integral.value
+        integral = np.abs(np.trapz(y=d['spectrum'], x=d['spectral_axis']) )#sum intensity under curve, K km/s
+        stacksum[i] = integral.value
 
         # calculating the noise
-        noise_region=np.logical_or(d['spectral_axis'].value < -abs(maxAbsVel), d['spectral_axis'].value > abs(maxAbsVel))
-        channoise=np.nanstd(d['spectrum'][noise_region]) #noise from signal free channels, nned to multiple by sqrt(number of channels) and channel width 
-        stacknoise[i]=channoise*np.sqrt(nchan)*np.abs(d['spectral_axis'].value[0]-d['spectral_axis'].value[1])
+        noise_region = np.logical_or(d['spectral_axis'].value < -abs(maxAbsVel),
+                                     d['spectral_axis'].value > abs(maxAbsVel))
+        channoise = np.nanstd(d['spectrum'][noise_region]) #noise from signal free channels, nned to multiple by sqrt(number of channels) and channel width 
+        stacknoise[i] = channoise*np.sqrt(nchan)*np.abs(d['spectral_axis'].value[0]-d['spectral_axis'].value[1])
 
         # putting in the bins
-        bin_lower[i]=binedge[i]
-        bin_upper[i]=binedge[i+1]
-        bin_mean[i]=(binedge[i]+binedge[i+1])/2
-        binlabel[i]=d['label']
+        bin_lower[i] = binedge[i]
+        bin_upper[i] = binedge[i+1]
+        bin_mean[i] = (binedge[i]+binedge[i+1])/2
+        #calculate the area of each bin in units of kpc^2    
+        binlabel[i] = d['label']
+        bin_area[i] = len(binmap[binmap==binlabel[i]].flatten())*pix_area    
         
         # calculating the mean SFR (as necessary)
-        if sfrmap is None:
-            pass
-        else:
+        if sfrmap is not None:
             sfr_mean[i]=np.nanmean(sfrmap[binmap==binlabel[i]])
-            #calculate the area of each bin in units of kpc^2
-            bin_area[i]=len(binmap[binmap==binlabel[i]].flatten())*pix_area
 
-            ## TODO: LTIR???
-
+        # calculate the mean LTIR (as necessary)
+        if ltirmap is not None:
+            ltir_mean[i] = np.nanmean(ltirmap[binmap==binlabel[i]])
     
+    ## AAK: Not quite sure I understand what's happening here.
     total_stack={}
-    if line=='CO': #CO is used to make stacking bins
-        total_stack['spectral_axis']=stack[0]['spectral_axis'].value
-        total_stack['bin_lower']=bin_lower
-        total_stack['bin_upper']=bin_upper
-        total_stack['bin_mean']=bin_mean
-        total_stack['bin_type']=bintype
-        total_stack['bin_unit']=binunit ### TODO: CAN I GET THIS FROM THE BINMAP DIRECTLY?
-        if sfrmap is None:
-            pass
-        else:
-            total_stack['sfr_mean_w4fuv']=sfr_mean
-            total_stack['bin_area']=bin_area
+    if line == 'CO': #CO is used to make stacking bins
+        total_stack['spectral_axis'] = stack[0]['spectral_axis'].value
+        total_stack['bin_lower'] = bin_lower
+        total_stack['bin_upper'] = bin_upper
+        total_stack['bin_mean'] = bin_mean
+        total_stack['bin_type'] = bintype
+        total_stack['bin_unit'] = binunit ### TODO: CAN I GET THIS FROM THE BINMAP DIRECTLY?
 
-            ## TODO: LTIR??
+        if sfrmap is not None:
+            total_stack['sfr_mean_w4fuv']=sfr_mean
+            total_stack['sfr_total_w4fuv']=sfr_mean * bin_area
+
+        if ltirmap is not None:
+            total_stack['ltir_mean'] = ltir_mean
+            total_stack['ltir_total'] = ltir_mean * bin_area
 
     total_stack[line+'_stack_profile']=stacked_profile
     total_stack[line+'_stack_sum']=stacksum

@@ -61,13 +61,20 @@ for galaxy in degas:
     else:
         b160 = None
         print("160micron image not found")
-        
-    # look for w3 interpolated images
-    if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")):
-        w3 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")
+   
+    # look for w4 interpolated images
+    if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")):
+        w4 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")
     else:
-        w3 = None
-        print("w3 image not found.")
+        w4 = None
+        print("w4 image not found.")    
+     
+    # look for w3 interpolated images
+    # if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")):
+    #     w3 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")
+    # else:
+    #     w3 = None
+    #     print("w3 image not found.")
  
     outFile = os.path.join(outDir,galaxy['NAME']+"_LTIR_gauss15.fits")
-    calc_LTIR(outFile,b24=b24,b70=b70, b100=b100,b160=b160, w3=w3)
+    calc_LTIR(outFile,b24=b24,b70=b70, b100=b100,b160=b160, w4=w4)

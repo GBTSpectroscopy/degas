@@ -205,7 +205,7 @@ def calc_stellar_mass(iracFile, MtoLFile, outFile):
 
 # ----------------------------------------------------------------------
 
-def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None):
+def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=None):
     '''
     Calculate LTIR based on the calibration in Galametz+ 2013.
     '''
@@ -468,6 +468,43 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None):
         # W/kpc^2 * 1e7 = erg/s/kpc^2
         # erg/s/kpc^2 / Lsun / (1000.0)**2 = Lsun/pc^2
         STIR_Lsunpc2 = (STIR_Wkpc2 * 1e7) / Lsun / (1000.0**2) 
+
+        # write the output file
+        outHdr = basehdr
+        outHdr['BUNIT'] = 'Lsun/pc^2'
+        outfits = fits.PrimaryHDU(data=STIR_Lsunpc2, header=outHdr)
+        outfits.writeto(outFile,overwrite=True)
+
+    elif (w4): 
+
+        print('calculating LTIR using WISE band 4 data')
+
+        ## use wise band 4 to calculate LTIR.  
+
+        ## Cluver+2017 bootstraps off the SINGS/KINGFISH data to show
+        ## that the relationship between LTIR and L12micron(W3) is
+        ## tighter and more linear than LTIR and L23micron (w4)
+        
+        ## Equation in Cluver+ 2017 
+        ## (Figure 3, equation 2; See erratum for correct equation.).
+        a = 0.915
+        b = 1.96
+
+        # read in each image
+        f23 = fits.open(w4)
+        
+        basehdr = f23[0].header
+
+        ## input unit is MJy/sr for W3 data, which is a surface brightness.
+        # convert from MJy/sr to W/kpc^2, then to Lsun/pc^2
+        data23freq = c / (23.0*1e-4)
+        data23 = f23[0].data * unitfactor * data23freq
+        data23 = (data23 * 1e7) / Lsun / (1000.0**2) 
+
+        f23.close()   
+
+         # calculate LTIR using coefficients above
+        STIR_Lsunpc2 = 10**(a * np.log10(data23) + b)
 
         # write the output file
         outHdr = basehdr

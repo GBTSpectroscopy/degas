@@ -59,7 +59,7 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
 
-def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
+def makeTable(galaxy, vtype, regridDir, outDir):
     '''
 
     make fitstable containing all lines from stacking results for each galaxy
@@ -84,7 +84,7 @@ def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
     '''
 
     # For NGC6946, skip 13CO/C18O since we don't have that data.
-    if galaxy['NAME'] is 'NGC6946':
+    if galaxy['NAME'] == 'NGC6946':
         linelist=['CO','HCN','HCOp']
     else:
         linelist=['CO','HCN','HCOp','13CO','C18O']
@@ -109,7 +109,7 @@ def makeTable(galaxy, vtype, scriptDir, regridDir, outDir):
     galtable=hstack(galtabs) 
 
     # add the name of the galaxy.
-    galtable['galaxy']= name
+    galtable['galaxy']= galaxy['NAME']
 
     # return the table and the stack.
     return galtable, stack_meta
@@ -190,7 +190,15 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     '''
 
-    cofile = os.path.join(regridDir,galaxy['NAME']+'_12CO_regrid.fits')
+    #make SN map, sigma-clipped mom0, 2D masked cube, and galactocentric radius map.
+
+    #TO DO : move to separate script??  only needs to be done once not every time we 
+    # stack? But would need to add file i/o
+    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
+    stellarmap = mapStellar(galaxy,mom0cut, regridDir, outDir)
+    sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
+    R_arcmin, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
+
 
     # Read in the line file for stacking
     if line=='CO':
@@ -212,15 +220,6 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
     velocity=Projection.from_hdu(vhdu)
 
-    #make SN map, sigma-clipped mom0, 2D masked cube, and galactocentric radius map.
-
-    #TO DO : move to separate script??  only needs to be done once not every time we 
-    # stack? But would need to add file i/o
-
-    mom0cut, masked_co, sn_mask = mapSN(name, regridDir, outDir, sncut=3.0)  
-    stellarmap = mapStellar(name,mom0cut, regridDir, outDir)
-    sfrmap = mapSFR(name,mom0cut, regridDir, outDir)
-    R_arcmin, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
 
     ## filling in the meta information for the stack.
     stack_meta={}
@@ -231,30 +230,30 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     stack_meta['bin_area']='kpc^2'
 
     ## create intensity bins
-    binmap, binedge, binlabels = makeBins(mom0cut, 'intensity', outDir)  
+    binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
     cmap=plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
 
     # do intensity stack
     r_intensity=stack(line, masked_line, galaxy, velocity, 
-                      binmap, binedge, binlabels,'K km/s',
+                      binmap, binedge, binlabels,'intensity','K km/s',
                       sfrmap=sfr) 
 
     ## create stellar mass bin
-    binmap, binedge, binlabels = makeBins(stellarmap, 'stellarmass', outDir)  
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+    binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
+    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
 
     ## do stellar mass stack
     r_stellarmass=stack(line, masked_line, galaxy, velocity,  
-                        binmap, binedge, binlabels, 'Msun/pc^2',
+                        binmap, binedge, binlabels, 'stellarmass', 'Msun/pc^2',
                         sfrmap=sfr)
 
     ## create radius bins
-    binmap, binedge, binlabels = makeBins(R_r25, 'radius', outDir) 
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+    binmap, binedge, binlabels = makeBins(galaxy, R_r25, 'radius', outDir) 
+    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
     # stack on radius
     r_radius=stack(line, masked_line, galaxy, velocity,
-                   binmap, binedge, binlabels, 'R25',
+                   binmap, binedge, binlabels, 'radius', 'R25',
                    sfrmap=sfr)
                  
     # put the individual stack together.
@@ -343,8 +342,7 @@ def mapStellar(galaxy, mom0cut, regridDir, outDir):
     # open the stellar mass
 
     ## TODO : NEED TO UPDATE WITH NEW ANCILLAR DATA FROM SARAH
-    stellarhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_w1_stellarmass_regrid.fits'))[0]
-    starmask=fits.getdata(os.path.join(regridDir,galaxy['NAME']+'_w1_gauss15_stars_regrid.fits'))
+    stellarhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_mstar_gauss15_regrid.fits'))[0]
 
     stellar=stellarhdu.data
     #stellar[starmask==1.0]=np.nan #apply star mask ## AAK: I think I can skip this.
@@ -371,7 +369,7 @@ def mapSFR(galaxy, mom0cut, regridDir, outDir):
     12/3/2020  A.A. Kepley     Added comments and clarified inputs
     '''
     
-    sfrhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_w4fuv_sfr_regrid.fits'))[0]
+    sfrhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_sfr_fuvw4_gauss15_regrid.fits'))[0]
     sfr=sfrhdu.data
     sfr[np.isnan(mom0cut)]=np.nan
     w=WCS(sfrhdu.header)
@@ -382,7 +380,7 @@ def mapSFR(galaxy, mom0cut, regridDir, outDir):
     sfrmap.quicklook()
 
     # save plot of map
-    plt.savefig(os.path.join(outDir,galaxy+'_sfr.png'))
+    plt.savefig(os.path.join(outDir,galaxy['NAME']+'_sfr.png'))
     plt.clf()
     plt.close()
     
@@ -429,15 +427,19 @@ def mapGCR(galaxy,  basemap):
     head=basemap.header
     pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
     R_arcmin=np.degrees(R*pxscale)*60 # map of GCR in arcmin
+    R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
     R_r25=R_arcmin/r25 # map of GCR in units of R25
 
+    Rarcmin_map=Projection(R_arcmin,header=head,wcs=w) 
+    Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
+    Rr25_map = Projection(R_r25,header=head,wcs=w) 
+
     # map of galactocentric radius in unit of kpc, arcmin, in r25
-    return R_arcmin, R_kpc, R_r25 
+    return Rarcmin_map, Rkpc_map, Rr25_map 
 
 
-def makeBins(basemap,  bintype, outDir):
+def makeBins(galaxy, basemap,  bintype, outDir):
     '''
     Create bins for the data
 
@@ -472,7 +474,7 @@ def makeBins(basemap,  bintype, outDir):
     bins[bins==len(binedge)] = 0 
     # make bins map 
     binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(os.path.join(outDir,galaxy.upper()+'_binsby'+bintype+'.fits'), overwrite=True)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
     return binmap, binedge, binlabels
 
 def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
@@ -509,7 +511,7 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     return cmap
 
 def stack(line, cube, galaxy, velocity, 
-          binmap, binedge, binlabels, binunit,
+          binmap, binedge, binlabels, bintype, binunit,
           sfrmap=None, LTIRmap=None,
           maxAbsVel = 250.0):
 

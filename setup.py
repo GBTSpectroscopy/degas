@@ -87,7 +87,6 @@ generate_version_py(PACKAGENAME, VERSION, RELEASE,
 scripts = [fname for fname in glob.glob(os.path.join('scripts', '*'))
            if not os.path.basename(fname).startswith('README')]
 
-
 # Get configuration information from all of the various subpackages.
 # See the docstring for setup_helpers.update_package_files for more
 # details.
@@ -124,7 +123,7 @@ package_info['package_data'][PACKAGENAME].extend(c_files)
 setup(name=PACKAGENAME,
       version=VERSION,
       description=DESCRIPTION,
-      scripts=scripts,
+      scripts=[],
       dependency_links=['https://github.com/GBTSpectroscopy/gbtpipe/tarball/master#egg=gbtpipe-0.2'],
       install_requires=['astropy','fitsio','numpy','gbtpipe>0.1'],
       author=AUTHOR,

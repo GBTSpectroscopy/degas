@@ -282,7 +282,9 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                Gains=None,
                OffType='linefit',
                OutputRoot = None, overwrite=False, 
-               MaskName=None, **kwargs):
+               MaskName=None,
+               CatalogFile=None,
+               **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
@@ -326,9 +328,9 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
                                           pkg_resources.get_distribution("degas").version,
                                           Project)
-    ObjectCatalog = catalogs.loadCatalog()
-    ThisGalaxy = ObjectCatalog[ObjectCatalog['NAME'] == Galaxy]
 
+    ObjectCatalog = catalogs.loadCatalog(CatalogFile=CatalogFile)
+    ThisGalaxy = ObjectCatalog[ObjectCatalog['NAME'] == Galaxy]
     galaxy_center = SkyCoord(ThisGalaxy['RA'], ThisGalaxy['DEC'],
                              unit=(u.hour, u.deg), frame='fk5')
 

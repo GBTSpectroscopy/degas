@@ -14,13 +14,16 @@ from gbtpipe.Preprocess import buildMaskLookup
 from gbtpipe.Baseline import robustBaseline
 import warnings
 
-def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, angleCut=None):
     wtvals = np.squeeze(fits.getdata(wtsFile))
     badmask = ~(wtvals > (weightCut * wtvals.max()))
     yy, xx = np.indices(wtvals.shape)
     dist = (yy - y0)**2 + (xx - x0)**2
-    mindist = np.min(dist[badmask])
-    mask = dist < mindist
+    if angleCut is None:
+        mindist = np.min(dist[badmask])
+        mask = dist < mindist
+    else:
+        pass
     cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
     cube = cube.with_mask(cubemask)
     cube = cube.minimal_subcube()
@@ -59,7 +62,8 @@ def cleansplit(filename, galaxy=None,
                edgeMask=False,
                weightCut=0.2,
                spectralSetup=None,
-               spatialSmooth=1.0):
+               spatialSmooth=1.0,
+               CatalogFile=None):
     """
     Takes a raw DEGAS cube and produces individual cubes for each
     spectral line.
@@ -95,8 +99,9 @@ def cleansplit(filename, galaxy=None,
     """
 
     Cube = SpectralCube.read(filename)
-    CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
-                                        package='degas')
+    if CatalogFile is None:
+        CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
+                                            package='degas')
     Catalog = Table.read(CatalogFile, format='ascii')
 
     # Find which galaxy in our catalog corresponds to the object we
@@ -112,6 +117,19 @@ def cleansplit(filename, galaxy=None,
                 galcoord.ra > RABound[0] and
                 galcoord.dec < DecBound[1] and
                 galcoord.dec > DecBound[0]):
+                match[index] = True
+        MatchRow = Catalog[match]
+        galcoord = SkyCoord(MatchRow['RA'],
+                            MatchRow['DEC'],
+                            unit=(u.hourangle, u.deg))
+        Galaxy = MatchRow['NAME'].data[0]
+        print("Catalog Match with " + Galaxy)
+        V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
+
+    elif type(galaxy) is str:
+        match = np.zeros_like(Catalog, dtype=np.bool)
+        for index, row in enumerate(Catalog):
+            if galaxy in row['NAME']:
                 match[index] = True
         MatchRow = Catalog[match]
         galcoord = SkyCoord(MatchRow['RA'],

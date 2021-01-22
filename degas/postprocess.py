@@ -240,14 +240,14 @@ def cleansplit(filename, galaxy=None,
         # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):
-            ThisCube.spectral_smooth(Kern)
+            ThisCube = ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
             
         # Spatial Smooth
         if spatialSmooth > 1.0:
             newBeam = Beam(major=ThisCube.beam.major * spatialSmooth,
                            minor=ThisCube.beam.minor * spatialSmooth)
-            ThisCube.convolve_to(newBeam)
+            ThisCube = ThisCube.convolve_to(newBeam)
             smoothstr = '_smooth{0}'.format(spatialSmooth)
         else:
             smoothstr = ''

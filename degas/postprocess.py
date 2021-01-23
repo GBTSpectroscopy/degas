@@ -13,17 +13,20 @@ from radio_beam import Beam
 from gbtpipe.Preprocess import buildMaskLookup
 from gbtpipe.Baseline import robustBaseline
 import warnings
+from astropy import wcs
 
-def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, angleCut=None):
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, minRadius=None):
     wtvals = np.squeeze(fits.getdata(wtsFile))
     badmask = ~(wtvals > (weightCut * wtvals.max()))
     yy, xx = np.indices(wtvals.shape)
-    dist = (yy - y0)**2 + (xx - x0)**2
-    if angleCut is None:
-        mindist = np.min(dist[badmask])
-        mask = dist < mindist
-    else:
-        pass
+    dist = np.sqrt((yy - y0)**2 + (xx - x0)**2)
+    mindist = np.min(dist[badmask])
+    if minRadius is not None:
+        pixsize = wcs.utils.proj_plane_pixel_scales(cube.wcs) * u.deg
+        minradpix = (minRadius / pixsize[0]).to(u.dimensionless_unscaled).value
+        if mindist < minradpix:
+            mindist = minradpix
+    mask = dist < mindist
     cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
     cube = cube.with_mask(cubemask)
     cube = cube.minimal_subcube()
@@ -59,6 +62,7 @@ def cleansplit(filename, galaxy=None,
                blorder=3, HanningLoops=0,
                maskfile=None,
                circleMask=True,
+               minRadius=1.3 * u.arcmin,
                edgeMask=False,
                weightCut=0.2,
                spectralSetup=None,
@@ -192,7 +196,8 @@ def cleansplit(filename, galaxy=None,
             ThisCube = circletrim(ThisCube,
                                   filename.replace('.fits','_wts.fits'),
                                   x0, y0,
-                                  weightCut=weightCut)
+                                  weightCut=weightCut,
+                                  minRadius=minRadius)
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
                                 filename.replace('.fits','_wts.fits'),

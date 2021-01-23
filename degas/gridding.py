@@ -86,12 +86,6 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                  maskfile=maskfile,
                                  outname=filename, **kwargs)
                 
-                postprocess.cleansplit(filename + '.fits',
-                                       spectralSetup=setup,
-                                       HanningLoops=1, blorder=posblorder,
-                                       spatialSmooth=1.3, 
-                                       maskfile=maskfile,
-                                       **kwargs)
             else:
                 
                 warnings.warn("Mask file not found. Proceeding to grid without mask file")
@@ -110,11 +104,11 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                  plotsubdir='timeseries/',
                                  outname=filename, **kwargs)
                 
-                postprocess.cleansplit(filename + '.fits',
-                                       spectralSetup=setup,
-                                       HanningLoops=1, blorder=posblorder,
-                                       spatialSmooth=1.3, 
-                                       **kwargs)
+        postprocess.cleansplit(filename + '.fits',
+                               spectralSetup=setup,
+                               HanningLoops=1, blorder=posblorder,
+                               spatialSmooth=1.3, 
+                               **kwargs)
 
         
                 

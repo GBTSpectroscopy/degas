@@ -61,7 +61,7 @@ def calc_etamb(freq):
 
     # calculate eta_mb via a polynominal fit from GBT Memo 302
     eta_mb = 1.23 * eta_a + 0.005*(freq.value-60) - 0.00003 * (freq.value - 60)**2
-    return eta_mb
+    return (eta_a, eta_mb)
 
 def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
     wtvals = np.squeeze(fits.getdata(wtsFile))
@@ -271,14 +271,14 @@ def cleansplit(filename, galaxy=None,
         # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):
-            ThisCube.spectral_smooth(Kern) ## AAK: don't you have to put an output cube here?
+            ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
             
         # Spatial Smooth
         if spatialSmooth > 1.0:
             newBeam = Beam(major=ThisCube.beam.major * spatialSmooth,
                            minor=ThisCube.beam.minor * spatialSmooth)
-            ThisCube.convolve_to(newBeam)  ## AAK: don't you have to put an output cube here -- YES you do. CHECK WITH ERIC ABOUT THIS.
+            ThisCube.convolve_to(newBeam) 
             smoothstr = '_smooth{0}'.format(spatialSmooth)
         else:
             smoothstr = ''
@@ -288,12 +288,18 @@ def cleansplit(filename, galaxy=None,
         ## GBT forward efficiency is 0.99 ~= 1.0. 
         ## assumes that rest freq ~ observing freq, which should be okay for our sources.
         freq = ThisCube.header['RESTFRQ'] * u.Hz
-        eta_mb = calc_etamb(freq)
+        (eta_a, eta_mb) = calc_etamb(freq)
         ThisCube = ThisCube/eta_mb
 
         # Final Writeout
-        ThisCube.write(Galaxy + '_' + ThisLine +
+        finalFile = Galaxy + '_' + ThisLine +
                        '_rebase{0}'.format(blorder) + smoothstr +
-                       '_hanning{0}.fits'.format(HanningLoops),
+                       '_hanning{0}.fits'.format(HanningLoops)
+        ThisCube.write(finalFile,
                        overwrite=True)
 
+        # Get the headers right via brute force fits manipulation.
+        finalCube = fits.open(finalFile)
+        finalCube[0].header['ETAMB'] = eta_mb
+        finalCube[0].header['BUNIT'] = ('K','TMB') # indicate that units are now TMB via a comment
+        finalCube.writeto(finalCube,overwrite=True)

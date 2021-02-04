@@ -20,10 +20,10 @@ for galaxy in degas:
     print("***Processing galaxy: " + galaxy['NAME'] + "***")
     
     # look for 24micron images        
-    if os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_lvl_release_mips24_gauss15.fits")):
-        b24 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_lvl_release_mips24_gauss15.fits")
-    elif os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_bendomips_release_mips24_gauss15.fits")):
+    if os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_bendomips_release_mips24_gauss15.fits")):
         b24 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_bendomips_release_mips24_gauss15.fits")
+    elif os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_lvl_release_mips24_gauss15.fits")):
+        b24 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_lvl_release_mips24_gauss15.fits")
     elif os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_sings_release_mips24_gauss15.fits")):
         b24 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_sings_release_mips24_gauss15.fits")
     else:

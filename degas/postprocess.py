@@ -65,12 +65,19 @@ def calc_etamb(freq):
     return (eta_a, eta_mb)
 
 
-def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
+
+
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, minRadius=None):
     wtvals = np.squeeze(fits.getdata(wtsFile))
     badmask = ~(wtvals > (weightCut * wtvals.max()))
     yy, xx = np.indices(wtvals.shape)
-    dist = (yy - y0)**2 + (xx - x0)**2
+    dist = np.sqrt((yy - y0)**2 + (xx - x0)**2)
     mindist = np.min(dist[badmask])
+    if minRadius is not None:
+        pixsize = wcs.utils.proj_plane_pixel_scales(cube.wcs) * u.deg
+        minradpix = (minRadius / pixsize[0]).to(u.dimensionless_unscaled).value
+        if mindist < minradpix:
+            mindist = minradpix
     mask = dist < mindist
     cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
     cube = cube.with_mask(cubemask)

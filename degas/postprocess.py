@@ -114,6 +114,7 @@ def cleansplit(filename, galaxy=None,
                blorder=3, HanningLoops=0,
                maskfile=None,
                circleMask=True,
+               minRadius=1.3 * u.arcmin,
                edgeMask=False,
                weightCut=0.2,
                spectralSetup=None,
@@ -243,6 +244,13 @@ def cleansplit(filename, galaxy=None,
             x0, y0, _ = ThisCube.wcs.wcs_world2pix(galcoord.ra,
                                                    galcoord.dec,
                                                    0, 0)
+            FoVFile = get_pkg_data_filename('./data/field_of_view.csv',
+                                                package='degas')
+            if FoVFile:
+                fov_table = Table.read(fov_file)
+                if np.any(fov_table['Galaxy'] == Galaxy):
+                    minRadius = (fov_table[fov_table['Galaxy'] == Galaxy]['FoV_arcsec']) * u.arcsec
+
             ThisCube = circletrim(ThisCube,
                                   filename.replace('.fits','_wts.fits'),
                                   x0, y0,

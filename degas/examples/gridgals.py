@@ -23,6 +23,8 @@ HCNgals = [
     'NGC4569',
 ]
 
+HCNgals=['IC0342']
+
 COgals = [
     'NGC4038',
     'NGC2146',
@@ -43,7 +45,7 @@ COgals = [
     'IC0342',
 ]
 
-
+COgals = ['IC0342']
 for gal in COgals:
     gridGalaxy(galaxy=gal, setup='13CO_C18O',
                release='QA0', datadir=datadir, PostprocOnly=True)

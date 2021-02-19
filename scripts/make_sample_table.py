@@ -61,7 +61,7 @@ header = '''\\begin{deluxetable}{rrrrrrrcrrr}
 '''
 
 footer = '''\enddata
-\\tablecomments{The values for right ascension, declination, and R$_{25}$ are taken from \citet{Makarov2014HyperLEDA.Distances}. Distances are taken from \citet{Tully2009TheDatabase}  with the exception of NGC6946, whose distance was taken from \citet{Anand2018A6946}. he quantities $\log$~M$_*$ and $\log$~SFR  are taken from \citet{Leroy2019AGalaxies}. The references for the inclination and position angles of the galaxies are indicated in the table as follows: (1) \citet{Leroy2009Heracles:Survey}  (2)\citet{Makarov2014HyperLEDA.Distances}  (3) P. Lang et al., (submitted to ApJ)  (4) \citet{DeBlok2008High-resolutionThings}. }
+\\tablecomments{The values for right ascension, declination, and R$_{25}$ are taken from \citet{Makarov2014HyperLEDA.Distances}. Distances are taken from \citet{Tully2009TheDatabase} with the exception of NGC6946, whose distance was taken from \citet{Anand2018A6946}. The quantities $\log$~M$_*$ and $\log$~SFR  are taken from \citet{Leroy2019AGalaxies}. The references for the inclination and position angles of the galaxies are indicated in the table as follows: (1) \citet{Leroy2009Heracles:Survey}  (2)\citet{Makarov2014HyperLEDA.Distances}  (3) P. Lang et al., (submitted to ApJ)  (4) \citet{DeBlok2008High-resolutionThings}. }
 
 
 \\end{deluxetable}

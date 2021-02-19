@@ -114,7 +114,7 @@ def cleansplit(filename, galaxy=None,
     """
     Takes a raw DEGAS cube and produces individual cubes for each
     spectral line.
-    
+
     Paramters
     ---------
     filename : str
@@ -309,9 +309,10 @@ def cleansplit(filename, galaxy=None,
         ThisCube = ThisCube/eta_mb
 
         # Final Writeout
-        ThisCube.write(Galaxy + '_' + ThisLine +
+        finalFile = Galaxy + '_' + ThisLine +
                        '_rebase{0}'.format(blorder) + smoothstr +
                        '_hanning{0}.fits'.format(HanningLoops),
+        ThisCube.write(finalFile,
                        overwrite=True)
 
         # Get the headers right via brute force fits manipulation.

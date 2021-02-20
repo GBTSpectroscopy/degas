@@ -306,7 +306,7 @@ def cleansplit(filename, galaxy=None,
         for i in range(HanningLoops):
             ThisCube = ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
-            
+
         # Spatial Smooth
         if spatialSmooth > 1.0:
             newBeam = Beam(major=ThisCube.beam.major * spatialSmooth,
@@ -334,4 +334,4 @@ def cleansplit(filename, galaxy=None,
         finalCube = fits.open(finalFile)
         finalCube[0].header['ETAMB'] = eta_mb
         finalCube[0].header['BUNIT'] = ('K','TMB') # indicate that units are now TMB via a comment
-        finalCube.writeto(finalCube,overwrite=True)
+        finalCube[0].writeto(finalFile,overwrite=True)

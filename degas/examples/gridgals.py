@@ -23,7 +23,7 @@ HCNgals = [
     'NGC4569',
 ]
 
-HCNgals=['IC0342']
+HCNgals=['NGC6946']
 
 COgals = [
     'NGC4038',

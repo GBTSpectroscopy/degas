@@ -324,9 +324,8 @@ def cleansplit(filename, galaxy=None,
         ThisCube = ThisCube/eta_mb
 
         # Final Writeout
-        finalFile = Galaxy + '_' + ThisLine +
-                       '_rebase{0}'.format(blorder) + smoothstr +
-                       '_hanning{0}.fits'.format(HanningLoops),
+        finalFile = Galaxy + '_' + ThisLine + '_rebase{0}'.format(blorder) + smoothstr + \
+                    '_hanning{0}.fits'.format(HanningLoops),
         ThisCube.write(finalFile,
                        overwrite=True)
 

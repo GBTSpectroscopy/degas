@@ -118,6 +118,7 @@ def cleansplit(filename, galaxy=None,
                edgeMask=False,
                weightCut=0.2,
                spectralSetup=None,
+               CatalogFile=None,
                spatialSmooth=1.0):
     """
     Takes a raw DEGAS cube and produces individual cubes for each
@@ -247,7 +248,7 @@ def cleansplit(filename, galaxy=None,
             FoVFile = get_pkg_data_filename('./data/field_of_view.csv',
                                                 package='degas')
             if FoVFile:
-                fov_table = Table.read(fov_file)
+                fov_table = Table.read(FoVFile)
                 if np.any(fov_table['Galaxy'] == Galaxy):
                     minRadius = (fov_table[fov_table['Galaxy'] == Galaxy]['FoV_arcsec']) * u.arcsec
 

@@ -28,7 +28,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                **kwargs):
 
     pipeversion = pkg_resources.get_distribution("degas").version
-
+    pipeversion = pipeversion.replace('208', '210')
     setup_dict = {'13CO_C18O':'13co_c18o',
                   'HCN_HCO+':'hcn_hcop',
                   '12CO':'12co'}
@@ -103,7 +103,7 @@ def gridGalaxy(galaxy='IC0342', setup='13CO_C18O',
                                  blorder=scanblorder,
                                  plotsubdir='timeseries/',
                                  outname=filename, **kwargs)
-                
+
         postprocess.cleansplit(filename + '.fits',
                                spectralSetup=setup,
                                HanningLoops=1, blorder=posblorder,

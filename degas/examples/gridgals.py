@@ -45,15 +45,15 @@ COgals = [
     'IC0342',
 ]
 
-COgals = ['IC0342']
-for gal in COgals:
-    gridGalaxy(galaxy=gal, setup='13CO_C18O',
-               release='QA0', datadir=datadir, PostprocOnly=True)
+# COgals = ['IC0342']
+# for gal in COgals:
+#     gridGalaxy(galaxy=gal, setup='13CO_C18O',
+#                release='QA0', datadir=datadir, PostprocOnly=True)
 
     
 for gal in HCNgals:
     gridGalaxy(galaxy=gal, setup='HCN_HCO+',
-               release='QA0', datadir=datadir)
+               release='QA0', datadir=datadir, PostprocOnly=True)
 
 
 # gridGalaxy(galaxy='NGC5055', setup='13CO_C18O', release='QA0', datadir=datadir)

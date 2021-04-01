@@ -41,11 +41,18 @@ idx_dr1 = degas_table['DR1'] == 1
 
 # Extract list of galaxies via fancy list comprehension
 
+# phangs
+phangs_list = [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'phangs','*10kms_gauss15.fits'))]
+
+
 # heracles
 heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15_fixed.fits'))]
 
 # bima song
 bima_list = [ os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'bima_song','*gauss15_fixed.fits'))]
+
+# everyHeracles (from Adam)
+extra_hera_adam_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','_co21_native.fits'))]
 
 # everyHERACLES
 extra_hera_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'co_from_andreas','*.cube.fits'))]
@@ -74,7 +81,9 @@ for galaxy in degas_table[idx_dr1]:
 
         degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'GBT'
       
-    ## use heracles first
+    ## use phangs first
+
+    ## use heracles second
     elif galaxy['NAME'] in heracles_list:
 
         cubeFile = os.path.join(otherDataDir,'heracles',
@@ -101,6 +110,8 @@ for galaxy in degas_table[idx_dr1]:
 
         degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'HERACLES'
    
+
+    ## use extra HERA data from adam next 
 
 
     ## use HERA data from Andreas next (everyHERACLES)

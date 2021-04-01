@@ -171,6 +171,103 @@ def fixExtraHERA(fitsimage,beam=15.0):
     interpCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),
                      overwrite=True)
 
+def fixExtraHERAfromAdam(fitsimage,beam=15.0):
+    '''
+    Purpose: fix up extra HERA data from Adam
+    '''
+
+    # switch header from M/S to m/s to fix up wcs read errors with SpectralCube
+    f = fits.open(fitsimage)
+    f[0].header['CUNIT3'] = 'm/s'
+    newimage = fitsimage.replace('.fits','_fixed.fits')
+    f.writeto(newimage,overwrite=True)
+    f.close()
+    
+    # open image
+    cube = SpectralCube.read(newimage)    
+    
+    # switch to km/s
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+
+    # smooth
+    newBeam = Beam(beam*u.arcsec)
+    smoothCube = cube_kms.convolve_to(newBeam)
+
+    # write out
+    smoothCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),overwrite=True)
+
+def fixPhangs(image,beam=15.0):
+    '''
+    Purpose: fix up Phangs data so we can do analysis for DEGAS
+    '''
+    os.environ['TMPDIR'] = '/lustre/cv/users/akepley/tmp'
+
+    cube = SpectralCube.read(image)
+    
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+
+    smoothFactor = 4.0 
+    spSmoothCube = cube_kms.spectral_smooth(Box1DKernel(smoothFactor))
+
+    # Interpolate onto a new axis
+    spec_axis = spSmoothCube.spectral_axis
+    chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+
+    interpCube = spSmoothCube.spectral_interpolate(new_axis,
+                                                   suppress_smooth_warning=True)
+
+    newBeam = Beam(beam*u.arcsec)
+    smoothCube = interpCube. convolve_to(newBeam)
+    smoothCube.write(image.replace('_7p5as.fits','_10kms_gauss15.fits'),overwrite=True)
+
+def fixJialu(image,beam=15.0):
+    '''
+    Purpose: fix up Jialu's IC0342 cube so we can use it for analysis for DEGAS
+    '''
+    
+    f = fits.open(image)
+
+    f[0].header['BUNIT'] = 'K'
+    f[0].header['RESTFRQ'] = float(rest_freq_12co.to(u.Hz).value)    
+
+    f.writeto(image.replace('.fits','_fixed.fits'), overwrite=True)
+
+    image =  image.replace('.fits','_fixed.fits')
+
+    # open image
+    cube = SpectralCube.read(image)   
+
+    cube_ms = cube.with_spectral_unit(u.m / u.s) 
+
+    ## This should set header
+    #cube_ms = cube.with_spectral_unit(u.m / u.s, rest_value=rest_freq_12co)
+
+    # chop off bad edge
+    subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
+
+    # add beam
+    beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
+
+    # smooth
+    newBeam = Beam(common_beam*u.arcsec)
+    smoothCube = beamcube.convolve_to(newBeam)
+
+    # smooth spectrally.
+    smoothFactor = 3.0
+    spSmoothCube = smoothCube.spectral_smooth(Box1DKernel(smoothFactor))
+    spec_axis = spSmoothCube.spectral_axis
+    chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+
+    interpCube = spSmoothCube.spectral_interpolate(new_axis,
+                                                   suppress_smooth_warning=False)
+
+    # write out
+    interpCube.write(image.replace('8arcsec_fixed.fits','10kms_gauss15.fits'),
+                     overwrite=True)
+
+
 #----------------------------------------------------------------------
 
 def calc_stellar_mass(iracFile, MtoLFile, outFile):

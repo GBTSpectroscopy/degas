@@ -200,31 +200,36 @@ def fixPhangs(image,beam=15.0):
     '''
     Purpose: fix up Phangs data so we can do analysis for DEGAS
     '''
-    os.environ['TMPDIR'] = '/lustre/cv/users/akepley/tmp'
+    #os.environ['TMPDIR'] = '/lustre/cv/users/akepley/tmp'
 
     cube = SpectralCube.read(image)
     
     cube_kms = cube.with_spectral_unit(u.km / u.s)
+    #cube_kms.allow_huge_operations=True
 
     smoothFactor = 4.0 
-    spSmoothCube = cube_kms.spectral_smooth(Box1DKernel(smoothFactor))
+    spSmoothCube = cube_kms.spectral_smooth(Box1DKernel(smoothFactor),
+                                            use_memmap=False)
 
     # Interpolate onto a new axis
     spec_axis = spSmoothCube.spectral_axis
     chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
-    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.km/u.s
 
     interpCube = spSmoothCube.spectral_interpolate(new_axis,
                                                    suppress_smooth_warning=True)
 
     newBeam = Beam(beam*u.arcsec)
-    smoothCube = interpCube. convolve_to(newBeam)
+    smoothCube = interpCube.convolve_to(newBeam)
     smoothCube.write(image.replace('_7p5as.fits','_10kms_gauss15.fits'),overwrite=True)
 
 def fixJialu(image,beam=15.0):
     '''
     Purpose: fix up Jialu's IC0342 cube so we can use it for analysis for DEGAS
     '''
+
+    #12CO rest frequency
+    resta_freq_12co = 115.27120180*u.GHz
     
     f = fits.open(image)
 
@@ -250,7 +255,7 @@ def fixJialu(image,beam=15.0):
     beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
 
     # smooth
-    newBeam = Beam(common_beam*u.arcsec)
+    newBeam = Beam(beam*u.arcsec)
     smoothCube = beamcube.convolve_to(newBeam)
 
     # smooth spectrally.

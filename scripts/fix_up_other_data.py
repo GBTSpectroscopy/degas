@@ -25,8 +25,6 @@ otherDataDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data')
 # common beam
 common_beam = 15.0 #arcsec
 
-#12CO rest frequency
-rest_freq_12co = 115.27120180*u.GHz
 
 
 ## fix BIMA data
@@ -93,6 +91,16 @@ extra_hera_list = glob.glob(os.path.join(otherDataDir,'co_from_andreas','*hera_c
 for image in extra_hera_list:
     analysis_setup.fixExtraHERA(image,beam=common_beam)
 
+## fix up extra HERA data from Adam 
+## --------------------------------------------------
+
+### Includes eta_mb efficiency correction
+
+extra_hera_adam_list = glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','*hera_co21_native.fits'))
+
+for image in extra_hera_adam_list:
+    analysis_setup.fixExtraHERAFromAdam(image,beam=common_beam)
+
 
 ## NGC4038
 ## -------
@@ -120,7 +128,7 @@ print("Processing PHANGS data")
 
 phangsList = glob.glob(os.path.join(otherDataDir,'phangs',"*_co21_7p5as.fits"))
 for image in phangsList:
-    analysis_setup.fixPhangs(image,beam=commmon_beam)
+    analysis_setup.fixPhangs(image,beam=common_beam)
     
 
 

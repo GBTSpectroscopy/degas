@@ -10,7 +10,7 @@ import os
 import glob
 import re
 
-from degas.analysis_setup import fixBIMA, fixHeracles, fixOVRO, fixNRO, fixExtraHERA, smoothCube
+import degas.analysis_setup as analysis_setup
 
 from radio_beam import Beam
 import astropy.units as u
@@ -23,10 +23,8 @@ import numpy as np
 otherDataDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data')
 
 # common beam
-beam = 15.0 #arcsec
+common_beam = 15.0 #arcsec
 
-#12CO rest frequency
-rest_freq_12co = 115.27120180*u.GHz
 
 
 ## fix BIMA data
@@ -37,7 +35,7 @@ print("processing BIMA data")
 bima_list = glob.glob(os.path.join(otherDataDir,'bima_song','*_gauss15.fits'))
 
 for image in bima_list:
-    fixBIMA(image)
+    analysis_setup.fixBIMA(image)
 
 ## fix heracles images 
 ## ---------------------
@@ -46,7 +44,7 @@ print("processing heracles data")
 
 heracles_list = glob.glob(os.path.join(otherDataDir,'heracles','*_gauss15.fits'))
 for image in heracles_list:
-    fixHeracles(image)
+    analysis_setup.fixHeracles(image)
 
 ## fix up OVRO data
 ## -----------------
@@ -55,7 +53,7 @@ print("processing OVRO data")
 
 ovro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*.co.cmmsk.fits'))
 for image in ovro_list:
-    fixOVRO(image,beam=beam)
+    analysis_setup.fixOVRO(image,beam=common_beam)
 
 ## fix up IC0342 12CO data from Jialu
 # -----------------------------------
@@ -64,47 +62,7 @@ print("processing IC342 12CO from Jialu")
 
 image = os.path.join(otherDataDir,'jialu','ic0342_regrid_12co_cube_Tmb_8arcsec.fits')
 
-f = fits.open(image)
-
-f[0].header['BUNIT'] = 'K'
-f[0].header['RESTFRQ'] = float(rest_freq_12co.to(u.Hz).value)    
-
-f.writeto(image.replace('.fits','_fixed.fits'), overwrite=True)
-
-image =  image.replace('.fits','_fixed.fits')
-
-# open image
-cube = SpectralCube.read(image)   
-
-cube_ms = cube.with_spectral_unit(u.m / u.s) 
-
-## This should set header
-#cube_ms = cube.with_spectral_unit(u.m / u.s, rest_value=rest_freq_12co)
-
-# chop off bad edge
-subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
-
-# add beam
-beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
-
-# smooth
-newBeam = Beam(beam*u.arcsec)
-smoothCube = beamcube.convolve_to(newBeam)
-
-# smooth spectrally.
-smoothFactor = 3.0
-spSmoothCube = smoothCube.spectral_smooth(Box1DKernel(smoothFactor))
-spec_axis = spSmoothCube.spectral_axis
-chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
-new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
-
-interpCube = spSmoothCube.spectral_interpolate(new_axis,
-                                               suppress_smooth_warning=False)
-
-
-# write out
-interpCube.write(image.replace('8arcsec_fixed.fits','10kms_gauss15.fits'),
-                 overwrite=True)
+analysis_setup.fixJialu(image,beam=common_beam)
 
 ## fix up NRO data 
 ## ---------------
@@ -117,7 +75,7 @@ print("processing NRO data")
 ## coordinates are weird (RA---GLS and DEC--GLS)
 nro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*RD.FITS'))
 for image in nro_list:
-    fixNRO(image)
+    analysis_setup.fixNRO(image)
 
 ## fix up every HERA data from Andreas
 ## ---------------------------------------------------------
@@ -131,7 +89,17 @@ print("processing extra HERA data from Andreas")
 extra_hera_list = glob.glob(os.path.join(otherDataDir,'co_from_andreas','*hera_co21.cube.fits'))
 
 for image in extra_hera_list:
-    fixExtraHERA(image,beam=beam)
+    analysis_setup.fixExtraHERA(image,beam=common_beam)
+
+## fix up extra HERA data from Adam 
+## --------------------------------------------------
+
+### Includes eta_mb efficiency correction
+
+extra_hera_adam_list = glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','*hera_co21_native.fits'))
+
+for image in extra_hera_adam_list:
+    analysis_setup.fixExtraHERAfromAdam(image,beam=common_beam)
 
 
 ## NGC4038
@@ -152,6 +120,16 @@ newBeam = Beam(15.1*u.arcsec) ## beam is slightly too big in one
                               ## making the smoothing slightly larger.
 smoothCube = cube.convolve_to(newBeam)
 smoothCube.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
+
+## PHANGS data
+## -----------
+
+print("Processing PHANGS data")
+
+phangsList = glob.glob(os.path.join(otherDataDir,'phangs',"*_co21_7p5as.fits"))
+for image in phangsList:
+    analysis_setup.fixPhangs(image,beam=common_beam)
+    
 
 # ## fix up NGC3631 and NGC4030 HERA data from Adam
 # ## ----------------------------------------------

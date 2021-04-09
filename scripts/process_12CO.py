@@ -4,6 +4,8 @@
 # Date          Programmer              Description of Changes
 # ----------------------------------------------------------------------
 # 4/14/2020     A.A. Kepley             Original Code
+# 4/8/2021      A.A. Kepley             Updated to include phangs and new hera data
+
 
 import os
 from degas.masking import cubemask
@@ -35,20 +37,26 @@ degas_table = Table.read(os.path.join(scriptDir,"degas_base.fits"))
 # create a column for logging masks.
 if 'MASK' in degas_table.colnames:
     degas_table.remove_column('MASK')
-degas_table.add_column(Column(np.full_like(degas_table['NAME'],''),dtype='S15'),name='MASK')
+degas_table.add_column(Column(np.full_like(degas_table['NAME'],''),dtype='S25'),name='MASK')
 
 idx_dr1 = degas_table['DR1'] == 1
 
 # Extract list of galaxies via fancy list comprehension
 
+# phangs
+phangs_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'phangs','*10kms_gauss15.fits'))]
+
 # heracles
 heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15_fixed.fits'))]
 
-# bima song
-bima_list = [ os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'bima_song','*gauss15_fixed.fits'))]
+# everyHeracles (from Adam)
+extra_hera_adam_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','*10kms_gauss15.fits'))]
 
 # everyHERACLES
 extra_hera_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'co_from_andreas','*.cube.fits'))]
+
+# bima song
+bima_list = [ os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'bima_song','*gauss15_fixed.fits'))]
 
 # OVRO
 ovro_list = [ os.path.basename(image).split('.')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'temp_co','*co.cmmsk_gauss15_fixed.fits'))]
@@ -74,7 +82,22 @@ for galaxy in degas_table[idx_dr1]:
 
         degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'GBT'
       
-    ## use heracles first
+    ## use phangs first
+    elif galaxy['NAME'] in phangs_list:
+        cubeFile = os.path.join(otherDataDir,'phangs',
+                                galaxy['NAME'].lower() + '_12m+7m+tp_co21_10kms_gauss15.fits')
+
+        ## works for NGC2903 and NGC3521 and NGC4569
+        cubemask(cubeFile,
+                 outName,
+                 outDir=maskDir,
+                 peakCut=peakCut, lowCut=lowCut,
+                 minBeamFrac=2.0,
+                 minNchan=3.0)
+        
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'PHANGS'
+
+    ## use heracles second
     elif galaxy['NAME'] in heracles_list:
 
         cubeFile = os.path.join(otherDataDir,'heracles',
@@ -90,9 +113,6 @@ for galaxy in degas_table[idx_dr1]:
                      threeD=True)
         else:
 
-            cubeFile = os.path.join(otherDataDir,'heracles',
-                                  galaxy['NAME']+'_heracles_gauss15_fixed.fits')
-  
             cubemask(cubeFile,
                      outName,
                      outDir=maskDir,
@@ -102,15 +122,21 @@ for galaxy in degas_table[idx_dr1]:
         degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'HERACLES'
    
 
+    ## use extra HERA data from adam next 
+    elif galaxy['NAME'] in extra_hera_adam_list:
+        
+        cubeFile = os.path.join(otherDataDir,'everyHeracles_fromadam_20210318',
+                                galaxy['NAME'].lower()+'_hera_co21_native_fixed_10kms_gauss15.fits')
 
-    ## use HERA data from Andreas next (everyHERACLES)
-    elif galaxy['NAME'] in extra_hera_list:
-    
-        if galaxy['NAME'] == 'NGC3631':
+        if galaxy['NAME'] == 'NGC3147':
+            # this galaxy has a lot of fluffy low-level CO emission. By channel doesn't identify it as much as doing a three dimension cut for things that show up in multiple channels.
 
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
-
+            cubemask(cubeFile,
+                     outName,
+                     outDir=maskDir,
+                     peakCut=3.5,lowCut=2.0,
+                     minBeamFrac=1.5,threeD=True,minNchan=5.0)   
+        elif galaxy['NAME'] == 'NGC3631':
 
             cubemask(cubeFile,
                      outName,
@@ -121,8 +147,38 @@ for galaxy in degas_table[idx_dr1]:
         elif galaxy['NAME'] == 'NGC4030':
             # this galaxy has a lot of fluffy low-level CO emission. By channel doesn't identify it as much as doing a three dimension cut for things that show up in multiple channels.
 
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
+            cubemask(cubeFile,
+                     outName,
+                     outDir=maskDir,
+                     peakCut=3.5,lowCut=2.0,
+                     minBeamFrac=1.0,threeD=True,minNchan=3.0)
+
+        else:
+
+            cubemask(cubeFile,
+                     outName,
+                     outDir=maskDir,
+                     peakCut=peakCut,lowCut=lowCut)
+            
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'everyHERACLES'
+
+    ## use HERA data from Andreas next (everyHERACLES)
+    elif galaxy['NAME'] in extra_hera_list:
+        
+        cubeFile = os.path.join(otherDataDir,'co_from_andreas',
+                                galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
+
+
+        if galaxy['NAME'] == 'NGC3631':
+
+            cubemask(cubeFile,
+                     outName,
+                     outDir=maskDir,
+                     peakCut=peakCut,lowCut=lowCut,
+                     skipChan=[5])     
+
+        elif galaxy['NAME'] == 'NGC4030':
+            # this galaxy has a lot of fluffy low-level CO emission. By channel doesn't identify it as much as doing a three dimension cut for things that show up in multiple channels.
 
 
             cubemask(cubeFile,
@@ -134,9 +190,6 @@ for galaxy in degas_table[idx_dr1]:
         elif galaxy['NAME'] == 'NGC3147':
             # this galaxy has a lot of fluffy low-level CO emission. By channel doesn't identify it as much as doing a three dimension cut for things that show up in multiple channels.
 
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
-
             cubemask(cubeFile,
                      outName,
                      outDir=maskDir,
@@ -146,8 +199,6 @@ for galaxy in degas_table[idx_dr1]:
 
         elif galaxy['NAME'] == 'NGC4501':
             
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
 
             cubemask(cubeFile,
                      outName,
@@ -157,8 +208,6 @@ for galaxy in degas_table[idx_dr1]:
            
         elif galaxy['NAME'] == 'NGC4535':
 
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
             
             cubemask(cubeFile,
                      outName,
@@ -167,15 +216,13 @@ for galaxy in degas_table[idx_dr1]:
                      minBeamFrac=1.5)    
         else:
 
-            cubeFile = os.path.join(otherDataDir,'co_from_andreas',
-                                  galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
-
+        
             cubemask(cubeFile,
                      outName,
                      outDir=maskDir,
                      peakCut=peakCut,lowCut=lowCut)
 
-        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'everyHERACLES'
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'everyHERACLES_Andreas'
 
     ## use bima third
     elif galaxy['NAME'] in bima_list:
@@ -232,7 +279,7 @@ for galaxy in degas_table[idx_dr1]:
                  outDir=maskDir,
                  peakCut=peakCut, lowCut=lowCut)
         
-        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'ALMA'
+        degas_table['MASK'][degas_table['NAME'] == galaxy['NAME']] = 'WILSON'
 
     
     else:

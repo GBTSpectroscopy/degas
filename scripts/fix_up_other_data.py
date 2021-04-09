@@ -99,7 +99,7 @@ for image in extra_hera_list:
 extra_hera_adam_list = glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','*hera_co21_native.fits'))
 
 for image in extra_hera_adam_list:
-    analysis_setup.fixExtraHERAFromAdam(image,beam=common_beam)
+    analysis_setup.fixExtraHERAfromAdam(image,beam=common_beam)
 
 
 ## NGC4038
@@ -130,8 +130,6 @@ phangsList = glob.glob(os.path.join(otherDataDir,'phangs',"*_co21_7p5as.fits"))
 for image in phangsList:
     analysis_setup.fixPhangs(image,beam=common_beam)
     
-
-
 
 # ## fix up NGC3631 and NGC4030 HERA data from Adam
 # ## ----------------------------------------------

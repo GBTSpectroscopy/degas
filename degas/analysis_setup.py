@@ -197,19 +197,36 @@ def fixExtraHERAfromAdam(fitsimage,beam=15.0):
     smoothCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),overwrite=True)
 
 def fixPhangs(image,beam=15.0):
-    '''
-    Purpose: fix up Phangs data so we can do analysis for DEGAS
+    '''Purpose: fix up Phangs data so we can do analysis for DEGAS.
+
+    4/1/2021: I needed to modify, spectral_cube/base_class.py,
+    _get_filled_data function to explicitly use memory mapping. Hack
+    courtesy of Eric Koch. Evidently the cube was memory mapped, but
+    not the mask.
+
+    return self._mask._filled(data=data, wcs=self._wcs, fill=fill,
+                                  view=view, wcs_tolerance=self._wcs_tolerance,
+                                  #use_memmap=use_memmap
+                                  use_memmap=False # hack to get phangs data to work
+                                 )
+
     '''
     #os.environ['TMPDIR'] = '/lustre/cv/users/akepley/tmp'
 
-    cube = SpectralCube.read(image)
+    #cube = SpectralCube.read(image)
+    cube = SpectralCube.read(image, use_memmap=False, mode='readonly')
+
+    if re.search('ngc2903',image):
+        subCube = cube[59:332,:,:]
+    else:
+        subCube = cube[:,:,:]
     
-    cube_kms = cube.with_spectral_unit(u.km / u.s)
-    #cube_kms.allow_huge_operations=True
+    cube_kms = subCube.with_spectral_unit(u.km / u.s)
 
     smoothFactor = 4.0 
+    cube_kms.allow_huge_operations=True
     spSmoothCube = cube_kms.spectral_smooth(Box1DKernel(smoothFactor),
-                                            use_memmap=False)
+                                            use_memmap=False,verbose=1)
 
     # Interpolate onto a new axis
     spec_axis = spSmoothCube.spectral_axis
@@ -220,6 +237,8 @@ def fixPhangs(image,beam=15.0):
                                                    suppress_smooth_warning=True)
 
     newBeam = Beam(beam*u.arcsec)
+
+    #interpCube.allow_huge_operations=True
     smoothCube = interpCube.convolve_to(newBeam)
     smoothCube.write(image.replace('_7p5as.fits','_10kms_gauss15.fits'),overwrite=True)
 

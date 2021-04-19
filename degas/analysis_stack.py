@@ -12,7 +12,7 @@ import glob
 from astropy.wcs import WCS
 import os
 
-def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1'):
+def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
@@ -43,11 +43,17 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
     idx = degas[release] == 1
 
+    if not sourceList:
+        sourceList = degas[idx]['NAME']
+
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
     for galaxy in degas[idx]:
-        full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
-        tablelist.append(full_tab)
+
+        if galaxy['NAME'] in sourceList:
+            full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
+            tablelist.append(full_tab)
+        
 
     # stack all the tables together
     table=vstack(tablelist)
@@ -108,6 +114,16 @@ def makeTable(galaxy, vtype, regridDir, outDir):
     # merge different lines together horizontally
     galtable=hstack(galtabs) 
 
+    ## ADD empty 13CO and C18O columns for NGC6946
+    ## '13CO_stack_profile','13CO_stack_sum','13CO_stack_noise','C18O_stack_profile','C18O_stack_sum','C18O_stack_noise'
+    #if galaxy['NAME'] == 'NGC6946':
+    #    for col in ['13CO_stack_sum','13CO_stack_noise','C18O_stack_sum','C18O_stack_noise']:
+    #        galtable.add_column(np.zeros(len(galtable['HCN_stack_sum'])), name=col)
+    #    for col in ['13CO_stack_profile','C18O_stack_profile']:
+    #        galtable.add_column(np.zeros(np.shape(galtable['HCN_stack_profile'])), name=col)
+        
+            
+        
     # add the name of the galaxy.
     galtable['galaxy']= galaxy['NAME']
 
@@ -199,7 +215,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     stellarmap = mapStellar(galaxy,mom0cut, regridDir, outDir)
     sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
     ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
-    R_arcmin, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
+    R_arcsec, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
 
 
     # Read in the line file for stacking
@@ -209,7 +225,7 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
         ltir=ltirmap
     else:
         if line=='HCN':
-            linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
+            linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_maxnchan_smooth.fits')
         else:
             linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
         sfr=None
@@ -252,12 +268,12 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
                         sfrmap=sfr,ltirmap=ltir)
 
     ## create radius bins
-    binmap, binedge, binlabels = makeBins(galaxy, R_r25, 'radius', outDir) 
+    binmap, binedge, binlabels = makeRadiusBins(galaxy, R_arcsec, outDir) 
     cmap=plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
     # stack on radius
     r_radius=stack(line, masked_line, galaxy, velocity,
-                   binmap, binedge,  'radius', 'R25',
+                   binmap, binedge,  'radius', 'arcsec',
                    sfrmap=sfr,ltirmap=ltir)
                  
     # put the individual stack together.
@@ -466,16 +482,16 @@ def mapGCR(galaxy,  basemap):
     head=basemap.header
     pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_arcmin=np.degrees(R*pxscale)*60 # map of GCR in arcmin
+    R_arcsec=np.degrees(R*pxscale)*3600.0 # map of GCR in arcsec
     R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
-    R_r25=R_arcmin/r25 # map of GCR in units of R25
+    R_r25=(R_arcsec/60.0)/r25 # map of GCR in units of R25
 
-    Rarcmin_map=Projection(R_arcmin,header=head,wcs=w) 
+    Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
     Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
     Rr25_map = Projection(R_r25,header=head,wcs=w) 
 
     # map of galactocentric radius in unit of kpc, arcmin, in r25
-    return Rarcmin_map, Rkpc_map, Rr25_map 
+    return Rarcsec_map, Rkpc_map, Rr25_map 
 
 
 def makeBins(galaxy, basemap,  bintype, outDir):
@@ -514,6 +530,50 @@ def makeBins(galaxy, basemap,  bintype, outDir):
     # make bins map 
     binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
     binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
+    return binmap, binedge, binlabels
+
+
+def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
+    '''
+    Create bins for the data
+
+    basemap: map used to create bins (SpectralCube Projection)
+    
+    outDir: directory to write output bin image
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
+                                calculate up to other code.
+    4/15/2021   A.A. Kepley     Changes bins to be beam width apart in radius.
+    '''
+
+    #breakpoint()
+    
+    # original code
+    #binnum=5
+    #binedge = np.zeros(binnum+1)
+    #binedge[1:]=np.logspace(-1, np.log10(0.5), num=binnum,base=10)#create bins based on r25
+    #bins = np.digitize(basemap, binedge) #this will automatically add an extra bin in the end for nan values
+    #binlabels=[""]+['{0:1.2f}'.format(i)+'R25' for i in binedge]
+    # Blank NaN values
+    #bins[bins==len(binedge)] = 0 
+
+    minrad = 0.0+beam/2.0
+    maxrad = np.max(basemap).value
+
+    binedge = np.arange(minrad, maxrad, beam)
+    binedge = np.insert(binedge,0,0)
+    bins = np.digitize(basemap,binedge) 
+
+    binlabels = [""] + ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
+    # Blank NaN values
+    bins[bins==len(binedge)] = 0 
+
+    # make bins map 
+    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
     return binmap, binedge, binlabels
 
 def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):

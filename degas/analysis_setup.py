@@ -724,7 +724,8 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
         # interpolate velocity axis. This needs to be done first.
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
-                
+
+        regridCube.allow_huge_operations=True
         newCube = regridCube.reproject(baseCube.header)
 
         if mask:

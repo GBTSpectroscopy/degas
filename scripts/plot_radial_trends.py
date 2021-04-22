@@ -29,17 +29,23 @@ for galaxy in degas[dr1]:
     
     plt.close()
 
+    
     for line in ['CO','HCN','HCOp','13CO','C18O']:
+
+        if (galaxy['NAME'] == 'NGC6946') & ((line == '13CO') | (line == 'C18O')):
+            continue
+        
         # get radius in kpc
         radius = (stack[idx]['bin_mean'] * galaxy['DIST_MPC'] * 1e6 / 206265.0) / 1e3
         
         plt.plot(radius,stack[idx][line+'_stack_sum'],marker=style[line]['marker'],color=style[line]['color'], linestyle='--',label=style[line]['name'])
 
+
     plt.yscale('log')
    
     plt.legend()
     plt.title(galaxy['NAME'])
-    plt.xlabel(r"Galactocentric Radius (kpc)") ## NEED TO FIGURE OUT UNITS HERE.
+    plt.xlabel(r"Galactocentric Radius (arcsec)") 
     plt.ylabel(r"Stacked Integrated Intensity (K km s$^{-1}$)") ## NEED TO FIGURE OUT UNITS HERE.
     plt.show()
 

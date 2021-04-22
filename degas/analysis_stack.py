@@ -65,6 +65,8 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
 
+    return table
+
 def makeTable(galaxy, vtype, regridDir, outDir):
     '''
 
@@ -236,9 +238,10 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     #import mom1 or  peakvel fits for stacking velocity
     ## TODO: this looks complicated. Can't i just open the velocity file?
+    ## TODO: Also don't I only have to to this once for each galaxy?
     velocity_file=galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' #need to change
     vhdu=fits.open(os.path.join(regridDir,velocity_file))
-    vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
+    #vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
     velocity=Projection.from_hdu(vhdu)
  
     ## filling in the meta information for the stack.
@@ -270,6 +273,8 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     ## create radius bins
     binmap, binedge, binlabels = makeRadiusBins(galaxy, R_arcsec, outDir) 
     cmap=plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
+
+    #breakpoint()
 
     # stack on radius
     r_radius=stack(line, masked_line, galaxy, velocity,
@@ -457,7 +462,7 @@ def mapGCR(galaxy,  basemap):
     dec = galaxy['DEC_DEG']
     inc = np.radians(galaxy['INCL_DEG'])
     pa = np.radians(galaxy['POSANG_DEG'])
-    r25 = galaxy['R25_DEG'] * 60.0 # arcmin
+    r25 = galaxy['R25_DEG'] * 3600.0 # arcsec
     Dmpc = galaxy['DIST_MPC']
     
     # get wcs
@@ -484,7 +489,7 @@ def mapGCR(galaxy,  basemap):
 
     R_arcsec=np.degrees(R*pxscale)*3600.0 # map of GCR in arcsec
     R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
-    R_r25=(R_arcsec/60.0)/r25 # map of GCR in units of R25
+    R_r25=R_arcsec/r25 # map of GCR in units of R25
 
     Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
     Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
@@ -656,8 +661,11 @@ def stack(line, cube, galaxy, velocity,
     pix_area=(np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
     nchan=cube.shape[0]
 
-    # do the stack
-    stack, labelvals = stacking.BinByLabel(cube, binmap.value, velocity,
+    cube_nonan = cube.with_fill_value(0)
+
+    # do the stack -- making sure the units work out right.
+    stack, labelvals = stacking.BinByLabel(cube_nonan,
+                                           binmap.value, velocity,
                                            weight_map=None)
     
     # set up the results output

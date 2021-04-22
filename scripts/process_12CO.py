@@ -47,7 +47,7 @@ idx_dr1 = degas_table['DR1'] == 1
 phangs_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'phangs','*10kms_gauss15.fits'))]
 
 # heracles
-heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15_fixed.fits'))]
+heracles_list =  [os.path.basename(image).split('_')[0] for image in glob.glob(os.path.join(otherDataDir,'heracles','*gauss15_fixed_kms.fits'))]
 
 # everyHeracles (from Adam)
 extra_hera_adam_list = [os.path.basename(image).split('_')[0].upper() for image in glob.glob(os.path.join(otherDataDir,'everyHeracles_fromadam_20210318','*10kms_gauss15.fits'))]
@@ -101,7 +101,7 @@ for galaxy in degas_table[idx_dr1]:
     elif galaxy['NAME'] in heracles_list:
 
         cubeFile = os.path.join(otherDataDir,'heracles',
-                                  galaxy['NAME']+'_heracles_gauss15_fixed.fits')
+                                  galaxy['NAME']+'_heracles_gauss15_fixed_kms.fits')
 
         if galaxy['NAME'] == 'NGC0337':
             cubemask(cubeFile,

@@ -23,10 +23,7 @@ dr1 = degas['DR1'] == 1
 
 # for each dr1 galaxy, show radial trends for each line.
 for galaxy in degas[dr1]:
-    idx = (stack['galaxy'] == galaxy['NAME']) & (stack['bin_type'] == 'radius')
 
-    ## figure out better radial binning here.
-    
     plt.close()
 
     
@@ -34,19 +31,38 @@ for galaxy in degas[dr1]:
 
         if (galaxy['NAME'] == 'NGC6946') & ((line == '13CO') | (line == 'C18O')):
             continue
+
+        idx = ( (stack['galaxy'] == galaxy['NAME']) \
+                & (stack['bin_type'] == 'radius') \
+                & (stack[line+'_stack_sum'] > 0))
         
-        # get radius in kpc
+        # get radius in kpc -- radius stacks in arcsec.
         radius = (stack[idx]['bin_mean'] * galaxy['DIST_MPC'] * 1e6 / 206265.0) / 1e3
-        
-        plt.plot(radius,stack[idx][line+'_stack_sum'],marker=style[line]['marker'],color=style[line]['color'], linestyle='--',label=style[line]['name'])
+        # determine whether upper or lower limits
+        uplims = stack[idx][line+'_stack_noise']*3.0 > stack[idx][line+'_stack_sum']
+   
+        stack_sum = stack[idx][line+'_stack_sum']
+        stack_sum[uplims] = stack[idx][line+'_stack_noise'][uplims]*3.0
+
+        yerr = stack[idx][line+'_stack_noise']
+        yerr[uplims] = stack_sum[uplims] * 0.3
+
+
+        plt.errorbar(radius, stack_sum,
+                     yerr = yerr,
+                     uplims = uplims,
+                     marker = style[line]['marker'],
+                     color = style[line]['color'], 
+                     linestyle = '--', 
+                     label = style[line]['name'])
 
 
     plt.yscale('log')
    
     plt.legend()
     plt.title(galaxy['NAME'])
-    plt.xlabel(r"Galactocentric Radius (arcsec)") 
-    plt.ylabel(r"Stacked Integrated Intensity (K km s$^{-1}$)") ## NEED TO FIGURE OUT UNITS HERE.
+    plt.xlabel(r"Galactocentric Radius (kpc)") 
+    plt.ylabel(r"Stacked Integrated Intensity (K km s$^{-1}$)") 
     plt.show()
 
     plt.savefig(os.path.join(plotDir,galaxy['NAME']+'_radial_lines.pdf'))

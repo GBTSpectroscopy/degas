@@ -9,4 +9,4 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_test')
 
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903'])
 
-results = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1')
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1')

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from matplotlib import colors
 import aplpy
-from astropy.table import Table, Column, vstack, hstack
+from astropy.table import Table, Column, vstack, QTable
 import re
 import glob 
 from astropy.wcs import WCS
@@ -81,7 +81,7 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     so I still need to pass this down.?
     
     regridDir: regrid directory
-    
+    x
     outDir: output directory
 
     
@@ -117,7 +117,7 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
 
     # For NGC6946, skip 13CO and C18O since we don't have that data.
-    if galaxy['NAME'] is not 'NGC6946':
+    if galaxy['NAME'] != 'NGC6946':
         # read in 13CO
         linefile = os.path.join(regridDir,galaxy['NAME']+'_13CO_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
         cube13CO = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
@@ -189,7 +189,7 @@ def makeStack(galaxy, regridDir, outDir,
 
     '''
  
-    ## TODO -- potentially this could be done inside stack routine? 
+    ## TODO -- potentially this could be done inside stack routine? or as unit on table. look up astropy tables with units?
     ## filling in the meta information for the stack.
     stack_meta={}
     stack_meta['spectra_axis_unit']=cubeCO.spectral_axis.unit.to_string()
@@ -305,11 +305,12 @@ def stackLines(galaxy, velocity,
     '''
 
     # get the relevant info on the galaxy and cube
-    Dmpc = galaxy['DIST_MPC']
-    pix_area = (np.radians(np.abs(cubeCO.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
-    nchan = cubeCO.shape[0]
+    D = galaxy['DIST_MPC'] * u.Mpc
+    pix_area = (np.radians(np.abs(cubeCO.header['CDELT1']))*D.to(u.kpc))**2  #kpc^2 ## TODO CHECK THIS CONVERSION
 
     # do the individual line stacks.
+    # -----------------------------
+
     stack={}
     if cubeCO:
         ## fill in nans with 0 to avoid fft shift issue with nans
@@ -357,25 +358,26 @@ def stackLines(galaxy, velocity,
                                                        weight_map=None)
 
     # putting the table together
+    # -------------------------
 
-    # first add bings
+    # first add bins
     t = {'bin_lower': binedge[0:-1], 
          'bin_upper': binedge[1:], 
          'bin_mean': (binedge[0:-1] + binedge[1:])/2.0}
-    total_stack = Table(t)
+    total_stack = QTable(t)
     
     # Then set up the structures for the bin-based profiles, etc.
     spectral_profile = {}
-    spectral_profile['CO'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
-    spectral_profile['HCN'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
-    spectral_profile['HCOp'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
+    spectral_profile['CO'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
+    spectral_profile['HCN'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
+    spectral_profile['HCOp'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
  
     bin_label = np.zeros(len(labelvals))
-    bin_area = np.zeros(len(labelvals))
-    sfr_mean = np.zeros(len(labelvals))
-    ltir_mean = np.zeros(len(labelvals))
+    bin_area = np.zeros(len(labelvals)) * pix_area.unit
+    sfr_mean = np.zeros(len(labelvals)) * sfrmap.unit
+    ltir_mean = np.zeros(len(labelvals))* ltirmap.unit
 
-    spectral_axis = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
+    spectral_axis = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
 
     for i in range(len(labelvals)):
         spectral_axis[i,:] = stack['CO'][i]['spectral_axis']
@@ -383,43 +385,41 @@ def stackLines(galaxy, velocity,
         bin_label[i] = stack['CO'][i]['label']
 
         ## TODO CHECK THE CALCULATION BELOW FOR BINAREA
-        bin_area[i]= len(binmap[binmap==bin_label[i]].flatten())*pix_area  
-        
+        bin_area[i]= float(sum(binmap[binmap==bin_label[i]].flatten()))*pix_area          
         # calculating the mean SFR as requested
         if sfrmap is not None:
-            sfr_mean[i] = np.nanmean(sfrmap[binmap==bin_label[i]])
-
+            sfr_mean[i] = np.nanmean(sfrmap[binmap==bin_label[i]]) 
         # calculate the mean LTIR as request
         if ltirmap is not None:
-            ltir_mean[i] = np.nanmean(ltirmap[binmap==bin_label[i]])
+            ltir_mean[i] = np.nanmean(ltirmap[binmap==bin_label[i]]) 
     
         # get the spectral profiles
         for line in ['CO','HCN','HCOp']:
-            spectral_profile[line][i,:] = stack[line][i]['spectrum']
+            spectral_profile[line][i,:] = stack[line][i]['spectrum'] 
 
     # add above items to the table
+    total_stack.add_column(Column(spectral_axis),name='spectral_axis')
     for line in ['CO','HCN','HCOp']:
-        total_stack.add_column(Column(spectral_profile[line], name=line+'_stack_profile'))
+        total_stack.add_column(Column(spectral_profile[line], name='stack_profile_'+line,unit=cubeCO.unit))
 
     # TODO CHECK UNITS HERE
-    total_stack.add_column(Column(spectral_axis),name='spectral_axis')
-    total_stack.add_column(Column(bin_area),name='bin_area')
-    total_stack.add_column(Column(sfr_mean),name='sfr_mean') # Msun/yr/kpc^2 -- units from input image
+    total_stack.add_column(Column(bin_area,name='bin_area'))
+    total_stack.add_column(Column(sfr_mean,name='sfr_mean')) # Msun/yr/kpc^2 -- units from input image
     total_stack.add_column(Column(sfr_mean * bin_area),name='sfr_total') # Msun/yr/kpc^2 * kpc^2 = Msun/Yr
     total_stack.add_column(Column(ltir_mean),name='ltir_mean') # Lsun/pc^2 -- units from input image
     total_stack.add_column(Column(ltir_mean * 1000.0**2 *bin_area),name='ltir_total') # Lsun/pc^2 * (1000 pc/kpc)^2 * kpc^2   = Lsun
         
     # organizing the 13CO and C18O data if we have it.
     if '13CO' in stack.keys():
-        spectral_profile['13CO'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
-        spectral_profile['C18O'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis'])))
+        spectral_profile['13CO'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
+        spectral_profile['C18O'] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
 
         for i in range(len(labelvals)):
             for line in ['13CO','C18O']:
-                spectral_profile[line][i,:] = stack[line][i]['spectrum']
+                spectral_profile[line][i,:] = stack[line][i]['spectrum'] 
 
         for line in ['13CO','C18O']:
-            total_stack.add_column(Column(spectral_profile[line]), name=line+'_stack_profile')  
+            total_stack.add_column(Column(spectral_profile[line], name='stack_profile_'+line,unit=cubeCO.unit))  
 
     return total_stack
 
@@ -482,9 +482,10 @@ def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
     minrad = 0.0+beam/2.0
     maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
 
-    binedge = np.arange(minrad, maxrad, beam)
+    binedge = np.arange(minrad, maxrad, beam)  
     binedge = np.insert(binedge,0,0)
-    bins = np.digitize(basemap,binedge) 
+    binedge = binedge * basemap.unit
+    bins = np.digitize(basemap.value,binedge.value) 
 
     binlabels = ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
 
@@ -721,8 +722,8 @@ def mapGCR(galaxy,  basemap):
     head=basemap.header
     pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_arcsec=np.degrees(R*pxscale)*3600.0 # map of GCR in arcsec
-    R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
+    R_arcsec=np.degrees(R*pxscale)*3600.0 * u.arcsec# map of GCR in arcsec
+    R_kpc=R*pxscale*Dmpc*1000 * u.kpc# map of GCR in kpc
     R_r25=R_arcsec/r25 # map of GCR in units of R25
 
     Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 

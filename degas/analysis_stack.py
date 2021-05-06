@@ -12,7 +12,7 @@ import glob
 from astropy.wcs import WCS
 import os
 
-def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1'):
+def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
@@ -43,11 +43,17 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
     idx = degas[release] == 1
 
+    if not sourceList:
+        sourceList = degas[idx]['NAME']
+
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
     for galaxy in degas[idx]:
-        full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
-        tablelist.append(full_tab)
+
+        if galaxy['NAME'] in sourceList:
+            full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
+            tablelist.append(full_tab)
+        
 
     # stack all the tables together
     table=vstack(tablelist)
@@ -58,6 +64,8 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
 
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
+
+    return table
 
 def makeTable(galaxy, vtype, regridDir, outDir):
     '''
@@ -80,21 +88,58 @@ def makeTable(galaxy, vtype, regridDir, outDir):
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added comments
+    4/29/2021   A.A. Kepley     Moved all calculations for galaxy here 
+                                instead of repeating per line.
 
     '''
 
-    # For NGC6946, skip 13CO/C18O since we don't have that data.
+    print("Processing " + galaxy['NAME'] + "\n")
+
+    # For NGC6946, skip 13CO and C18O since we don't have that data.
     if galaxy['NAME'] == 'NGC6946':
         linelist=['CO','HCN','HCOp']
     else:
         linelist=['CO','HCN','HCOp','13CO','C18O']
+    
+    # Create associated maps needed for analysis.
+    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
+    stellarmap = mapStellar(galaxy, mom0cut, regridDir, outDir)
+    sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
+    ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
+    R_arcsec, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
+
+    velocity_file=galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
+    vhdu=fits.open(os.path.join(regridDir,velocity_file))
+    velocity=Projection.from_hdu(vhdu)
 
     # for each line stack the data.
     galtabs=[]
     for line in linelist: 
 
+        # Read in the line file for stacking
+        if line == 'CO':
+            masked_line = masked_co
+            sfr = sfrmap
+            ltir = ltirmap
+        else:
+            if line == 'HCN':
+                linefile = os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_maxnchan_smooth.fits')
+            else:
+                linefile = os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+
+            sfr = None
+            ltir = None
+
+            linecube = SpectralCube.read(os.path.join(regridDir,linefile))
+            masked_line = linecube.with_mask(sn_mask)
+
         #get the full stack result for each line
-        full_stack, stack_meta=makeStack(galaxy, vtype, line, regridDir, outDir) 
+        full_stack, stack_meta = makeStack(galaxy, line, regridDir, outDir,
+                                           mom0cut = mom0cut, masked_co = masked_co,
+                                           masked_line = masked_line,
+                                           velocity=velocity,
+                                           sfr = sfr, ltir = ltir, 
+                                           stellarmap=stellarmap, R_arcsec=R_arcsec) 
 
         # combine the individual line stacks.
         linetabs=[]
@@ -110,6 +155,10 @@ def makeTable(galaxy, vtype, regridDir, outDir):
 
     # add the name of the galaxy.
     galtable['galaxy']= galaxy['NAME']
+
+    ## TODO 
+    ## -- add other meta data like units here???
+    ## -- remove lines of sight with no CO?
 
     # return the table and the stack.
     return galtable, stack_meta
@@ -160,15 +209,16 @@ def readStack(stack,line):
     return tab
 
 
-def makeStack(galaxy, vtype, line, regridDir, outDir):
+def makeStack(galaxy, line, regridDir, outDir,
+              mom0cut = None, masked_co = None, masked_line=None,
+              velocity = None, sfr = None, ltir = None,
+              stellarmap = None, R_arcsec = None):
     '''
     
     make stacks for all lines and ancillary data for one galaxy
     output python dictionaries
 
     galaxy: degas_base.fits entry for galaxy we are processing
-    
-    vtype: type of map we are stacking on
     
     line: line we are stacking on
     
@@ -188,42 +238,10 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
     12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
                                 use the degas table 
     12/10/2020  A.A. Kepley     Added LTIR
+    4/29/2021   A.A. Kepley     Moved up map calculations to makeStack to 
+                                avoid doing multiple times.
 
     '''
-
-    #make SN map, sigma-clipped mom0, 2D masked cube, and galactocentric radius map.
-
-    #TO DO : move to separate script??  only needs to be done once not every time we 
-    # stack? But would need to add file i/o
-    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
-    stellarmap = mapStellar(galaxy,mom0cut, regridDir, outDir)
-    sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
-    ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
-    R_arcmin, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
-
-
-    # Read in the line file for stacking
-    if line=='CO':
-        masked_line=masked_co
-        sfr=sfrmap
-        ltir=ltirmap
-    else:
-        if line=='HCN':
-            linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth.fits')
-        else:
-            linefile=os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
-        sfr=None
-        ltir=None
-
-        linecube=SpectralCube.read(os.path.join(regridDir,linefile))
-        masked_line=linecube.with_mask(sn_mask)
-
-    #import mom1 or  peakvel fits for stacking velocity
-    ## TODO: this looks complicated. Can't i just open the velocity file?
-    velocity_file=galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' #need to change
-    vhdu=fits.open(os.path.join(regridDir,velocity_file))
-    vhdu[0].header['BUNIT']=masked_co.spectral_axis.unit.to_string()
-    velocity=Projection.from_hdu(vhdu)
  
     ## filling in the meta information for the stack.
     stack_meta={}
@@ -235,30 +253,30 @@ def makeStack(galaxy, vtype, line, regridDir, outDir):
 
     ## create intensity bins
     binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+    plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
 
     # do intensity stack
     r_intensity=stack(line, masked_line, galaxy, velocity, 
                       binmap, binedge, 'intensity','K km/s',
-                      sfrmap=sfr, ltirmap=ltir) 
+                      sfrmap = sfr, ltirmap = ltir) 
 
     ## create stellar mass bin
     binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
+    plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
 
     ## do stellar mass stack
     r_stellarmass=stack(line, masked_line, galaxy, velocity,  
                         binmap, binedge,  'stellarmass', 'Msun/pc^2',
-                        sfrmap=sfr,ltirmap=ltir)
+                        sfrmap = sfr,ltirmap = ltir)
 
     ## create radius bins
-    binmap, binedge, binlabels = makeBins(galaxy, R_r25, 'radius', outDir) 
-    cmap=plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
+    binmap, binedge, binlabels = makeRadiusBins(galaxy, R_arcsec, outDir) 
+    plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
     # stack on radius
     r_radius=stack(line, masked_line, galaxy, velocity,
-                   binmap, binedge,  'radius', 'R25',
-                   sfrmap=sfr,ltirmap=ltir)
+                   binmap, binedge,  'radius', 'arcsec',
+                   sfrmap = sfr,ltirmap = ltir)
                  
     # put the individual stack together.
     full_stack=[r_intensity, r_stellarmass, r_radius]
@@ -441,7 +459,7 @@ def mapGCR(galaxy,  basemap):
     dec = galaxy['DEC_DEG']
     inc = np.radians(galaxy['INCL_DEG'])
     pa = np.radians(galaxy['POSANG_DEG'])
-    r25 = galaxy['R25_DEG'] * 60.0 # arcmin
+    r25 = galaxy['R25_DEG'] * 3600.0 # arcsec
     Dmpc = galaxy['DIST_MPC']
     
     # get wcs
@@ -466,16 +484,16 @@ def mapGCR(galaxy,  basemap):
     head=basemap.header
     pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_arcmin=np.degrees(R*pxscale)*60 # map of GCR in arcmin
+    R_arcsec=np.degrees(R*pxscale)*3600.0 # map of GCR in arcsec
     R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
-    R_r25=R_arcmin/r25 # map of GCR in units of R25
+    R_r25=R_arcsec/r25 # map of GCR in units of R25
 
-    Rarcmin_map=Projection(R_arcmin,header=head,wcs=w) 
+    Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
     Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
     Rr25_map = Projection(R_r25,header=head,wcs=w) 
 
     # map of galactocentric radius in unit of kpc, arcmin, in r25
-    return Rarcmin_map, Rkpc_map, Rr25_map 
+    return Rarcsec_map, Rkpc_map, Rr25_map 
 
 
 def makeBins(galaxy, basemap,  bintype, outDir):
@@ -516,6 +534,38 @@ def makeBins(galaxy, basemap,  bintype, outDir):
     binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
     return binmap, binedge, binlabels
 
+
+def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
+    '''
+    Create bins for the data
+
+    basemap: map used to create bins (SpectralCube Projection)
+    
+    outDir: directory to write output bin image
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
+                                calculate up to other code.
+    4/15/2021   A.A. Kepley     Changes bins to be beam width apart in radius.
+    '''
+    
+    minrad = 0.0+beam/2.0
+    maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
+
+    binedge = np.arange(minrad, maxrad, beam)
+    binedge = np.insert(binedge,0,0)
+    bins = np.digitize(basemap,binedge) 
+
+    binlabels = ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
+
+    # make bins map 
+    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
+
+    return binmap, binedge, binlabels
+
 def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     '''
     visualize binning
@@ -524,30 +574,24 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added comments
+    4/29/2021   A.A. Kepley     Simplified plotting code
 
     '''
-    
 
-    #visualize binning 
-    cmap= plt.cm.viridis
-    cmaplist=[cmap(i) for i in range(cmap.N)]
-    cmap=colors.LinearSegmentedColormap.from_list('Custom',cmaplist, cmap.N)
-    norm=colors.BoundaryNorm(range(len(binedge)+1),cmap.N)
+    mapvals = np.arange(1.0,len(binedge)+1)    
 
-    heatmap=plt.imshow(binmap.value, cmap=cmap, norm=norm)
-    plt.close()
+    plt.subplot(projection=binmap.wcs)
+    heatmap = plt.imshow(binmap.value,origin='lower')
 
-    fig=aplpy.FITSFigure(binmap.hdu) #show coordinates
-    fig.show_colorscale(cmap=cmap)
-    cbar=plt.colorbar(heatmap)
+    plt.colorbar(heatmap, boundaries=binedge, values=mapvals)
 
-    cbar.ax.set_yticklabels(binlabels) 
-    cbar.ax.text(1.5,1.0/(2*len(binedge)),'NaN') 
+    plt.xlabel('RA (J2000)')
+    plt.ylabel('Dec (J2000)')
+
     plt.savefig(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.png'))
     plt.clf()
     plt.close()
 
-    return cmap
 
 def stack(line, cube, galaxy, velocity, 
           binmap, binedge, bintype, binunit,
@@ -592,12 +636,16 @@ def stack(line, cube, galaxy, velocity,
     '''
 
     # get the relevant info on the galaxy and cube
-    Dmpc=galaxy['DIST_MPC']
-    pix_area=(np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
-    nchan=cube.shape[0]
+    Dmpc = galaxy['DIST_MPC']
+    pix_area = (np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
+    nchan = cube.shape[0]
 
-    # do the stack
-    stack, labelvals = stacking.BinByLabel(cube, binmap.value, velocity,
+    ## fill in nans with 0 to avoid fft shift issue with nans
+    cube_nonan = cube.with_fill_value(0) 
+
+    # do the stack -- making sure the units work out right.
+    stack, labelvals = stacking.BinByLabel(cube_nonan,
+                                           binmap.value, velocity,
                                            weight_map=None)
     
     # set up the results output
@@ -643,14 +691,17 @@ def stack(line, cube, galaxy, velocity,
         
         # calculating the mean SFR (as necessary)
         if sfrmap is not None:
-            sfr_mean[i]=np.nanmean(sfrmap[binmap==binlabel[i]])
+            sfr_mean[i] = np.nanmean(sfrmap[binmap==binlabel[i]])
 
         # calculate the mean LTIR (as necessary)
         if ltirmap is not None:
             ltir_mean[i] = np.nanmean(ltirmap[binmap==binlabel[i]])
     
-    ## AAK: Not quite sure I understand what's happening here.
+
     total_stack={}
+
+    # the CO is used to make the bins, so if another line, we skip. 
+    # It should be the same for all lines.
     if line == 'CO': #CO is used to make stacking bins
         total_stack['spectral_axis'] = stack[0]['spectral_axis'].value
         total_stack['bin_lower'] = bin_lower
@@ -660,16 +711,16 @@ def stack(line, cube, galaxy, velocity,
         total_stack['bin_unit'] = binunit ### TODO: CAN I GET THIS FROM THE BINMAP DIRECTLY?
 
         if sfrmap is not None:
-            total_stack['sfr_mean_w4fuv']=sfr_mean
-            total_stack['sfr_total_w4fuv']=sfr_mean * bin_area
+            total_stack['sfr_mean_w4fuv'] = sfr_mean # Msun/yr/kpc^2 -- units from input image
+            total_stack['sfr_total_w4fuv'] = sfr_mean * bin_area # Msun/yr/kpc^2 * kpc^2 = Msun/Yr
 
         if ltirmap is not None:
-            total_stack['ltir_mean'] = ltir_mean
-            total_stack['ltir_total'] = ltir_mean * bin_area
+            total_stack['ltir_mean'] = ltir_mean # Lsun/pc^2 -- units from input image
+            total_stack['ltir_total'] = ltir_mean * 1000.0**2 *  bin_area # Lsun/pc^2 * (1000 pc/kpc)^2 * kpc^2   = Lsun
 
-    total_stack[line+'_stack_profile']=stacked_profile
-    total_stack[line+'_stack_sum']=stacksum
-    total_stack[line+'_stack_noise']=stacknoise
+    total_stack[line+'_stack_profile'] = stacked_profile
+    total_stack[line+'_stack_sum'] = stacksum
+    total_stack[line+'_stack_noise'] = stacknoise
 
     return total_stack
 

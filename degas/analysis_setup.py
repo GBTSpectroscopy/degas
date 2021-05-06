@@ -93,8 +93,13 @@ def fixHeracles(fitsimage):
     # Convert VELOCITY to VRAD for Heracles headers.
     if f[0].header['CTYPE3'] == 'VELOCITY':
         f[0].header['CTYPE3'] = 'VRAD' 
+        
+    newimage = fitsimage.replace('.fits','_fixed.fits')
+    f.writeto(newimage,overwrite=True)
 
-    f.writeto(fitsimage.replace('.fits','_fixed.fits'),overwrite=True)
+    cube = SpectralCube.read(newimage)
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+    cube_kms.write(newimage.replace('.fits','_kms.fits'),overwrite=True)
 
 def fixOVRO(fitsimage,beam=15.0):
     '''
@@ -142,14 +147,16 @@ def fixExtraHERA(fitsimage,beam=15.0):
     
     # open image
     cube = SpectralCube.read(newimage)    
-    
+
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+
     if re.search('ngc3631',newimage):
         # extra channels with data
-        subCube = cube[72:379,:,:]
+        subCube = cube_kms[72:379,:,:]
     elif re.search('ngc4030',newimage):
-        subCube = cube[78:384,:,:]
+        subCube = cube_kms[78:384,:,:]
     else:
-        subCube = cube[:,:,:]
+        subCube = cube_kms[:,:,:]
 
     # smooth
     newBeam = Beam(beam*u.arcsec)
@@ -162,7 +169,7 @@ def fixExtraHERA(fitsimage,beam=15.0):
     # Interpolate onto a new axis
     spec_axis = spSmoothCube.spectral_axis
     chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
-    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.km/u.s
 
     interpCube = spSmoothCube.spectral_interpolate(new_axis,
                                                    suppress_smooth_warning=True)
@@ -248,7 +255,7 @@ def fixJialu(image,beam=15.0):
     '''
 
     #12CO rest frequency
-    resta_freq_12co = 115.27120180*u.GHz
+    rest_freq_12co = 115.27120180*u.GHz
     
     f = fits.open(image)
 
@@ -262,13 +269,13 @@ def fixJialu(image,beam=15.0):
     # open image
     cube = SpectralCube.read(image)   
 
-    cube_ms = cube.with_spectral_unit(u.m / u.s) 
+    cube_kms = cube.with_spectral_unit(u.km / u.s) 
 
     ## This should set header
     #cube_ms = cube.with_spectral_unit(u.m / u.s, rest_value=rest_freq_12co)
 
     # chop off bad edge
-    subcube = cube_ms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
+    subcube = cube_kms.subcube(xlo=0,xhi=134,ylo=0,yhi=150)
 
     # add beam
     beamcube = subcube.with_beam(Beam(8.0*u.arcsec))
@@ -282,7 +289,7 @@ def fixJialu(image,beam=15.0):
     spSmoothCube = smoothCube.spectral_smooth(Box1DKernel(smoothFactor))
     spec_axis = spSmoothCube.spectral_axis
     chan_width = spec_axis[1]-spec_axis[0] # channels are equally spaced in velocity
-    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.m/u.s
+    new_axis = np.arange(spec_axis[0].value,spec_axis[-1].value,smoothFactor*chan_width.value) * u.km/u.s
 
     interpCube = spSmoothCube.spectral_interpolate(new_axis,
                                                    suppress_smooth_warning=False)
@@ -708,9 +715,10 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     except:
         print("Can't read in " + baseCubeFits + ".")
 
-    # determine how many dimensions the other data sets have
+    # determine ndim and bunit for other data sets
     f = fits.open(otherDataFits)
     ndim = f[0].header['NAXIS']
+    bunit = f[0].header['BUNIT']
     f.close()
 
     # output image name
@@ -724,7 +732,8 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
         # interpolate velocity axis. This needs to be done first.
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
-                
+
+        regridCube.allow_huge_operations=True
         newCube = regridCube.reproject(baseCube.header)
 
         if mask:
@@ -737,10 +746,12 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         else:
             newdata = newCube.filled_data[:,:,:]
             finalCube = SpectralCube(newdata,newCube.wcs,mask=baseCube.mask)
-            
-        finalCube.write(newFits,overwrite=True)
+        
+        finalCube.with_spectral_unit(baseCube.spectral_axis.unit).write(newFits,overwrite=True)
 
     elif ndim == 2:
+        
+        ## consider using Projection.from_hdu then Projection.reproject here?
 
         # regrid image
         newcube = reproject_interp(otherDataFits,
@@ -761,8 +772,12 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         
         newdata[np.invert(totalBaseMask)] = np.nan
         
+        # fix up header with input image units
+        outHdr = baseCube.wcs.dropaxis(2).to_header()
+        outHdr.append(('BUNIT',bunit))
+
         # write out regridded data
-        fits.writeto(newFits,newdata,baseCube.wcs.dropaxis(2).to_header(),overwrite=True)
+        fits.writeto(newFits,newdata,outHdr,overwrite=True)
         
 
     else:

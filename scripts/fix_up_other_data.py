@@ -49,11 +49,11 @@ for image in heracles_list:
 ## fix up OVRO data
 ## -----------------
 
-print("processing OVRO data")
+# print("processing OVRO data")
 
-ovro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*.co.cmmsk.fits'))
-for image in ovro_list:
-    analysis_setup.fixOVRO(image,beam=common_beam)
+# ovro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*.co.cmmsk.fits'))
+# for image in ovro_list:
+#     analysis_setup.fixOVRO(image,beam=common_beam)
 
 ## fix up IC0342 12CO data from Jialu
 # -----------------------------------
@@ -67,15 +67,15 @@ analysis_setup.fixJialu(image,beam=common_beam)
 ## fix up NRO data 
 ## ---------------
 
-print("processing NRO data")
+# print("processing NRO data")
 
-## From https://www.nro.nao.ac.jp/~nro45mrt/html/COatlas/?  Website says
-## see Kuno et al. 2007, PASJ 59, 117 for details.  Beam size is given
-## as 15". BUNIT is "K", so maybe only adding Beamsize.  RA and Deg
-## coordinates are weird (RA---GLS and DEC--GLS)
-nro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*RD.FITS'))
-for image in nro_list:
-    analysis_setup.fixNRO(image)
+# ## From https://www.nro.nao.ac.jp/~nro45mrt/html/COatlas/?  Website says
+# ## see Kuno et al. 2007, PASJ 59, 117 for details.  Beam size is given
+# ## as 15". BUNIT is "K", so maybe only adding Beamsize.  RA and Deg
+# ## coordinates are weird (RA---GLS and DEC--GLS)
+# nro_list = glob.glob(os.path.join(otherDataDir,'temp_co','*RD.FITS'))
+# for image in nro_list:
+#     analysis_setup.fixNRO(image)
 
 ## fix up every HERA data from Andreas
 ## ---------------------------------------------------------
@@ -112,13 +112,15 @@ print("Processing NGC4038 data from  Chris Wilson.")
 image = os.path.join(otherDataDir,'ngc4038_from_chris','ngc_4038_4039_7m_co10.fits')
 cube = SpectralCube.read(image)
 
-cube.beam
+cube_kms =  cube.with_spectral_unit(u.km / u.s)
+
+cube_kms.beam
 #Beam: BMAJ=15.044642430220799 arcsec BMIN=7.606865194646399 arcsec BPA=-86.90099904919 deg
  
 newBeam = Beam(15.1*u.arcsec) ## beam is slightly too big in one
                               ## direction to smooth to 15.0, so
                               ## making the smoothing slightly larger.
-smoothCube = cube.convolve_to(newBeam)
+smoothCube = cube_kms.convolve_to(newBeam)
 smoothCube.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
 
 ## PHANGS data

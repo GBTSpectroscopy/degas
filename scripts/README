@@ -44,3 +44,6 @@ The full analysis is:
 
 # set up data for analysis
 %run align_to_degas.py # -- a whole bunch of regridding, etc for analysis.
+
+# run the stacking analysis
+%run do_stack.py

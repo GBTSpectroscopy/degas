@@ -1,18 +1,19 @@
-from spectral_stack import stacking #need to make sure Erik's code is installed
+#from spectral_stack import stacking #need to make sure Erik's code is installed
 from spectral_cube import SpectralCube, Projection
 import numpy as np
+import numpy.ma as ma
 import astropy.units as u
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from matplotlib import colors
 import aplpy
-from astropy.table import Table, Column, vstack, hstack
+from astropy.table import Table, Column, vstack, QTable
 import re
 import glob 
 from astropy.wcs import WCS
 import os
 
-def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
+def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
@@ -35,7 +36,8 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     10/30/2020  A.A. Kepley     Added comments and clarified inputs
-    12/3/2020   A.A. Kepley     Modified to pull list of galaxies from degas base table.
+    12/3/2020   A.A. Kepley     Modified to pull list of galaxies from 
+                                degas base table.
 
     '''
     
@@ -49,25 +51,19 @@ def makeResultsFITSTable(regridDir, outDir, scriptDir, vtype='mom1', outname='te
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
     for galaxy in degas[idx]:
-
         if galaxy['NAME'] in sourceList:
-            full_tab, meta=makeTable(galaxy, vtype, regridDir, outDir)
+            full_tab = makeGalaxyTable(galaxy, vtype, regridDir, outDir)
             tablelist.append(full_tab)
-        
 
     # stack all the tables together
     table=vstack(tablelist)
-
-    # AAK: Looks like the meta data comes from the last galaxy
-    # processed. Is this going to be okay?
-    table.meta=meta
 
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
 
     return table
 
-def makeTable(galaxy, vtype, regridDir, outDir):
+def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     '''
 
     make fitstable containing all lines from stacking results for each galaxy
@@ -90,128 +86,82 @@ def makeTable(galaxy, vtype, regridDir, outDir):
     12/3/2020   A.A. Kepley     Added comments
     4/29/2021   A.A. Kepley     Moved all calculations for galaxy here 
                                 instead of repeating per line.
+    5/6/2021    A.A. Kepley     Modified so that all lines are calculated at once.
 
     '''
 
     print("Processing " + galaxy['NAME'] + "\n")
 
-    # For NGC6946, skip 13CO and C18O since we don't have that data.
-    if galaxy['NAME'] == 'NGC6946':
-        linelist=['CO','HCN','HCOp']
-    else:
-        linelist=['CO','HCN','HCOp','13CO','C18O']
-    
     # Create associated maps needed for analysis.
-    mom0cut, masked_co, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
+    mom0cut, cubeCO, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
     stellarmap = mapStellar(galaxy, mom0cut, regridDir, outDir)
     sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
     ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
 
-    velocity_file=galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
-    vhdu=fits.open(os.path.join(regridDir,velocity_file))
-    velocity=Projection.from_hdu(vhdu)
+    velocity_file = galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
+    vhdu = fits.open(os.path.join(regridDir,velocity_file))
+    velocity = Projection.from_hdu(vhdu)
 
-    # for each line stack the data.
-    galtabs=[]
-    for line in linelist: 
+    # read in HCN
+    linefile = os.path.join(regridDir,galaxy['NAME']+'_HCN_rebase3_smooth1.3_hanning1_maxnchan_smooth.fits')
+    cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+    
+    # read in HCO+
+    linefile = os.path.join(regridDir,galaxy['NAME']+'_HCOp_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+    cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
 
-        # Read in the line file for stacking
-        if line == 'CO':
-            masked_line = masked_co
-            sfr = sfrmap
-            ltir = ltirmap
-        else:
-            if line == 'HCN':
-                linefile = os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_maxnchan_smooth.fits')
-            else:
-                linefile = os.path.join(regridDir,galaxy['NAME']+'_'+line+'_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+    # For NGC6946, skip 13CO and C18O since we don't have that data.
+    if galaxy['NAME'] != 'NGC6946':
+        # read in 13CO
+        linefile = os.path.join(regridDir,galaxy['NAME']+'_13CO_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        cube13CO = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
 
-            sfr = None
-            ltir = None
+        # read in C18O
+        linefile = os.path.join(regridDir,galaxy['NAME']+'_C18O_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+        
+    else:
+        cube13CO = None
+        cubeC18O = None
 
-            linecube = SpectralCube.read(os.path.join(regridDir,linefile))
-            masked_line = linecube.with_mask(sn_mask)
+    #get the full stack result for each line
+    full_stack = makeStack(galaxy, regridDir, outDir,
+                                       mom0cut = mom0cut, 
+                                       cubeCO = cubeCO,
+                                       cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
+                                       cube13CO = cube13CO, cubeC18O = cubeC18O,
+                                       velocity = velocity,
+                                       sfrmap = sfrmap, ltirmap = ltirmap, 
+                                       stellarmap=stellarmap, R_arcsec=R_arcsec) 
+    # remove stacks that don't have CO spectra 
+    nstack = len(full_stack)
+    keepstack = np.full(nstack,True)
+    
+    for i in range(nstack):
+        if np.all(full_stack['stack_profile_CO'][i] == 0):
+            keepstack[i] = False
 
-        #get the full stack result for each line
-        full_stack, stack_meta = makeStack(galaxy, line, regridDir, outDir,
-                                           mom0cut = mom0cut, masked_co = masked_co,
-                                           masked_line = masked_line,
-                                           velocity=velocity,
-                                           sfr = sfr, ltir = ltir, 
-                                           stellarmap=stellarmap, R_arcsec=R_arcsec) 
+    full_stack = full_stack[keepstack]
+            
+    fit_plot_dir =  os.path.join(outDir,'spec_fits')
+    if not os.path.exists(fit_plot_dir):
+        os.mkdir(fit_plot_dir)
 
-        # combine the individual line stacks.
-        linetabs=[]
-        for i in range(len(full_stack)):
-            stack=full_stack[i] #pick out stack for each bin type of this line
-            tab=readStack(stack, line) #read stack of this bintype of this line into table format
-            linetabs.append(tab)
-        full_tab=vstack(linetabs) #vertically merge the stacks of all bintypes for each line
-        galtabs.append(full_tab)
+    full_stack = addIntegratedIntensity(full_stack, fit_plot_dir)
 
-    # merge different lines together horizontally
-    galtable=hstack(galtabs) 
-
-    # add the name of the galaxy.
-    galtable['galaxy']= galaxy['NAME']
-
-    ## TODO 
-    ## -- add other meta data like units here???
-    ## -- remove lines of sight with no CO?
+   
 
     # return the table and the stack.
-    return galtable, stack_meta
+    return full_stack
 
 
-def readStack(stack,line):
-    '''
-    read stacking results (dictionary output) for each galaxy and each line
-
-    stack: stack result
-    line: line name
-
-     Date        Programmer      Description of Changes
-    ----------------------------------------------------------------------
-    10/29/2020  Yiqing Song     Original Code
-    12/3/2020   A.A. Kepley     Added more comments
-
-    '''
-
-    cols=[]
-    nrow=len(stack[line+'_stack_sum'])
-    rows=[]
-    for key in stack.keys():
-        data=stack[key]
-        if key=='spectral_axis':
-            col=Column(name=key,dtype=np.float, shape=data.shape)
-        elif key == 'bin_type' or key=='bin_unit':
-            col=Column(name=key,dtype='U10')
-        elif key == line+'_stack_profile':
-            col=Column(name=key, dtype=np.float, shape=data.shape[1])
-        else:
-            col=Column(name=key, dtype=np.float)
-        cols.append(col)
-    tab=Table()
-    tab.add_columns(cols)
-    for i in range(nrow):
-        row=[]
-        for key in stack.keys():
-            data=stack[key]
-            if key=='spectral_axis' or key=='bin_type' or key=='bin_unit':
-                r=data
-            elif key==line+'_stack_profile':
-                r=data[i,:]
-            else:
-                r=data[i]
-            row.append(r)
-        tab.add_row(row)
-    return tab
-
-
-def makeStack(galaxy, line, regridDir, outDir,
-              mom0cut = None, masked_co = None, masked_line=None,
-              velocity = None, sfr = None, ltir = None,
+def makeStack(galaxy, regridDir, outDir,
+              mom0cut = None,
+              cubeCO = None,
+              cubeHCN = None, cubeHCOp=None,
+              cube13CO = None, cubeC18O = None,
+              velocity = None, sfrmap = None, ltirmap = None,
               stellarmap = None, R_arcsec = None):
     '''
     
@@ -235,7 +185,7 @@ def makeStack(galaxy, line, regridDir, outDir,
      Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
-    12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
+   12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
                                 use the degas table 
     12/10/2020  A.A. Kepley     Added LTIR
     4/29/2021   A.A. Kepley     Moved up map calculations to makeStack to 
@@ -243,45 +193,701 @@ def makeStack(galaxy, line, regridDir, outDir,
 
     '''
  
-    ## filling in the meta information for the stack.
-    stack_meta={}
-    stack_meta['spectra_axis_unit']=masked_co.spectral_axis.unit.to_string()
-    stack_meta['stacked_profile_unit']=masked_co.unit.to_string()
-    stack_meta['stacksum_unit']=masked_co.unit.to_string()+masked_co.spectral_axis.unit.to_string()
-    stack_meta['sfr_unit']='Msun/yr/kpc^2'
-    stack_meta['bin_area']='kpc^2'
 
     ## create intensity bins
     binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
     plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
 
     # do intensity stack
-    r_intensity=stack(line, masked_line, galaxy, velocity, 
-                      binmap, binedge, 'intensity','K km/s',
-                      sfrmap = sfr, ltirmap = ltir) 
+    # TODO CHECK UNITS
+    #r_intensity=stackLines(galaxy, velocity, 
+    #                  binmap, binedge, 'intensity', 'K km/s',
+    #                  cubeCO = cubeCO,
+    #                  cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+    #                  cube13CO = cube13CO, cubeC18O = cubeC18O,
+    #                  sfrmap = sfrmap, ltirmap = ltirmap) 
 
     ## create stellar mass bin
     binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
     plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
 
     ## do stellar mass stack
-    r_stellarmass=stack(line, masked_line, galaxy, velocity,  
-                        binmap, binedge,  'stellarmass', 'Msun/pc^2',
-                        sfrmap = sfr,ltirmap = ltir)
+    ## TODO CHECK UNITS
+    #r_stellarmass=stackLines(galaxy, velocity,  
+    #                    binmap, binedge,  'stellarmass', 'Msun/pc^2',
+    #                    cubeCO = cubeCO,
+    #                    cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+    #                    cube13CO = cube13CO, cubeC18O = cubeC18O,
+    #                    sfrmap = sfrmap, ltirmap = ltirmap)
 
     ## create radius bins
     binmap, binedge, binlabels = makeRadiusBins(galaxy, R_arcsec, outDir) 
     plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
     # stack on radius
-    r_radius=stack(line, masked_line, galaxy, velocity,
-                   binmap, binedge,  'radius', 'arcsec',
-                   sfrmap = sfr,ltirmap = ltir)
-                 
-    # put the individual stack together.
-    full_stack=[r_intensity, r_stellarmass, r_radius]
+    ## TODO CHECK UNITS
+    r_radius=stackLines(galaxy, velocity,
+                        binmap, binedge,  'radius',  'arcsec',
+                        cubeCO = cubeCO,
+                        cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                        cube13CO = cube13CO, cubeC18O = cubeC18O,
+                        sfrmap = sfrmap, ltirmap = ltirmap)
+    r_radius.add_column(Column(np.tile('radius',len(r_radius))),name='bin_type',index=0)
 
-    return full_stack, stack_meta
+    ## TODO ADD OTHER STACKS ONCE I HAVE BINS
+    # put the individual stack together. 
+    #full_stack = vstack([r_intensity, r_stellarmass, r_radius])
+    full_stack = r_radius
+    
+    full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
+
+    return full_stack
+
+def stackLines(galaxy, velocity, 
+               binmap, binedge, bintype, binunit,
+               cubeCO = None,
+               cubeHCN = None,
+               cubeHCOp = None,
+               cube13CO = None,
+               cubeC18O = None,
+               sfrmap = None, 
+               ltirmap = None,
+               maxAbsVel = 250.0):
+
+    '''
+    Actually do the stacking.
+
+    cube: data we are stacking (SpectralCube)
+
+    galaxy: line from degas_base.fits table with galaxy information.
+    
+    velocity: velocity map to stack data using
+
+    binmap: bin map
+
+    binedge: bin edges
+    
+    binlabel: bin labels
+    
+    bintype: type of bin
+    
+    cubeCO: CO cube
+
+    cubeHCN: HCN cube
+    
+    cubeHCOp: HCO+ cube
+    
+    cube13CO: 13CO cube
+    
+    cubeC18O: C18O cube
+
+    sfrmap: star formation rate map
+
+    ltirmap: LTIR map
+
+    maxAbsVel: absolute maximum velocity to include in spectral in km/s. 
+    Assumes line is centered at zero (which should be true for stacking).
+    
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/03/2020  A.A. Kepley     Added comments and moved bin creation up 
+                                a level to simplify code.
+    12/10/2020  A.A. Kepley     added LTIR calculation
+    5/6/2021    A.A. Kepley     modified to fit all lines for one galaxy at 
+                                once so I can use CO FWHM to calculate upper 
+                                limits for other lines
+
+    '''
+
+    from signal_id.stacking import bin_by_label as BinByLabel
+
+    # get the relevant info on the galaxy and cube
+    D = galaxy['DIST_MPC'] * u.Mpc
+    pix_area = (np.radians(np.abs(cubeCO.header['CDELT1']))*D.to(u.kpc))**2  #kpc^2 ## TODO CHECK THIS CONVERSION
+
+    # do the individual line stacks.
+    # -----------------------------
+
+    stack={}
+    if cubeCO:
+        ## fill in nans with 0 to avoid fft shift issue with nans
+        #cubeCO_nonan = cubeCO.with_fill_value(0) 
+        
+        # do the stack -- making sure the units work out right.
+
+        stack['CO'], labelvals = BinByLabel(cubeCO,
+                                            binmap.value, velocity,
+                                            weight_map=None,
+                                            return_weights=True)
+        
+    if cubeHCN:
+        ## fill in nans with 0 to avoid fft shift issue with nans
+        #cubeHCN_nonan = cubeHCN.with_fill_value(0) 
+        
+        # do the stack -- making sure the units work out right.
+        stack['HCN'], labelvals = BinByLabel(cubeHCN,
+                                             binmap.value, velocity,
+                                             weight_map=None,
+                                             return_weights=True)
+        
+    if cubeHCOp:
+
+        #cubeHCOp_nonan = cubeHCOp.with_fill_value(0) 
+        
+        # do the stack -- making sure the units work out right.
+        stack['HCOp'], labelvals = BinByLabel(cubeHCOp,
+                                              binmap.value, velocity,
+                                              weight_map=None,
+                                              return_weights=True)
+        
+    if cube13CO:
+        #cube13CO_nonan = cube13CO.with_fill_value(0) 
+        
+        # do the stack -- making sure the units work out right.
+        stack['13CO'], labelvals = BinByLabel(cube13CO,
+                                              binmap.value, velocity,
+                                              weight_map=None,
+                                              return_weights=True)
+        
+    if cubeC18O:
+        
+        #cubeC18O_nonan = cubeC18O.with_fill_value(0) 
+        
+        # do the stack -- making sure the units work out right.
+        stack['C18O'], labelvals = BinByLabel(cubeC18O,
+                                              binmap.value, velocity,
+                                              weight_map=None,
+                                              return_weights=True)
+        
+    # putting the table together
+    # -------------------------
+
+    # first add bins
+    t = {'bin_lower': binedge[0:-1], 
+         'bin_upper': binedge[1:], 
+         'bin_mean': (binedge[0:-1] + binedge[1:])/2.0}
+    total_stack = QTable(t)
+    
+    # Then set up the structures for the bin-based profiles, etc.
+    spectral_profile = {}
+    stack_weights = {}
+    for line in ['CO','HCN','HCOp','13CO','C18O']:
+        spectral_profile[line] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
+        stack_weights[line] = np.zeros((len(labelvals)))
+ 
+    bin_label = np.zeros(len(labelvals))
+    bin_area = np.zeros(len(labelvals)) * pix_area.unit
+    sfr_mean = np.zeros(len(labelvals)) * sfrmap.unit
+    ltir_mean = np.zeros(len(labelvals))* ltirmap.unit
+
+    spectral_axis = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
+
+    for i in range(len(labelvals)):
+        spectral_axis[i,:] = stack['CO'][i]['spectral_axis']
+
+        bin_label[i] = stack['CO'][i]['label']
+
+        ## TODO CHECK THE CALCULATION BELOW FOR BINAREA
+        bin_area[i]= float(sum(binmap[binmap==bin_label[i]].flatten()))*pix_area          
+        # calculating the mean SFR as requested
+        if sfrmap is not None:
+            sfr_mean[i] = np.nanmean(sfrmap[binmap==bin_label[i]]) 
+        # calculate the mean LTIR as request
+        if ltirmap is not None:
+            ltir_mean[i] = np.nanmean(ltirmap[binmap==bin_label[i]]) 
+    
+        # get the spectral profiles
+        for line in ['CO','HCN','HCOp','13CO','C18O']:
+            if line in stack.keys():
+                spectral_profile[line][i,:] = stack[line][i]['spectrum'] 
+                stack_weights[line][i] = stack[line][i]['weights']
+            else:
+                 spectral_profile[line][i,:] = np.full(len(stack['CO'][0]['spectral_axis']),np.nan)
+                 stack_weights[line][i] = np.nan
+
+    # add above items to the table
+    total_stack.add_column(Column(spectral_axis),name='spectral_axis')
+    for line in ['CO','HCN','HCOp','13CO','C18O']:
+        total_stack.add_column(Column(spectral_profile[line], name='stack_profile_'+line,unit=cubeCO.unit))
+        total_stack.add_column(Column(stack_weights[line],name='stack_weights_'+line))
+
+    # TODO CHECK UNITS HERE
+    total_stack.add_column(Column(bin_area,name='bin_area'))
+    total_stack.add_column(Column(sfr_mean,name='sfr_mean')) # Msun/yr/kpc^2 -- units from input image
+    total_stack.add_column(Column(sfr_mean * bin_area),name='sfr_total') # Msun/yr/kpc^2 * kpc^2 = Msun/Yr
+    total_stack.add_column(Column(ltir_mean),name='ltir_mean') # Lsun/pc^2 -- units from input image
+    total_stack.add_column(Column(ltir_mean * 1000.0**2 *bin_area),name='ltir_total') # Lsun/pc^2 * (1000 pc/kpc)^2 * kpc^2   = Lsun
+        
+    return total_stack
+
+def addIntegratedIntensity(full_stack, outDir):
+    '''
+
+    calculate the integrated line flux and the associated noise
+
+    Input:
+
+    full_stack: astropy table with one row containing the stacks for
+    each bin.
+
+    outDir: directory for diagnostics plots
+    
+    Output:
+    
+    stack with added columns for the integrated intensity.
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    5/13/2021   A.A. Kepley     Original Code
+
+    '''
+
+    # get number of stacks
+    nstack = len(full_stack)
+
+    # initialize output arrays
+    int_intensity_fit = {}
+    int_intensity_fit_err = {}
+    int_intensity_fit_uplim = {}
+
+    int_intensity_sum = {}
+    int_intensity_sum_err = {}
+    int_intensity_sum_uplim = {}
+
+    fwhm_fit = np.zeros(nstack)* full_stack['spectral_axis'].unit
+    fwhm_sum = np.zeros(nstack)* full_stack['spectral_axis'].unit
+
+    for line in ['CO','HCN','HCOp','13CO','C18O']:
+
+        int_intensity_fit[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+        int_intensity_fit_err[line] = ma.zeros(nstack)* full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+        int_intensity_fit_uplim[line] = np.full(nstack,False)
+
+        int_intensity_sum[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+        int_intensity_sum_err[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+        int_intensity_sum_uplim[line] = np.full(nstack,False)
+        
+    # calculate the integrated intensity from a fit and from a simple sum.
+    for i in range(nstack):
+        
+        line = 'CO'
+        (stack_int, stack_int_err, fwhm, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir)
+
+        int_intensity_fit['CO'][i] = stack_int
+        int_intensity_fit_err['CO'][i] = stack_int_err
+        int_intensity_fit_uplim[i] = uplim
+        fwhm_fit[i] = fwhm
+
+        for line in ['HCN', 'HCOp', '13CO','C18O']:
+
+            if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
+                 ( ( line == '13CO') | (line == 'C18O'))):
+            
+                int_intensity_fit[line][i] = np.nan
+                int_intensity_fit_err[line][i] = np.nan
+                int_intensity_fit_uplim[line][i] = True
+
+            else:
+            
+                (stack_int, stack_int_err, fwhm, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir, fwhm=fwhm)
+
+                int_intensity_fit[line][i] = stack_int
+                int_intensity_fit_err[line][i] = stack_int_err
+                int_intensity_fit_uplim[line][i] = uplim
+
+            
+        # straight sum
+        (stack_sum, stack_sum_err, fwhm, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
+                                                                   full_stack[i]['stack_profile_CO'])
+
+        int_intensity_sum['CO'][i] = stack_sum
+        int_intensity_sum_err['CO'][i] = stack_sum_err
+        int_intensity_sum_uplim[i] = uplim
+        fwhm_sum[i] = fwhm
+
+        for line in ['HCN', 'HCOp', '13CO','C18O']:
+            
+            if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
+                 ( ( line == '13CO') | (line == 'C18O'))):
+                
+                int_intensity_sum[line][i] = np.nan
+                int_intensity_sum_err[line][i] = np.nan
+                int_intensity_sum_uplim[line][i] = True
+
+            else:
+            
+            
+                (stack_sum, stack_sum_err, fwhm, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
+                                                                                 full_stack[i]['stack_profile_'+line], 
+                                                                             fwhm = fwhm)
+
+                int_intensity_sum[line][i] = stack_sum
+                int_intensity_sum_err[line][i] = stack_sum_err
+                int_intensity_sum_uplim[line][i] = uplim
+
+
+    # add results to data able.
+    for line in ['CO','HCN','HCOp','13CO','C18O']:
+        full_stack.add_column(Column(int_intensity_fit[line],name='int_intensity_fit_'+line))
+        full_stack.add_column(Column(int_intensity_fit_err[line],name='int_intensity_fit_err_'+line))
+        full_stack.add_column(Column(int_intensity_fit_uplim[line],name='int_intensity_fit_uplim_'+line))
+
+        full_stack.add_column(Column(int_intensity_sum[line],name='int_intensity_sum_'+line))
+        full_stack.add_column(Column(int_intensity_sum_err[line],name='int_intensity_sum_err_'+line))
+        full_stack.add_column(Column(int_intensity_sum_uplim[line],name='int_intensity_sum_uplim_'+line))
+        
+
+    full_stack.add_column(Column(fwhm_fit),name='FWHM_fit')
+    full_stack.add_column(Column(fwhm_sum),name='FWHM_sum')
+
+    return full_stack
+
+
+def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, maxAbsVel=250.0*u.km/u.s, snThreshold=3.0):
+    '''
+    calculate the straight sum of the integrated intensity.
+    
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    5/13/2021   A.A. Kepley     Original Code
+
+    '''
+
+    from astropy.modeling import models, fitting
+    from scipy import integrate
+
+    # default is to scale to normal distribution
+    from scipy.stats import median_absolute_deviation as mad 
+
+    chanwidth = spectral_axis[1] - spectral_axis[0]
+
+    lineFreeChans = (spectral_axis > maxAbsVel ) | (spectral_axis < - maxAbsVel)
+
+    # mad is already scaled to gaussian distribution
+    noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit
+
+    lineChans = (spectral_axis < maxAbsVel ) & (spectral_axis > - maxAbsVel)
+    
+    if np.any(stack_profile[lineChans] > snThreshold * noisePerChan):
+        # sum line
+
+        # start off by fitting one Gassian
+        amp_est = max(stack_profile)
+        peak_cut = spectral_axis[stack_profile > amp_est * 0.5]
+        fwhm = max(peak_cut) - min(peak_cut)
+        sigma_est = fwhm/2.355
+        init_g = models.Gaussian1D(amplitude = amp_est, stddev=sigma_est)
+        fit_g = fitting.LevMarLSQFitter()
+        result_g = fit_g(init_g, spectral_axis, stack_profile)
+
+        newLineChans = ( (spectral_axis <  (result_g.mean + 3.0*result_g.stddev)) & 
+                         (spectral_axis > (result_g.mean - 3.0*result_g.stddev)))
+        
+        stack_sum = np.sum(stack_profile[newLineChans]*chanwidth)
+        stack_sum_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
+
+        uplim=False
+
+    elif fwhm:
+        stack_sum_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
+        stack_sum = snThreshold * stack_sum_err
+        uplim = True
+
+    else:
+        stack_sum_err = np.nan * stack_profile.unit * spectral_axis.unit
+        stack_sum = np.nan * stack_profile.unit * spectral_axis.unit
+        fwhm = np.nan * spectral_axis.unit
+        uplim = True
+        
+    return stack_sum, stack_sum_err, fwhm, uplim
+        
+
+def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/u.s, snThreshold=3.0):
+    '''
+    
+    calculate integrated intensity via a gaussian fit
+
+    input: 
+
+        stack: single stack
+    
+        outDir: output directory for plots and diagnostics
+    
+        fwhm: fwhm to use for upper limit estimate
+
+        maxAbsVel: maximum velocity at which we expect emission.
+    
+        snThreshold: S/N threshold for peak finding
+
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    5/13/2021   A.A. Kepley     Original Code
+
+    '''
+    
+    # default is to scale to normal distribution
+    from scipy.stats import median_absolute_deviation as mad 
+
+    from astropy.modeling import models, fitting
+    from scipy import integrate
+    from scipy.stats import f
+
+    spectral_axis = stack['spectral_axis']
+    stack_profile = stack['stack_profile_'+line]
+
+    chanwidth = spectral_axis[1] - spectral_axis[0]
+
+    lineFreeChans = (spectral_axis > maxAbsVel ) | (spectral_axis < - maxAbsVel)
+
+    # mad is already scaled to gaussian distribution
+    noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit
+
+    lineChans = (spectral_axis < maxAbsVel ) & (spectral_axis > - maxAbsVel)
+
+    plt.clf()
+    fig, myax = plt.subplots(nrows=1, ncols=1,figsize=(8,6))
+
+    plt.plot(spectral_axis, stack_profile,label='data')
+    plt.xlabel('Velocity - ' + spectral_axis.unit.to_string())
+    plt.ylabel('Average Intensity - ' + stack_profile.unit.to_string())
+    plt.title(stack['galaxy'] + ' ' + line + ' ' +  stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
+    plt.text(0.07,0.95,"Noise="+noisePerChan.to_string(),transform=myax.transAxes)
+    plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
+
+    if np.any(stack_profile[lineChans] > snThreshold * noisePerChan):
+        # fit line using Gaussian
+
+        # construct weight vector
+        weights = np.ones(len(stack_profile)) / noisePerChan.value
+
+        # start off by fitting one Gassian
+        amp_est = max(stack_profile)
+        peak_cut = spectral_axis[stack_profile > amp_est * 0.5]
+        fwhm_est = max(peak_cut) - min(peak_cut)
+        sigma_est = fwhm_est/2.355
+        init_g = models.Gaussian1D(amplitude = amp_est.value, stddev=sigma_est.value)
+
+        init_g.amplitude.min = 0.0
+        init_g.stddev.min = 6.0
+        init_g.stddev.max = 200.0
+
+        fit_g = fitting.LevMarLSQFitter()
+
+        result_g = fit_g(init_g, spectral_axis.value, stack_profile.value, weights=weights)
+
+        myax.plot(spectral_axis, result_g(spectral_axis.value), label='1 Gauss')
+
+        # Now fit two Gaussians
+        init_g1 = models.Gaussian1D(amplitude = result_g.amplitude/2.0, 
+                                    stddev = result_g.stddev/2.0, 
+                                    mean = result_g.mean+result_g.stddev)
+
+        init_g1.amplitude.min = 0.0
+        init_g1.stddev.min = 6.0
+        init_g1.stddev.max = 200.0
+
+        init_g2 = models.Gaussian1D(amplitude = result_g.amplitude/2.0, 
+                                    stddev = result_g.stddev/2.0, 
+                                    mean = result_g.mean-result_g.stddev)
+
+        init_g2.amplitude.min = 0.0
+        init_g2.stddev.min = 6.0
+        init_g2.stddev.max = 200.0
+
+        init_g1_g2 = init_g1 + init_g2
+        
+        fit_g1_g2 = fitting.LevMarLSQFitter()
+
+        result_g1_g2 = fit_g1_g2(init_g1_g2, spectral_axis.value, stack_profile.value, weights=weights)
+
+        plt.plot(spectral_axis, result_g1_g2(spectral_axis.value), label='2 Gauss')
+
+        # calculate reduced chi-square for each fit.
+    
+        chisquare_g, chisquare_r_g = chiSquare(stack_profile.value, result_g(spectral_axis.value),1.0/weights, nparams=3)
+        chisquare_g1_g2, chisquare_r_g1_g2 = chiSquare(stack_profile.value, result_g1_g2(spectral_axis.value),1.0/weights, nparams=6)
+    
+        # calculate f-values by taking ratio of chisquare values 
+        ## TODO: I think this is right. It's the definitely, but the
+        ## distribution to compare to is below.
+        fval = chisquare_r_g / chisquare_r_g1_g2
+
+        # sf = survival function = 1 - cdf 
+        # first parameter in f is the difference in the number of degrees
+        # of freedom between the two fits (here 6-3). The second is the
+        # number of degrees of freedom in the 2nd (2 gaussian
+        # fit). Citation wikipedia article on F statistics and
+        # regression. It's consistent with the description in Bevington
+        # and Robinson.
+        pvalue = f.sf(fval,6-3, (len(stack_profile)-6.0))
+    
+        myax.text(0.07,0.9,"Chi_1="+str(chisquare_r_g),transform=myax.transAxes)
+        myax.text(0.07,0.85,"Chi_2="+str(chisquare_r_g1_g2),transform=myax.transAxes)
+        myax.text(0.07,0.8,"F="+str(fval),transform=myax.transAxes)
+        myax.text(0.07,0.75,"p="+str(pvalue),transform=myax.transAxes)
+
+        # For diagnostics purposes.
+        # print(chisquare_r_g, chisquare_r_g1_g2,fval,pvalue)
+
+        # calculate integrated intensity from fits. If the pvalue is
+        # small, we reject the null hypothesis that the double-gaussian
+        # fits as well as a single gaussian.
+        if pvalue < 0.05:
+            stack_int = integrate.quad(result_g1_g2, -maxAbsVel.value, maxAbsVel.value)[0] * stack_profile.unit * spectral_axis.unit
+            stack_int_err = np.sqrt(fwhm_est/chanwidth) * chanwidth * noisePerChan 
+            fwhm = fwhm_est
+            myax.text(0.07,0.7,'Best: 2 Gauss', transform=myax.transAxes)
+        else:
+            stack_int =  integrate.quad(result_g, -maxAbsVel.value, maxAbsVel.value)[0] * stack_profile.unit * spectral_axis.unit
+            stack_int_err = np.sqrt(fwhm_est/chanwidth) * chanwidth * noisePerChan
+            fwhm = fwhm_est
+
+            myax.text(0.07,0.7,'Best: 1 Gauss', transform=myax.transAxes)
+
+
+        uplim = False
+
+    elif fwhm:
+
+        stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
+        
+        stack_int = snThreshold * stack_int_err
+
+        uplim = True
+
+    else:
+        stack_int = np.nan * spectral_axis.unit * stack_profile.unit
+        stack_int_err = np.nan* spectral_axis.unit * stack_profile.unit
+        fwhm = np.nan* spectral_axis.unit 
+        uplim = True
+
+
+    plt.legend(loc='upper right')
+    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_fit.png'
+    plt.savefig(os.path.join(outDir,plotname))
+    plt.close()
+
+
+    return stack_int, stack_int_err, fwhm, uplim
+
+
+def chiSquare(data, fit, error, nparams=1):
+    '''
+    Calculate reduced Chi squared
+
+    Date        Programmer      Description of Changes
+    ---------------------------------------------------------------------
+    5/13/2021   A.A. Kepley     Original Code
+
+    '''
+    
+    dof = len(fit) - nparams
+    
+    chisquare = np.sum((data-fit)**2/error**2)
+
+    chisquare_reduced = chisquare / dof
+    
+    return chisquare, chisquare_reduced
+
+
+def makeBins(galaxy, basemap,  bintype, outDir):
+    '''
+    Create bins for the data
+
+    basemap: map used to create bins (SpectralCube Projection)
+
+    bintype: type of bins ('intensity','stellarmass', 'radius')
+    
+    outDir: directory to write output bin image
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
+                                calculate up to other code.
+    '''
+
+    if bintype=='intensity' or bintype=='stellarmass':
+        #Bin the basemap by brightness
+        binnum=int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
+        binedge = np.nanmin(basemap.value)*np.logspace(0, binnum, num=binnum+1, base=np.e) #create bins based on dynamic range of mom0
+        bins = np.digitize(basemap.value, binedge) #this will automatically add an extra bin in the end for nan values
+        binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
+    elif bintype=='radius':
+        binnum=5
+        binedge = np.zeros(binnum+1)
+        binedge[1:]=np.logspace(-1, np.log10(0.5), num=binnum,base=10)#create bins based on r25
+        bins = np.digitize(basemap, binedge) #this will automatically add an extra bin in the end for nan values
+        binlabels=[""]+['{0:1.2f}'.format(i)+'R25' for i in binedge]
+    else:
+        raise Exception ("bintype should either be 'radius' or 'intensity' or 'stellarmass' ")
+    # Blank NaN values
+    bins[bins==len(binedge)] = 0 
+    # make bins map 
+    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
+    return binmap, binedge, binlabels
+
+
+def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
+    '''
+    Create bins for the data
+
+    basemap: map used to create bins (SpectralCube Projection)
+    
+    outDir: directory to write output bin image
+
+     Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
+                                calculate up to other code.
+    4/15/2021   A.A. Kepley     Changes bins to be beam width apart in radius.
+    '''
+    
+    minrad = 0.0+beam/2.0
+    maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
+
+    binedge = np.arange(minrad, maxrad, beam)  
+    binedge = np.insert(binedge,0,0)
+    binedge = binedge * basemap.unit
+    bins = np.digitize(basemap.value,binedge.value) 
+
+    binlabels = ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
+
+    # make bins map 
+    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
+
+    return binmap, binedge, binlabels
+
+def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
+    '''
+    visualize binning
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/29/2020  Yiqing Song     Original Code
+    12/3/2020   A.A. Kepley     Added comments
+    4/29/2021   A.A. Kepley     Simplified plotting code
+
+    '''
+
+    mapvals = np.arange(1.0,len(binedge)+1)    
+
+    plt.subplot(projection=binmap.wcs)
+    heatmap = plt.imshow(binmap.value,origin='lower')
+
+    plt.colorbar(heatmap, boundaries=binedge, values=mapvals)
+
+    plt.xlabel('RA (J2000)')
+    plt.ylabel('Dec (J2000)')
+
+    plt.savefig(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.png'))
+    plt.clf()
+    plt.close()
 
 
 def mapSN(galaxy, regridDir, outDir, sncut=3.0):
@@ -484,8 +1090,8 @@ def mapGCR(galaxy,  basemap):
     head=basemap.header
     pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_arcsec=np.degrees(R*pxscale)*3600.0 # map of GCR in arcsec
-    R_kpc=R*pxscale*Dmpc*1000 # map of GCR in kpc
+    R_arcsec=np.degrees(R*pxscale)*3600.0 * u.arcsec# map of GCR in arcsec
+    R_kpc=R*pxscale*Dmpc*1000 * u.kpc# map of GCR in kpc
     R_r25=R_arcsec/r25 # map of GCR in units of R25
 
     Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
@@ -496,233 +1102,8 @@ def mapGCR(galaxy,  basemap):
     return Rarcsec_map, Rkpc_map, Rr25_map 
 
 
-def makeBins(galaxy, basemap,  bintype, outDir):
-    '''
-    Create bins for the data
-
-    basemap: map used to create bins (SpectralCube Projection)
-
-    bintype: type of bins ('intensity','stellarmass', 'radius')
-    
-    outDir: directory to write output bin image
-
-     Date        Programmer      Description of Changes
-    ----------------------------------------------------------------------
-    10/29/2020  Yiqing Song     Original Code
-    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
-                                calculate up to other code.
-    '''
-
-    if bintype=='intensity' or bintype=='stellarmass':
-        #Bin the basemap by brightness
-        binnum=int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
-        binedge = np.nanmin(basemap.value)*np.logspace(0, binnum, num=binnum+1, base=np.e) #create bins based on dynamic range of mom0
-        bins = np.digitize(basemap.value, binedge) #this will automatically add an extra bin in the end for nan values
-        binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
-    elif bintype=='radius':
-        binnum=5
-        binedge = np.zeros(binnum+1)
-        binedge[1:]=np.logspace(-1, np.log10(0.5), num=binnum,base=10)#create bins based on r25
-        bins = np.digitize(basemap, binedge) #this will automatically add an extra bin in the end for nan values
-        binlabels=[""]+['{0:1.2f}'.format(i)+'R25' for i in binedge]
-    else:
-        raise Exception ("bintype should either be 'radius' or 'intensity' or 'stellarmass' ")
-    # Blank NaN values
-    bins[bins==len(binedge)] = 0 
-    # make bins map 
-    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
-    return binmap, binedge, binlabels
 
 
-def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
-    '''
-    Create bins for the data
-
-    basemap: map used to create bins (SpectralCube Projection)
-    
-    outDir: directory to write output bin image
-
-     Date        Programmer      Description of Changes
-    ----------------------------------------------------------------------
-    10/29/2020  Yiqing Song     Original Code
-    12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
-                                calculate up to other code.
-    4/15/2021   A.A. Kepley     Changes bins to be beam width apart in radius.
-    '''
-    
-    minrad = 0.0+beam/2.0
-    maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
-
-    binedge = np.arange(minrad, maxrad, beam)
-    binedge = np.insert(binedge,0,0)
-    bins = np.digitize(basemap,binedge) 
-
-    binlabels = ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
-
-    # make bins map 
-    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
-
-    return binmap, binedge, binlabels
-
-def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
-    '''
-    visualize binning
-
-    Date        Programmer      Description of Changes
-    ----------------------------------------------------------------------
-    10/29/2020  Yiqing Song     Original Code
-    12/3/2020   A.A. Kepley     Added comments
-    4/29/2021   A.A. Kepley     Simplified plotting code
-
-    '''
-
-    mapvals = np.arange(1.0,len(binedge)+1)    
-
-    plt.subplot(projection=binmap.wcs)
-    heatmap = plt.imshow(binmap.value,origin='lower')
-
-    plt.colorbar(heatmap, boundaries=binedge, values=mapvals)
-
-    plt.xlabel('RA (J2000)')
-    plt.ylabel('Dec (J2000)')
-
-    plt.savefig(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.png'))
-    plt.clf()
-    plt.close()
-
-
-def stack(line, cube, galaxy, velocity, 
-          binmap, binedge, bintype, binunit,
-          sfrmap=None, ltirmap=None,
-          maxAbsVel = 250.0):
-
-    '''
-    Actually do the stacking.
-
-    line: name of line we are stacking (string)
-
-    cube: data we are stacking (SpectralCube)
-
-    galaxy: line from degas_base.fits table with galaxy information.
-    
-    velocity: velocity map to stack data using
-
-    binmap: bin map
-
-    binedge: bin edges
-    
-    binlabel: bin labels
-    
-    bintype: type of bin
-    
-    binunit: units on bin [CAN I GET THIS FROM BINMAP?]
-
-    sfrmap: star formation rate map
-
-    ltirmap: LTIR map
-
-    maxAbsVel: absolute maximum velocity to include in spectral in km/s. 
-    Assumes line is centered at zero (which should be true for stacking).
-    
-    Date        Programmer      Description of Changes
-    ----------------------------------------------------------------------
-    10/29/2020  Yiqing Song     Original Code
-    12/03/2020  A.A. Kepley     Added comments and moved bin creation up 
-                                a level to simplify code.
-    12/10/2020  A.A. Kepley     added LTIR calculation
-
-    '''
-
-    # get the relevant info on the galaxy and cube
-    Dmpc = galaxy['DIST_MPC']
-    pix_area = (np.radians(np.abs(cube.header['CDELT1']))*Dmpc*1000)**2  #kpc^2
-    nchan = cube.shape[0]
-
-    ## fill in nans with 0 to avoid fft shift issue with nans
-    cube_nonan = cube.with_fill_value(0) 
-
-    # do the stack -- making sure the units work out right.
-    stack, labelvals = stacking.BinByLabel(cube_nonan,
-                                           binmap.value, velocity,
-                                           weight_map=None)
-    
-    # set up the results output
-    bin_mean = np.zeros(len(stack))
-    stacksum = np.zeros(len(stack))
-    stacked_profile = np.zeros((len(stack),len(stack[0]['spectral_axis'])))
-    binlabel = np.zeros(len(stack))
-    bin_mean = np.zeros(len(stack))
-    bin_lower = np.zeros(len(stack))
-    bin_upper = np.zeros(len(stack))
-    stacknoise = np.zeros(len(stack))
-    sfr_mean = np.zeros(len(stack))
-    sfr_total = np.zeros(len(stack))
-    ltir_mean = np.zeros(len(stack))
-    ltir_total = np.zeros(len(stack))
-    bin_area = np.zeros(len(stack))
-
-    # now put together the stacking results
-    for i in range(len(stack)):
-
-        d = stack[i]
-        
-        # profile
-        stacked_profile[i,:] = d['spectrum']
-
-        # integrated profile
-        integral = np.abs(np.trapz(y=d['spectrum'], x=d['spectral_axis']) )#sum intensity under curve, K km/s
-        stacksum[i] = integral.value
-
-        # calculating the noise
-        noise_region = np.logical_or(d['spectral_axis'].value < -abs(maxAbsVel),
-                                     d['spectral_axis'].value > abs(maxAbsVel))
-        channoise = np.nanstd(d['spectrum'][noise_region]) #noise from signal free channels, nned to multiple by sqrt(number of channels) and channel width 
-        stacknoise[i] = channoise*np.sqrt(nchan)*np.abs(d['spectral_axis'].value[0]-d['spectral_axis'].value[1])
-
-        # putting in the bins
-        bin_lower[i] = binedge[i]
-        bin_upper[i] = binedge[i+1]
-        bin_mean[i] = (binedge[i]+binedge[i+1])/2
-        #calculate the area of each bin in units of kpc^2    
-        binlabel[i] = d['label']
-        bin_area[i] = len(binmap[binmap==binlabel[i]].flatten())*pix_area    
-        
-        # calculating the mean SFR (as necessary)
-        if sfrmap is not None:
-            sfr_mean[i] = np.nanmean(sfrmap[binmap==binlabel[i]])
-
-        # calculate the mean LTIR (as necessary)
-        if ltirmap is not None:
-            ltir_mean[i] = np.nanmean(ltirmap[binmap==binlabel[i]])
-    
-
-    total_stack={}
-
-    # the CO is used to make the bins, so if another line, we skip. 
-    # It should be the same for all lines.
-    if line == 'CO': #CO is used to make stacking bins
-        total_stack['spectral_axis'] = stack[0]['spectral_axis'].value
-        total_stack['bin_lower'] = bin_lower
-        total_stack['bin_upper'] = bin_upper
-        total_stack['bin_mean'] = bin_mean
-        total_stack['bin_type'] = bintype
-        total_stack['bin_unit'] = binunit ### TODO: CAN I GET THIS FROM THE BINMAP DIRECTLY?
-
-        if sfrmap is not None:
-            total_stack['sfr_mean_w4fuv'] = sfr_mean # Msun/yr/kpc^2 -- units from input image
-            total_stack['sfr_total_w4fuv'] = sfr_mean * bin_area # Msun/yr/kpc^2 * kpc^2 = Msun/Yr
-
-        if ltirmap is not None:
-            total_stack['ltir_mean'] = ltir_mean # Lsun/pc^2 -- units from input image
-            total_stack['ltir_total'] = ltir_mean * 1000.0**2 *  bin_area # Lsun/pc^2 * (1000 pc/kpc)^2 * kpc^2   = Lsun
-
-    total_stack[line+'_stack_profile'] = stacked_profile
-    total_stack[line+'_stack_sum'] = stacksum
-    total_stack[line+'_stack_noise'] = stacknoise
-
-    return total_stack
 
 
     

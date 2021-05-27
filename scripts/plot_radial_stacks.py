@@ -28,8 +28,7 @@ for galaxy in degas[dr1]:
     plt.close()
 
     idx = ( (stack['galaxy'] == galaxy['NAME']) \
-            & (stack['bin_type'] == 'radius') \
-            & (stack['CO_stack_sum'] > 0))
+            & (stack['bin_type'] == 'radius'))
     
     nprofile = np.sum(idx)
         
@@ -59,7 +58,7 @@ for galaxy in degas[dr1]:
                 factor = 1.0
         
             flatax[i].plot(stack[idx]['spectral_axis'][i],
-                           stack[idx][line+'_stack_profile'][i] / factor,
+                           stack[idx]['stack_profile_'+line][i] / factor,
                            color=style[line]['color'],
                            linestyle='-',
                            marker=None,

@@ -121,7 +121,10 @@ newBeam = Beam(15.1*u.arcsec) ## beam is slightly too big in one
                               ## direction to smooth to 15.0, so
                               ## making the smoothing slightly larger.
 smoothCube = cube_kms.convolve_to(newBeam)
-smoothCube.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
+
+smoothCubeinK = smoothCube.to(u.K)
+
+smoothCubeinK.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
 
 ## PHANGS data
 ## -----------

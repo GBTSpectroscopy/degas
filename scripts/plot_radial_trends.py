@@ -33,22 +33,20 @@ for galaxy in degas[dr1]:
             continue
 
         idx = ( (stack['galaxy'] == galaxy['NAME']) \
-                & (stack['bin_type'] == 'radius') \
-                & (stack[line+'_stack_sum'] > 0))
+                & (stack['bin_type'] == 'radius'))
         
         # get radius in kpc -- radius stacks in arcsec.
         radius = (stack[idx]['bin_mean'] * galaxy['DIST_MPC'] * 1e6 / 206265.0) / 1e3
         # determine whether upper or lower limits
-        uplims = stack[idx][line+'_stack_noise']*3.0 > stack[idx][line+'_stack_sum']
+        uplims = stack[idx]['int_intensity_sum_uplim_'+line]
    
-        stack_sum = stack[idx][line+'_stack_sum']
-        stack_sum[uplims] = stack[idx][line+'_stack_noise'][uplims]*3.0
+        int_intensity = stack[idx]['int_intensity_sum_'+line]
+ 
+        yerr = stack[idx]['int_intensity_sum_err_'+line]
+        yerr[uplims] = int_intensity[uplims] * 0.3
 
-        yerr = stack[idx][line+'_stack_noise']
-        yerr[uplims] = stack_sum[uplims] * 0.3
 
-
-        plt.errorbar(radius, stack_sum,
+        plt.errorbar(radius, int_intensity,
                      yerr = yerr,
                      uplims = uplims,
                      marker = style[line]['marker'],

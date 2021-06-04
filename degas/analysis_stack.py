@@ -185,7 +185,7 @@ def makeStack(galaxy, regridDir, outDir,
      Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
-   12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
+    12/3/2020   A.A. Kepley     Added more comments plus minor changes to 
                                 use the degas table 
     12/10/2020  A.A. Kepley     Added LTIR
     4/29/2021   A.A. Kepley     Moved up map calculations to makeStack to 
@@ -311,50 +311,30 @@ def stackLines(galaxy, velocity,
 
     stack={}
     if cubeCO:
-        ## fill in nans with 0 to avoid fft shift issue with nans
-        #cubeCO_nonan = cubeCO.with_fill_value(0) 
-        
-        # do the stack -- making sure the units work out right.
-
         stack['CO'], labelvals = BinByLabel(cubeCO,
                                             binmap.value, velocity,
                                             weight_map=None,
                                             return_weights=True)
         
     if cubeHCN:
-        ## fill in nans with 0 to avoid fft shift issue with nans
-        #cubeHCN_nonan = cubeHCN.with_fill_value(0) 
-        
-        # do the stack -- making sure the units work out right.
         stack['HCN'], labelvals = BinByLabel(cubeHCN,
                                              binmap.value, velocity,
                                              weight_map=None,
                                              return_weights=True)
         
     if cubeHCOp:
-
-        #cubeHCOp_nonan = cubeHCOp.with_fill_value(0) 
-        
-        # do the stack -- making sure the units work out right.
         stack['HCOp'], labelvals = BinByLabel(cubeHCOp,
                                               binmap.value, velocity,
                                               weight_map=None,
                                               return_weights=True)
         
     if cube13CO:
-        #cube13CO_nonan = cube13CO.with_fill_value(0) 
-        
-        # do the stack -- making sure the units work out right.
         stack['13CO'], labelvals = BinByLabel(cube13CO,
                                               binmap.value, velocity,
                                               weight_map=None,
                                               return_weights=True)
         
     if cubeC18O:
-        
-        #cubeC18O_nonan = cubeC18O.with_fill_value(0) 
-        
-        # do the stack -- making sure the units work out right.
         stack['C18O'], labelvals = BinByLabel(cubeC18O,
                                               binmap.value, velocity,
                                               weight_map=None,
@@ -456,13 +436,12 @@ def addIntegratedIntensity(full_stack, outDir):
     int_intensity_sum_uplim = {}
 
     fwhm_fit = np.zeros(nstack)* full_stack['spectral_axis'].unit
-    fwhm_sum = np.zeros(nstack)* full_stack['spectral_axis'].unit
+
+    int_intensity_fit['CO'] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+    int_intensity_fit_err['CO'] = ma.zeros(nstack)* full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
+    int_intensity_fit_uplim['CO'] = np.full(nstack,False)
 
     for line in ['CO','HCN','HCOp','13CO','C18O']:
-
-        int_intensity_fit[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
-        int_intensity_fit_err[line] = ma.zeros(nstack)* full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
-        int_intensity_fit_uplim[line] = np.full(nstack,False)
 
         int_intensity_sum[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
         int_intensity_sum_err[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
@@ -471,42 +450,23 @@ def addIntegratedIntensity(full_stack, outDir):
     # calculate the integrated intensity from a fit and from a simple sum.
     for i in range(nstack):
         
+        # fit CO line to get integration region
         line = 'CO'
-        (stack_int, stack_int_err, fwhm, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir)
+        (stack_int, stack_int_err, stack_fit, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir)
+
+        fwhm_velrange = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.5 * np.max(stack_fit.eval())]
+        fwhm = fwhm_velrange[-1] - fwhm_velrange[0]
 
         int_intensity_fit['CO'][i] = stack_int
         int_intensity_fit_err['CO'][i] = stack_int_err
         int_intensity_fit_uplim[i] = uplim
         fwhm_fit[i] = fwhm
 
-        for line in ['HCN', 'HCOp', '13CO','C18O']:
-
-            if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
-                 ( ( line == '13CO') | (line == 'C18O'))):
-            
-                int_intensity_fit[line][i] = np.nan
-                int_intensity_fit_err[line][i] = np.nan
-                int_intensity_fit_uplim[line][i] = True
-
-            else:
-            
-                (stack_int, stack_int_err, fwhm, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir, fwhm=fwhm)
-
-                int_intensity_fit[line][i] = stack_int
-                int_intensity_fit_err[line][i] = stack_int_err
-                int_intensity_fit_uplim[line][i] = uplim
-
-            
+        int_axis = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.01 * np.max(stack_fit.eval())]
+        velrange = [np.min(int_axis), np.max(int_axis)]
+                                 
         # straight sum
-        (stack_sum, stack_sum_err, fwhm, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
-                                                                   full_stack[i]['stack_profile_CO'])
-
-        int_intensity_sum['CO'][i] = stack_sum
-        int_intensity_sum_err['CO'][i] = stack_sum_err
-        int_intensity_sum_uplim[i] = uplim
-        fwhm_sum[i] = fwhm
-
-        for line in ['HCN', 'HCOp', '13CO','C18O']:
+        for line in ['CO','HCN', 'HCOp', '13CO','C18O']:
             
             if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
                  ( ( line == '13CO') | (line == 'C18O'))):
@@ -516,35 +476,36 @@ def addIntegratedIntensity(full_stack, outDir):
                 int_intensity_sum_uplim[line][i] = True
 
             else:
-            
-            
-                (stack_sum, stack_sum_err, fwhm, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
-                                                                                 full_stack[i]['stack_profile_'+line], 
-                                                                             fwhm = fwhm)
+
+                (stack_sum, stack_sum_err, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
+                                                                           full_stack[i]['stack_profile_'+line], 
+                                                                           fwhm=fwhm,
+                                                                           velrange=velrange)
 
                 int_intensity_sum[line][i] = stack_sum
                 int_intensity_sum_err[line][i] = stack_sum_err
                 int_intensity_sum_uplim[line][i] = uplim
 
 
+    full_stack.add_column(Column(int_intensity_fit['CO'],name='int_intensity_fit_CO'))
+    full_stack.add_column(Column(int_intensity_fit_err['CO'],name='int_intensity_fit_err_CO'))
+    full_stack.add_column(Column(int_intensity_fit_uplim['CO'],name='int_intensity_fit_uplim_CO'))
+
+
     # add results to data able.
     for line in ['CO','HCN','HCOp','13CO','C18O']:
-        full_stack.add_column(Column(int_intensity_fit[line],name='int_intensity_fit_'+line))
-        full_stack.add_column(Column(int_intensity_fit_err[line],name='int_intensity_fit_err_'+line))
-        full_stack.add_column(Column(int_intensity_fit_uplim[line],name='int_intensity_fit_uplim_'+line))
-
+       
         full_stack.add_column(Column(int_intensity_sum[line],name='int_intensity_sum_'+line))
         full_stack.add_column(Column(int_intensity_sum_err[line],name='int_intensity_sum_err_'+line))
         full_stack.add_column(Column(int_intensity_sum_uplim[line],name='int_intensity_sum_uplim_'+line))
         
 
     full_stack.add_column(Column(fwhm_fit),name='FWHM_fit')
-    full_stack.add_column(Column(fwhm_sum),name='FWHM_sum')
 
     return full_stack
 
 
-def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, maxAbsVel=250.0*u.km/u.s, snThreshold=3.0):
+def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, velrange=[-250,250]*(u.km/u.s), snThreshold=3.0):
     '''
     calculate the straight sum of the integrated intensity.
     
@@ -562,48 +523,26 @@ def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, maxAbsVel=25
 
     chanwidth = spectral_axis[1] - spectral_axis[0]
 
-    lineFreeChans = (spectral_axis > maxAbsVel ) | (spectral_axis < - maxAbsVel)
+    lineFreeChans =  ((spectral_axis > velrange[1])  | (spectral_axis < velrange[0])) & (stack_profile != 0)
 
     # mad is already scaled to gaussian distribution
     noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit
 
-    lineChans = (spectral_axis < maxAbsVel ) & (spectral_axis > - maxAbsVel)
+    lineChans = (spectral_axis < velrange[1] ) & (spectral_axis > velrange[0])
     
-    if np.any(stack_profile[lineChans] > snThreshold * noisePerChan):
-        # sum line
+    stack_sum = np.sum(stack_profile[lineChans]*chanwidth)
+    stack_sum_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
 
-        # start off by fitting one Gassian
-        amp_est = max(stack_profile)
-        peak_cut = spectral_axis[stack_profile > amp_est * 0.5]
-        fwhm = max(peak_cut) - min(peak_cut)
-        sigma_est = fwhm/2.355
-        init_g = models.Gaussian1D(amplitude = amp_est, stddev=sigma_est)
-        fit_g = fitting.LevMarLSQFitter()
-        result_g = fit_g(init_g, spectral_axis, stack_profile)
-
-        newLineChans = ( (spectral_axis <  (result_g.mean + 3.0*result_g.stddev)) & 
-                         (spectral_axis > (result_g.mean - 3.0*result_g.stddev)))
-        
-        stack_sum = np.sum(stack_profile[newLineChans]*chanwidth)
-        stack_sum_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
-
-        uplim=False
-
-    elif fwhm:
-        stack_sum_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
-        stack_sum = snThreshold * stack_sum_err
-        uplim = True
-
+    if stack_sum > (snThreshold * stack_sum_err):
+        uplim = False
     else:
-        stack_sum_err = np.nan * stack_profile.unit * spectral_axis.unit
-        stack_sum = np.nan * stack_profile.unit * spectral_axis.unit
-        fwhm = np.nan * spectral_axis.unit
+        stack_sum = stack_sum_err * snThreshold
         uplim = True
         
-    return stack_sum, stack_sum_err, fwhm, uplim
+    return stack_sum, stack_sum_err, uplim
         
 
-def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/u.s, snThreshold=3.0):
+def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/u.s):
     '''
     
     calculate integrated intensity via a gaussian fit
@@ -630,22 +569,25 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     # default is to scale to normal distribution
     from scipy.stats import median_absolute_deviation as mad 
 
-    from astropy.modeling import models, fitting
+    #from astropy.modeling import models, fitting
     from scipy import integrate
-    from scipy.stats import f
+    #from scipy.stats import f
+
+    from lmfit.models import GaussianModel, ConstantModel
 
     spectral_axis = stack['spectral_axis']
     stack_profile = stack['stack_profile_'+line]
 
     chanwidth = spectral_axis[1] - spectral_axis[0]
 
-    lineFreeChans = (spectral_axis > maxAbsVel ) | (spectral_axis < - maxAbsVel)
-
-    # mad is already scaled to gaussian distribution
-    noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit
-
+    lineFreeChans = ((spectral_axis > maxAbsVel ) | (spectral_axis < - maxAbsVel)) & \
+                    (stack_profile.value != 0)
     lineChans = (spectral_axis < maxAbsVel ) & (spectral_axis > - maxAbsVel)
 
+    noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit # mad is already scaled to gaussian distribution
+    weights = np.ones(len(stack_profile)) / noisePerChan.value
+
+    # setup plot
     plt.clf()
     fig, myax = plt.subplots(nrows=1, ncols=1,figsize=(8,6))
 
@@ -656,106 +598,103 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     plt.text(0.07,0.95,"Noise="+noisePerChan.to_string(),transform=myax.transAxes)
     plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
 
-    if np.any(stack_profile[lineChans] > snThreshold * noisePerChan):
-        # fit line using Gaussian
+    # Start with simple DC model
+    dcOffset = ConstantModel()
+    pars_dc = dcOffset.make_params(c=0)
+    dcOffsetFit = dcOffset.fit(stack_profile.value,pars_dc, x=spectral_axis.value, weights=weights)
+    #print(dcOffsetFit.fit_report())
 
-        # construct weight vector
-        weights = np.ones(len(stack_profile)) / noisePerChan.value
+    plt.axhline(dcOffsetFit.best_fit,label='DC Offset',color='gray')
 
-        # start off by fitting one Gassian
-        amp_est = max(stack_profile)
-        peak_cut = spectral_axis[stack_profile > amp_est * 0.5]
-        fwhm_est = max(peak_cut) - min(peak_cut)
-        sigma_est = fwhm_est/2.355
-        init_g = models.Gaussian1D(amplitude = amp_est.value, stddev=sigma_est.value)
+    myax.text(0.07,0.9,'DC BIC='+str(dcOffsetFit.bic), transform=myax.transAxes)
 
-        init_g.amplitude.min = 0.0
-        init_g.stddev.min = 6.0
-        init_g.stddev.max = 200.0
+    # Fit Single Gaussian
 
-        fit_g = fitting.LevMarLSQFitter()
+    g1 = GaussianModel()
 
-        result_g = fit_g(init_g, spectral_axis.value, stack_profile.value, weights=weights)
+    pars_g1 = g1.guess(stack_profile.value,x=spectral_axis.value)
+    pars_g1['sigma'].max = 200.0
+    #pars_g1['amplitude'].min = 0.0
+    pars_g1['amplitude'].min = noisePerChan.value
 
-        myax.plot(spectral_axis, result_g(spectral_axis.value), label='1 Gauss')
+    g1Fit = g1.fit(stack_profile.value,pars_g1,x=spectral_axis.value,weights=weights)
 
-        # Now fit two Gaussians
-        init_g1 = models.Gaussian1D(amplitude = result_g.amplitude/2.0, 
-                                    stddev = result_g.stddev/2.0, 
-                                    mean = result_g.mean+result_g.stddev)
+    #print(g1Fit.fit_report())
 
-        init_g1.amplitude.min = 0.0
-        init_g1.stddev.min = 6.0
-        init_g1.stddev.max = 200.0
+    plt.plot(spectral_axis,g1Fit.best_fit,label='1 Gauss')
+    
+    myax.text(0.07,0.85,'1 Gauss BIC='+str(g1Fit.bic), transform=myax.transAxes)
 
-        init_g2 = models.Gaussian1D(amplitude = result_g.amplitude/2.0, 
-                                    stddev = result_g.stddev/2.0, 
-                                    mean = result_g.mean-result_g.stddev)
+    if (dcOffsetFit.bic > g1Fit.bic):
+        # single gaussian is better than line, so try a 2 gaussian fit.
 
-        init_g2.amplitude.min = 0.0
-        init_g2.stddev.min = 6.0
-        init_g2.stddev.max = 200.0
+        # Fit 2 gaussians to compare to single gauss fit
+        g2 = GaussianModel(prefix='g1_') + GaussianModel(prefix='g2_')
+        pars_g2 = g2.make_params(g1_amplitude = g1Fit.params['amplitude'].value/2.0,
+                                 g1_sigma = g1Fit.params['sigma'].value/2.0,
+                                 g1_center = g1Fit.params['center']-g1Fit.params['sigma'],
+                                 g2_amplitude = g1Fit.params['amplitude'].value/2.0,
+                                 g2_sigma = g1Fit.params['sigma'].value/2.0,
+                                 g2_center = g1Fit.params['center']+g1Fit.params['sigma'])
 
-        init_g1_g2 = init_g1 + init_g2
+        #pars_g2['g1_center'].min = -maxAbsVel.value
+        #pars_g2['g1_center'].max = maxAbsVel.value
+        pars_g2['g1_sigma'].max = 200.0
+        #pars_g2['g1_amplitude'].min = 0.0
+        pars_g2['g1_amplitude'].min = noisePerChan.value
+
+        #pars_g2['g2_center'].min = -maxAbsVel.value
+        #pars_g2['g2_center'].max = maxAbsVel.value
+        pars_g2['g2_sigma'].max = 200.0
+        #pars_g2['g2_amplitude'].min = 0.0
+        pars_g2['g2_amplitude'].min = noisePerChan.value
+
+        g2Fit = g2.fit(stack_profile.value, pars_g2, x=spectral_axis.value,weights=weights)
+
+        # print(g2Fit.fit_report())
+
+        plt.plot(spectral_axis,g2Fit.best_fit,label='2 Gauss')
         
-        fit_g1_g2 = fitting.LevMarLSQFitter()
+        myax.text(0.07,0.8,'2 Gauss BIC='+str(g2Fit.bic), transform=myax.transAxes)
 
-        result_g1_g2 = fit_g1_g2(init_g1_g2, spectral_axis.value, stack_profile.value, weights=weights)
+        if g2Fit.bic > g1Fit.bic:
+            # single gaussian fit best -- revert to single gaussian
+            stack_int = integrate.trapezoid(g1Fit.best_fit*stack_profile.unit,
+                                            x=spectral_axis)
+            
+            # get from fit
+            stack_fit = g1Fit
+            fwhm = g1Fit.values['fwhm'] * spectral_axis.unit
+            stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
+            
+            myax.text(0.07,0.75,'Best: 1 Gauss', transform=myax.transAxes)
 
-        plt.plot(spectral_axis, result_g1_g2(spectral_axis.value), label='2 Gauss')
-
-        # calculate reduced chi-square for each fit.
-    
-        chisquare_g, chisquare_r_g = chiSquare(stack_profile.value, result_g(spectral_axis.value),1.0/weights, nparams=3)
-        chisquare_g1_g2, chisquare_r_g1_g2 = chiSquare(stack_profile.value, result_g1_g2(spectral_axis.value),1.0/weights, nparams=6)
-    
-        # calculate f-values by taking ratio of chisquare values 
-        ## TODO: I think this is right. It's the definitely, but the
-        ## distribution to compare to is below.
-        fval = chisquare_r_g / chisquare_r_g1_g2
-
-        # sf = survival function = 1 - cdf 
-        # first parameter in f is the difference in the number of degrees
-        # of freedom between the two fits (here 6-3). The second is the
-        # number of degrees of freedom in the 2nd (2 gaussian
-        # fit). Citation wikipedia article on F statistics and
-        # regression. It's consistent with the description in Bevington
-        # and Robinson.
-        pvalue = f.sf(fval,6-3, (len(stack_profile)-6.0))
-    
-        myax.text(0.07,0.9,"Chi_1="+str(chisquare_r_g),transform=myax.transAxes)
-        myax.text(0.07,0.85,"Chi_2="+str(chisquare_r_g1_g2),transform=myax.transAxes)
-        myax.text(0.07,0.8,"F="+str(fval),transform=myax.transAxes)
-        myax.text(0.07,0.75,"p="+str(pvalue),transform=myax.transAxes)
-
-        # For diagnostics purposes.
-        # print(chisquare_r_g, chisquare_r_g1_g2,fval,pvalue)
-
-        # calculate integrated intensity from fits. If the pvalue is
-        # small, we reject the null hypothesis that the double-gaussian
-        # fits as well as a single gaussian.
-        if pvalue < 0.05:
-            stack_int = integrate.quad(result_g1_g2, -maxAbsVel.value, maxAbsVel.value)[0] * stack_profile.unit * spectral_axis.unit
-            stack_int_err = np.sqrt(fwhm_est/chanwidth) * chanwidth * noisePerChan 
-            fwhm = fwhm_est
-            myax.text(0.07,0.7,'Best: 2 Gauss', transform=myax.transAxes)
         else:
-            stack_int =  integrate.quad(result_g, -maxAbsVel.value, maxAbsVel.value)[0] * stack_profile.unit * spectral_axis.unit
-            stack_int_err = np.sqrt(fwhm_est/chanwidth) * chanwidth * noisePerChan
-            fwhm = fwhm_est
+         
+            # two gaussian fit best
+            stack_int = integrate.trapezoid(g2Fit.best_fit*stack_profile.unit,
+                                            x=spectral_axis)
 
-            myax.text(0.07,0.7,'Best: 1 Gauss', transform=myax.transAxes)
+            # calculate from fit
+            stack_fit = g2Fit
+            fwhm_velrange = spectral_axis[g1Fit.eval() > 0.5 * np.max(g1Fit.eval())]
+            fwhm = (fwhm_velrange[-1] - fwhm_velrange[0])
+            stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
 
+            myax.text(0.07,0.75,'Best: 2 Gauss', transform=myax.transAxes)
 
+            
         uplim = False
 
     elif fwhm:
 
+        # dc offset is best fit. Estimate upper limit based on FWHM and S/N threshold
         stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
-        
         stack_int = snThreshold * stack_int_err
-
         uplim = True
+        stack_fit = dcOffsetFit
+
+        myax.text(0.07,0.8,'Best: DC', transform=myax.transAxes)
 
     else:
         stack_int = np.nan * spectral_axis.unit * stack_profile.unit
@@ -770,26 +709,7 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     plt.close()
 
 
-    return stack_int, stack_int_err, fwhm, uplim
-
-
-def chiSquare(data, fit, error, nparams=1):
-    '''
-    Calculate reduced Chi squared
-
-    Date        Programmer      Description of Changes
-    ---------------------------------------------------------------------
-    5/13/2021   A.A. Kepley     Original Code
-
-    '''
-    
-    dof = len(fit) - nparams
-    
-    chisquare = np.sum((data-fit)**2/error**2)
-
-    chisquare_reduced = chisquare / dof
-    
-    return chisquare, chisquare_reduced
+    return stack_int, stack_int_err, stack_fit, uplim
 
 
 def makeBins(galaxy, basemap,  bintype, outDir):

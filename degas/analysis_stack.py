@@ -477,8 +477,9 @@ def addIntegratedIntensity(full_stack, outDir):
 
             else:
 
-                (stack_sum, stack_sum_err, uplim) = sumIntegratedIntensity(full_stack[i]['spectral_axis'], 
-                                                                           full_stack[i]['stack_profile_'+line], 
+                (stack_sum, stack_sum_err, uplim) = sumIntegratedIntensity(full_stack[i], 
+                                                                           line, 
+                                                                           outDir,
                                                                            fwhm=fwhm,
                                                                            velrange=velrange)
 
@@ -505,7 +506,7 @@ def addIntegratedIntensity(full_stack, outDir):
     return full_stack
 
 
-def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, velrange=[-250,250]*(u.km/u.s), snThreshold=3.0):
+def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(u.km/u.s), snThreshold=3.0):
     '''
     calculate the straight sum of the integrated intensity.
     
@@ -514,12 +515,13 @@ def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, velrange=[-2
     5/13/2021   A.A. Kepley     Original Code
 
     '''
-
-    from astropy.modeling import models, fitting
-    from scipy import integrate
+    from scipy.ndimage import label
 
     # default is to scale to normal distribution
     from scipy.stats import median_absolute_deviation as mad 
+
+    spectral_axis = stack['spectral_axis']
+    stack_profile = stack['stack_profile_'+line]
 
     chanwidth = spectral_axis[1] - spectral_axis[0]
 
@@ -538,7 +540,34 @@ def sumIntegratedIntensity(spectral_axis, stack_profile, fwhm=None, velrange=[-2
     else:
         stack_sum = stack_sum_err * snThreshold
         uplim = True
-        
+
+    # make plot
+    plt.clf()
+    fig, myax = plt.subplots(nrows=1, ncols=1, figsize=(8,6))
+    plt.axhline(0,color='gray',linestyle=':')
+    plt.plot(spectral_axis, stack_profile, label='data',color='orange')
+    plt.xlabel('Velocity - ' + spectral_axis.unit.to_string())
+    plt.ylabel('Average Intensity - ' + stack_profile.unit.to_string())
+    plt.title(stack['galaxy'] + ' ' + line + ' ' + stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
+    plt.text(0.07, 0.95, "Noise="+noisePerChan.to_string(),transform=myax.transAxes)
+
+    plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
+    
+    plt.axvspan(spectral_axis[lineChans][0].value,spectral_axis[lineChans][-1].value, color='blue',alpha=0.2)
+
+    lineFreeRegs, nregs = label(lineFreeChans)
+
+    for i in range(0, nregs+1):
+        if np.all(lineFreeChans[lineFreeRegs == i]):
+            plt.axvspan(spectral_axis[lineFreeRegs == i][0].value,
+                        spectral_axis[lineFreeRegs == i][-1].value,
+                        color='green',alpha=0.2)            
+
+    plt.legend(loc='upper right')
+    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_sum.png'
+    plt.savefig(os.path.join(outDir,plotname))
+    plt.close()
+
     return stack_sum, stack_sum_err, uplim
         
 
@@ -566,6 +595,8 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
     '''
     
+    from matplotlib import gridspec
+
     # default is to scale to normal distribution
     from scipy.stats import median_absolute_deviation as mad 
 
@@ -589,14 +620,24 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
     # setup plot
     plt.clf()
-    fig, myax = plt.subplots(nrows=1, ncols=1,figsize=(8,6))
+    fig = plt.figure(figsize=(8,6))
+    gs = gridspec.GridSpec(2,1,height_ratios=[4,1])
+    ax0 = plt.subplot(gs[0])
+    ax1 = plt.subplot(gs[1])
+    #fig, myax = plt.subplots(nrows=2, ncols=1,figsize=(8,6))    
 
-    plt.plot(spectral_axis, stack_profile,label='data')
-    plt.xlabel('Velocity - ' + spectral_axis.unit.to_string())
-    plt.ylabel('Average Intensity - ' + stack_profile.unit.to_string())
-    plt.title(stack['galaxy'] + ' ' + line + ' ' +  stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
-    plt.text(0.07,0.95,"Noise="+noisePerChan.to_string(),transform=myax.transAxes)
-    plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
+    ax0.axhline(0,color='gray',linestyle=':')
+    ax0.plot(spectral_axis, stack_profile,label='data')
+
+    ax0.set_ylabel('Average Intensity - ' + stack_profile.unit.to_string())
+
+    ax0.set_title(stack['galaxy'] + ' ' + line + ' ' +  stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
+    ax0.text(0.07,0.95,"Noise="+noisePerChan.to_string(),transform=ax0.transAxes)
+    ax0.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
+
+    ax1.axhline(0,color='gray',linestyle=':')
+    ax1.set_xlabel('Velocity - ' + spectral_axis.unit.to_string())
+    ax1.set_ylabel('Fit Residuals - ' + stack_profile.unit.to_string())
 
     # Start with simple DC model
     dcOffset = ConstantModel()
@@ -604,9 +645,9 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     dcOffsetFit = dcOffset.fit(stack_profile.value,pars_dc, x=spectral_axis.value, weights=weights)
     #print(dcOffsetFit.fit_report())
 
-    plt.axhline(dcOffsetFit.best_fit,label='DC Offset',color='gray')
+    ax0.axhline(dcOffsetFit.best_fit,label='DC Offset',color='gray')
 
-    myax.text(0.07,0.9,'DC BIC='+str(dcOffsetFit.bic), transform=myax.transAxes)
+    ax0.text(0.07,0.9,'DC BIC='+str(dcOffsetFit.bic), transform=ax0.transAxes)
 
     # Fit Single Gaussian
 
@@ -621,9 +662,9 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
     #print(g1Fit.fit_report())
 
-    plt.plot(spectral_axis,g1Fit.best_fit,label='1 Gauss')
+    ax0.plot(spectral_axis,g1Fit.best_fit,label='1 Gauss')
     
-    myax.text(0.07,0.85,'1 Gauss BIC='+str(g1Fit.bic), transform=myax.transAxes)
+    ax0.text(0.07,0.85,'1 Gauss BIC='+str(g1Fit.bic), transform=ax0.transAxes)
 
     if (dcOffsetFit.bic > g1Fit.bic):
         # single gaussian is better than line, so try a 2 gaussian fit.
@@ -653,9 +694,9 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
         # print(g2Fit.fit_report())
 
-        plt.plot(spectral_axis,g2Fit.best_fit,label='2 Gauss')
+        ax0.plot(spectral_axis,g2Fit.best_fit,label='2 Gauss')
         
-        myax.text(0.07,0.8,'2 Gauss BIC='+str(g2Fit.bic), transform=myax.transAxes)
+        ax0.text(0.07,0.8,'2 Gauss BIC='+str(g2Fit.bic), transform=ax0.transAxes)
 
         if g2Fit.bic > g1Fit.bic:
             # single gaussian fit best -- revert to single gaussian
@@ -665,9 +706,10 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
             # get from fit
             stack_fit = g1Fit
             fwhm = g1Fit.values['fwhm'] * spectral_axis.unit
-            stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
-            
-            myax.text(0.07,0.75,'Best: 1 Gauss', transform=myax.transAxes)
+            stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan                                    
+            ax0.text(0.07,0.75,'Best: 1 Gauss', transform=ax0.transAxes)
+
+            ax1.plot(spectral_axis,g1Fit.residual)
 
         else:
          
@@ -681,8 +723,9 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
             fwhm = (fwhm_velrange[-1] - fwhm_velrange[0])
             stack_int_err = np.sqrt(fwhm/chanwidth) * chanwidth * noisePerChan
 
-            myax.text(0.07,0.75,'Best: 2 Gauss', transform=myax.transAxes)
-
+            ax0.text(0.07,0.75,'Best: 2 Gauss', transform=ax0.transAxes)
+            
+            ax1.plot(spectral_axis,g2Fit.residual)
             
         uplim = False
 
@@ -694,7 +737,9 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
         uplim = True
         stack_fit = dcOffsetFit
 
-        myax.text(0.07,0.8,'Best: DC', transform=myax.transAxes)
+        ax0.text(0.07,0.8,'Best: DC', transform=myax.transAxes)
+
+        ax1.plot(spectral_axis,dcOffsetFit.residual)
 
     else:
         stack_int = np.nan * spectral_axis.unit * stack_profile.unit
@@ -703,7 +748,7 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
         uplim = True
 
 
-    plt.legend(loc='upper right')
+    ax0.legend(loc='upper right')
     plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_fit.png'
     plt.savefig(os.path.join(outDir,plotname))
     plt.close()

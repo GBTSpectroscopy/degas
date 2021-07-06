@@ -267,7 +267,6 @@ def cleansplit(filename, galaxy=None,
         ThisCube.write(Galaxy + '_' + ThisLine + '.fits', overwrite=True)
         StartChan = ThisCube.closest_spectral_channel(V0 - Vgalaxy)
         EndChan = ThisCube.closest_spectral_channel(V0 + Vgalaxy)
-
         if maskfile is not None:
             maskLookup = buildMaskLookup(maskfile)
             shp = ThisCube.shape
@@ -287,6 +286,7 @@ def cleansplit(filename, galaxy=None,
                     spectrum = robustBaseline(spectrum, blorder=blorder,
                                               baselineIndex=~mask)
                     data[:, y, x] = spectrum
+                    
             ThisCube = SpectralCube(data * ThisCube.unit,
                                     ThisCube.wcs, header=ThisCube.header,
                                     meta={'BUNIT':ThisCube.header['BUNIT']})

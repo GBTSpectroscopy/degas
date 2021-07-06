@@ -1,6 +1,6 @@
 from spectral_cube import SpectralCube
 import astropy.units as u
-from scipy.ndimage import map_coordinates
+from scipy.ndimage import map_coordinates, binary_dilation
 import numpy as np
 import copy
 import astropy.wcs as wcs
@@ -288,7 +288,8 @@ def deduplicate_keywords(hdr):
     return(hdr)
 
 
-def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
+def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
+               dilate=0, emissionfile=None):
     """Builds masks for use in DEGAS imaging pipeline. 
 
     Parameters
@@ -313,6 +314,10 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
 
     outdir : str
         Directory for output masks to be stored in
+
+    dilate : int
+        Spectrally dilate the mask by this number of channels
+
     """
 
 
@@ -335,11 +340,23 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
             warnings.warn('Unable to make output directory '+outdir)
             raise
 
+
+    c = 299792.458
     # Read in original cube, ensure in velocity space
     s = SpectralCube.read(filename)
     s = s.with_spectral_unit(u.km / u.s, velocity_convention='radio')
     vmid = s.spectral_axis[len(s.spectral_axis)//2].value
-    c = 299792.458
+    if emissionfile:
+        cube = SpectralCube.read(emissionfile)
+        cube = cube.with_spectral_unit(u.km / u.s,
+                                       velocity_convention='radio')
+        s = cube.with_mask(s > 0 * s.unit)
+        s = s.with_fill_value(0 * s.unit)
+        dtype = np.float
+        outtype = np.float
+    else:
+        dtype = np.bool
+        outtype = np.uint8
     # HCN_HCO+
     # Build a mask with a spectral width of 2 GHz and the same spatial 
     # dimensions as the original mask
@@ -347,7 +364,7 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
     s_hcn = s.with_spectral_unit(u.Hz, rest_value=88.631847 * u.GHz)
     s_hcop = s.with_spectral_unit(u.Hz, rest_value=89.188518 * u.GHz)
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=np.byte)
+    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
     hdr = s_hcn.wcs.to_header()
     hdr['CRPIX3'] = 1000
     hdr['CDELT3'] = width / nChan
@@ -375,11 +392,15 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
         zz_hcop = int(zz_hcop)
         if 0 <= zz_hcn < s_hcn.shape[0]:
             mask[zz, :, :] = np.array(s_hcn.filled_data[zz_hcn, :, :],
-                                      dtype=np.bool)
+                                      dtype=dtype)
         if 0 <= zz_hcop < s_hcop.shape[0]:
             mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
-                                      dtype=np.bool)
-    maskcube = SpectralCube(mask, w, header=hdr)
+                                      dtype=dtype)
+    if dilate > 0 and (dtype == np.bool):
+        mask = binary_dilation(mask,
+                               np.ones((int(2 * dilate + 1), 1, 1),
+                                       dtype=dtype))
+    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
     galname = os.path.split(filename)[1].split('_')[0]
     
     maskcube.write(outdir + galname+'.hcn_hcop.mask.fits',
@@ -392,7 +413,7 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
     s_13co = s.with_spectral_unit(u.Hz, rest_value=110.20135 * u.GHz)
     s_c18o = s.with_spectral_unit(u.Hz, rest_value=109.78217 * u.GHz)
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=np.byte)
+    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
     hdr = s_13co.wcs.to_header()
     hdr['CRPIX3'] = 1000
     hdr['CDELT3'] = width / nChan
@@ -420,11 +441,16 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
         zz_c18o = int(zz_c18o)
         if 0 <= zz_13co < s_13co.shape[0]:
             mask[zz, :, :] = np.array(s_13co.filled_data[zz_13co, :, :],
-                                      dtype=np.bool)
+                                      dtype=dtype)
         if 0 <= zz_c18o < s_c18o.shape[0]:
             mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
-                                      dtype=np.bool)
-    maskcube = SpectralCube(mask, w, header=hdr)
+                                      dtype=dtype)
+    if dilate > 0 and dtype == np.bool:
+        mask = binary_dilation(mask,
+                               np.ones((int(2 * dilate + 1), 1, 1),
+                                       dtype=dtype))
+
+    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
     maskcube.write(outdir + galname + '.13co_c18o.mask.fits',
                    overwrite=True)
     
@@ -435,7 +461,7 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
     s_12co = s.with_spectral_unit(u.Hz, rest_value=115.271204 * u.GHz)
 
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=np.byte)
+    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
     hdr = s_12co.wcs.to_header()
     hdr['CRPIX3'] = 1000
     hdr['CDELT3'] = width / nChan
@@ -459,13 +485,18 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None):
         zz_12co = int(zz_12co)
         if 0 <= zz_12co < s_12co.shape[0]:
             mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
-                                      dtype=np.bool)
-    maskcube = SpectralCube(mask, w, header=hdr)
+                                      dtype=dtype)
+    if dilate > 0 and dtype == np.bool:
+        mask = binary_dilation(mask,
+                               np.ones((int(2 * dilate + 1), 1, 1),
+                                       dtype=dtype))
+
+    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
     maskcube.write(outdir + galname+'.12co.mask.fits', overwrite=True)
 
-def build_setup_masks():
+def build_setup_masks(**kwargs):
     OutputRoot = os.environ["DEGASDIR"]
     fl = glob.glob(OutputRoot + 'masks/NGC????_mask.fits')
     fl += glob.glob(OutputRoot + 'masks/IC????_mask.fits')
     for thisfile in fl:
-        buildmasks(thisfile)
+        buildmasks(thisfile, **kwargs)

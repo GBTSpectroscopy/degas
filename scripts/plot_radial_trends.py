@@ -37,11 +37,12 @@ for galaxy in degas[dr1]:
         
         # get radius in kpc -- radius stacks in arcsec.
         radius = (stack[idx]['bin_mean'] * galaxy['DIST_MPC'] * 1e6 / 206265.0) / 1e3
+    
         # determine whether upper or lower limits
         uplims = stack[idx]['int_intensity_sum_uplim_'+line]
    
         int_intensity = stack[idx]['int_intensity_sum_'+line]
- 
+        
         yerr = stack[idx]['int_intensity_sum_err_'+line]
         yerr[uplims] = int_intensity[uplims] * 0.3
 

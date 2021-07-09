@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # setup information sources
-stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_test','test_mom1.fits'))
+stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_test','stack_IR6p0_mom1.fits'))
 plotDir = os.path.join(os.environ['ANALYSISDIR'],'plots','radial_stacks')
 
 degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))

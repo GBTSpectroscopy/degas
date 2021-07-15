@@ -104,21 +104,22 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     velocity = Projection.from_hdu(vhdu)
 
     # read in HCN
-    linefile = os.path.join(regridDir,galaxy['NAME']+'_HCN_rebase3_smooth1.3_hanning1_maxnchan_smooth.fits')
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCN_*_hanning1_maxnchan_smooth.fits'))[0]
     cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
     
     # read in HCO+
-    linefile = os.path.join(regridDir,galaxy['NAME']+'_HCOp_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCOp_*_hanning1_smooth_regrid.fits'))[0]
     cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
 
     # For NGC6946, skip 13CO and C18O since we don't have that data.
-    if galaxy['NAME'] != 'NGC6946':
+    # For NGC4569, we are temporarily missing data.
+    if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
         # read in 13CO
-        linefile = os.path.join(regridDir,galaxy['NAME']+'_13CO_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))[0]
         cube13CO = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
 
         # read in C18O
-        linefile = os.path.join(regridDir,galaxy['NAME']+'_C18O_rebase3_smooth1.3_hanning1_smooth_regrid.fits')
+        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*_hanning1_smooth_regrid.fits'))[0]
         cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
         
     else:
@@ -454,38 +455,52 @@ def addIntegratedIntensity(full_stack, outDir):
         line = 'CO'
         (stack_int, stack_int_err, stack_fit, uplim) = fitIntegratedIntensity(full_stack[i], line, outDir)
 
-        fwhm_velrange = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.5 * np.max(stack_fit.eval())]
-        fwhm = fwhm_velrange[-1] - fwhm_velrange[0]
+        # skip the CO if you can't fit anything to it.
+        if stack_fit.nvarys == 1:
+            int_intensity_fit['CO'][i] = np.nan
+            int_intensity_fit_err['CO'][i] = np.nan
+            int_intensity_fit_uplim[i] = True
+            fwhm_fit[i] = np.nan
 
-        int_intensity_fit['CO'][i] = stack_int
-        int_intensity_fit_err['CO'][i] = stack_int_err
-        int_intensity_fit_uplim[i] = uplim
-        fwhm_fit[i] = fwhm
-
-        int_axis = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.01 * np.max(stack_fit.eval())]
-        velrange = [np.min(int_axis), np.max(int_axis)]
-                                 
-        # straight sum
-        for line in ['CO','HCN', 'HCOp', '13CO','C18O']:
-            
-            if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
-                 ( ( line == '13CO') | (line == 'C18O'))):
-                
+            for line in ['CO','HCN', 'HCOp', '13CO','C18O']:
                 int_intensity_sum[line][i] = np.nan
                 int_intensity_sum_err[line][i] = np.nan
-                int_intensity_sum_uplim[line][i] = True
+                int_intensity_sum_uplim[line][i] = True                
 
-            else:
+        else:
 
-                (stack_sum, stack_sum_err, uplim) = sumIntegratedIntensity(full_stack[i], 
+            fwhm_velrange = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.5 * np.max(stack_fit.eval())]
+            fwhm = fwhm_velrange[-1] - fwhm_velrange[0]
+
+            int_intensity_fit['CO'][i] = stack_int
+            int_intensity_fit_err['CO'][i] = stack_int_err
+            int_intensity_fit_uplim[i] = uplim
+            fwhm_fit[i] = fwhm
+
+            int_axis = full_stack[i]['spectral_axis'][stack_fit.eval() > 0.01 * np.max(stack_fit.eval())]
+            velrange = [np.min(int_axis), np.max(int_axis)]
+                                 
+            # straight sum
+            for line in ['CO','HCN', 'HCOp', '13CO','C18O']:
+            
+                if ( ( full_stack[i]['galaxy'] == 'NGC6946') & 
+                     ( ( line == '13CO') | (line == 'C18O'))):
+                
+                    int_intensity_sum[line][i] = np.nan
+                    int_intensity_sum_err[line][i] = np.nan
+                    int_intensity_sum_uplim[line][i] = True
+
+                else:
+
+                    (stack_sum, stack_sum_err, uplim) = sumIntegratedIntensity(full_stack[i], 
                                                                            line, 
                                                                            outDir,
                                                                            fwhm=fwhm,
                                                                            velrange=velrange)
 
-                int_intensity_sum[line][i] = stack_sum
-                int_intensity_sum_err[line][i] = stack_sum_err
-                int_intensity_sum_uplim[line][i] = uplim
+                    int_intensity_sum[line][i] = stack_sum
+                    int_intensity_sum_err[line][i] = stack_sum_err
+                    int_intensity_sum_uplim[line][i] = uplim
 
 
     full_stack.add_column(Column(int_intensity_fit['CO'],name='int_intensity_fit_CO'))
@@ -746,7 +761,7 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
         stack_int_err = np.nan* spectral_axis.unit * stack_profile.unit
         fwhm = np.nan* spectral_axis.unit 
         uplim = True
-
+        stack_fit = dcOffsetFit
 
     ax0.legend(loc='upper right')
     plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_fit.png'

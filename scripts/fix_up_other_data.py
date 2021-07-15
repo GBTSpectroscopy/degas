@@ -110,7 +110,26 @@ print("Processing NGC4038 data from  Chris Wilson.")
 # ALMA 7m from Chris Wilson
 
 image = os.path.join(otherDataDir,'ngc4038_from_chris','ngc_4038_4039_7m_co10.fits')
-cube = SpectralCube.read(image)
+
+## getting rid of some suspicious headers
+hdu = fits.open(image)
+hdr = hdu[0].header
+data = hdu[0].data
+
+hdr.remove('ALTRPIX')
+hdr.remove('ALTRVAL')
+hdr.remove('OBSGEO-X')
+hdr.remove('OBSGEO-Y')
+hdr.remove('OBSGEO-Z')
+hdr.remove('MJD-OBS')
+hdr.remove('DATE-OBS')
+hdr.remove('DISTANCE')
+
+newimage  = os.path.join(otherDataDir,'ngc4038_from_chris','ngc_4038_4039_7m_co10_fixed.fits')
+fits.writeto(newimage,data,hdr,overwrite=True)
+
+# regridding
+cube = SpectralCube.read(newimage)
 
 cube_kms =  cube.with_spectral_unit(u.km / u.s)
 
@@ -124,7 +143,7 @@ smoothCube = cube_kms.convolve_to(newBeam)
 
 smoothCubeinK = smoothCube.to(u.K)
 
-smoothCubeinK.write(image.replace('.fits','_gauss15.fits'),overwrite=True)
+smoothCubeinK.write(newimage.replace('.fits','_gauss15.fits'),overwrite=True)
 
 ## PHANGS data
 ## -----------

@@ -40,6 +40,7 @@ if 'MASK' in degas_table.colnames:
 degas_table.add_column(Column(np.full_like(degas_table['NAME'],''),dtype='S25'),name='MASK')
 
 idx_dr1 = degas_table['DR1'] == 1
+#idx_dr1 = degas_table['NAME'] == 'NGC4038'
 
 # Extract list of galaxies via fancy list comprehension
 
@@ -270,7 +271,7 @@ for galaxy in degas_table[idx_dr1]:
     elif galaxy['NAME'] == 'NGC4038':
         
         cubeFile = os.path.join(otherDataDir,'ngc4038_from_chris',
-                              'ngc_4038_4039_7m_co10_gauss15.fits')
+                              'ngc_4038_4039_7m_co10_fixed_gauss15.fits')
 
 
         ## ALMA DATA FROM CHRIS WILSON

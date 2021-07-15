@@ -23,6 +23,8 @@ def reduceAll(release='QA0',
               update=False,
               overwrite=False,
               outputDir=None,
+              getmask=True,
+              OffType='linefit',
               **kwargs):
     """
     This pulls logs and tries to reduce everything that's not already
@@ -49,7 +51,7 @@ def reduceAll(release='QA0',
     SessionRows = np.where(['Map' in row['Scan Type'] for row in Log])
     Log = Log[SessionRows]
 
-    uniqSrc = ObjectCatalog['NAME']
+    uniqSrc = list(ObjectCatalog['NAME'])
     if outputDir is None:
         cwd = os.getcwd()
     else:
@@ -58,7 +60,6 @@ def reduceAll(release='QA0',
     if not galaxyList:
         galaxyList = uniqSrc
 
-    # TODO: Take out the [::-1]; just there for debug
     for galaxy in uniqSrc:
         if ((galaxy != 'none') and (galaxy in galaxyList)):
             print('Reducing galaxy: '+galaxy+'\n')
@@ -115,6 +116,7 @@ def reduceAll(release='QA0',
                             startdate=row['Date (UT)'],
                             enddate=row['Date (UT)'],
                             project=row['Project'],
+                            OffType=OffType,
                             **kwargs)
                 
             # if np.any(LogRows):
@@ -133,6 +135,7 @@ def reduceAll(release='QA0',
 def reduceSession(session=1, overwrite=False, release = 'QA0', 
                   project='17B-151',
                   outputDir='/lustre/pipeline/scratch/DEGAS/',
+                  OffType='linefit',
                   **kwargs):
     """
     Function to reduce single-session data using the GBT-pipeline.
@@ -176,6 +179,7 @@ def reduceSession(session=1, overwrite=False, release = 'QA0',
                         startdate=Log[LogRows][0]['Date (UT)'],
                         enddate=Log[LogRows][-1]['Date (UT)'],
                         project=project,
+                        OffType=OffType,
                         **kwargs)
                 os.chdir(cwd)
 
@@ -183,6 +187,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
             overwrite=False, startdate = '2015-01-1',
             project='17B-151',
             enddate='2020-12-31',release='QA2',obslog=None,
+            OffType='linefit',
             **kwargs):
     """
     This is the DEGAS pipeline which chomps the observation logs and
@@ -256,6 +261,7 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            Galaxy=observation['Source'],
                            Setup=observation['Setup'],
                            Project=project,
+                           OffType=OffType,
                            overwrite=overwrite, **kwargs)
             else :
                 doPipeline(SessionNumber=observation['Astrid Session'],
@@ -268,10 +274,11 @@ def wrapper(logfile='ObservationLog.csv',galaxy='NGC2903',
                            Setup=observation['Setup'],
                            RawDataDir=observation['Special RawDir'],
                            Project=project,
+                           OffType=OffType,
                            overwrite=overwrite, **kwargs)
 
 def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
-               RefScans=[25, 45],
+               RefScans=None,
                Galaxy='NGC2903', Window='0',
                Project='17B-151',
                Setup='HCN/HCO+',
@@ -282,15 +289,20 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                Gains=None,
                OffType='linefit',
                OutputRoot = None, overwrite=False, 
-               MaskName=None, **kwargs):
+               MaskName=None,
+               CatalogFile=None,
+               **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
     """
+    if RefScans is None:
+        RefScans = [25, 45]
     if RawDataDir is None:
         try:
             RawDataDir = os.environ["DEGASDIR"]+'/rawdata/'
         except KeyError:
             RawDataDir = '/lustre/pipeline/scratch/DEGAS/rawdata/'
+
     if Gains is None:
         Gains = '1,'*16
         Gains = Gains[0:-1]
@@ -306,7 +318,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
             OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
 
     # Try to make the output directory
-    OutputDirectory = os.path.join(OutputRoot,Galaxy,Setup.replace('/','_'))
+    OutputDirectory = os.path.join(OutputRoot, Galaxy, Setup.replace('/','_'))
 
     if not os.access(OutputDirectory,os.W_OK):
         try:
@@ -326,9 +338,9 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     suffixname='_{2}_sess{0}_v{1}'.format(SessionNumber,
                                           pkg_resources.get_distribution("degas").version,
                                           Project)
-    ObjectCatalog = catalogs.loadCatalog()
-    ThisGalaxy = ObjectCatalog[ObjectCatalog['NAME'] == Galaxy]
 
+    ObjectCatalog = catalogs.loadCatalog(CatalogFile=CatalogFile)
+    ThisGalaxy = ObjectCatalog[ObjectCatalog['NAME'] == Galaxy]
     galaxy_center = SkyCoord(ThisGalaxy['RA'], ThisGalaxy['DEC'],
                              unit=(u.hour, u.deg), frame='fk5')
 
@@ -355,23 +367,39 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
     else:
         BadFeedArray = []
 
+    # if MaskName is None:
+    #     # AAK: Modified to add 12CO to the mask names since that's
+    #     # what my code generates.
+    #     MaskName = os.environ["DEGASDIR"] + '/masks/{0}_12CO_mask.fits'.format(Galaxy.upper())
+
+    suffixdict = {'HCN/HCO+':'.hcn_hcop.mask.fits',
+                  '13CO/C18O':'.13co_c18o.mask.fits',
+                  '12CO': '.12co.mask.fits'}
+
     if MaskName is None:
-        # AAK: Modified to add 12CO to the mask names since that's
-        # what my code generates.
-        MaskName = os.environ["DEGASDIR"] + '/masks/{0}_12CO_mask.fits'.format(Galaxy.upper())
+        TestMaskName = os.environ["DEGASDIR"] + '/masks/EMISSION_MASKS/' + Galaxy + suffixdict[Setup]
+        if os.access(TestMaskName, os.R_OK):
+            print('Found Mask:', TestMaskName)
+            MaskName = TestMaskName
+
     if os.access(MaskName, os.R_OK):
         print('Using spatial masking to set OFF positions: '+ MaskName)
         warnings.warn('Using spatial masking to set OFF positions')
         maskhdu = fits.open(MaskName.format(Galaxy.upper()))
-        mask = ~np.any(maskhdu[0].data, axis=0)
+        # mask = ~np.any(maskhdu[0].data, axis=0)
+        mask = (maskhdu[0].data).astype(np.bool)
+        mask = maskhdu[0].data
         w = wcs.WCS(maskhdu[0].header)
-        offselect = functools.partial(ArgusCal.SpatialMask, mask=mask, wcs=w)
+        offselect = functools.partial(ArgusCal.SpatialSpectralMask,
+                                      mask=mask, wcs=w, floatvalues=True,
+                                      offpct=30)
+
     else:
         warnings.warn('No mask found. Using zone of avoidance masking')
         offselect = functools.partial(ArgusCal.ZoneOfAvoidance,
                                       center=galaxy_center)
                                       
-
+    # offselect = ArgusCal.NoMask
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,

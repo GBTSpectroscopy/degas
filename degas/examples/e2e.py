@@ -9,12 +9,12 @@ import gbtpipe
 from spectral_cube import SpectralCube
 import aplpy
 import astropy.units as u
-import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-
+datadir='/mnt/bigdata/erosolow/surveys/DEGAS/'
 # Assuming we have a directory containing all the files.
-degas.calscans('TGBT15A_901_34.raw.vegas', start=82,
+
+degas.calscans(datadir + 'TGBT15A_901_34.raw.vegas', start=82,
                stop=105, 
                refscans=[80],
                outdir='testdir')

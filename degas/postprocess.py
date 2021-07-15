@@ -13,6 +13,7 @@ from radio_beam import Beam
 from gbtpipe.Preprocess import buildMaskLookup
 from gbtpipe.Baseline import robustBaseline
 import warnings
+from astropy import wcs
 
 
 def calc_etamb(freq, Jupiter=False):
@@ -26,13 +27,15 @@ def calc_etamb(freq, Jupiter=False):
         eta_jupiter = 1.23 * eta_aperture + 0.005 * (nu - 60) - 0.00003*(nu-60)**2
     where nu is in GHz.
 
-    It comes from a polynominal fit to nu and eta_jupiter using
-    eta_aperture as a function of frequency. This correction assumes
-    that our sources are approximately the size of Jupiter (43"
-    diameter)
+    It comes from a polynominal fit to nu and eta_jupiter using eta_aperture
+    as a function of frequency.
+
+    This correction assumes that our sources are approximately the
+    size of Jupiter (43" diameter), which isn't a bad assumption for
+    extended molecular gas.
 
     """
-    
+
     import math
     from astropy import constants as c
 
@@ -48,7 +51,7 @@ def calc_etamb(freq, Jupiter=False):
         else:
             print("check units on input frequency. Should be either in GHz or Hz")
     # convert frequency to GHz to use in fit
-    freq = freq.to(u.GHz)            
+    freq = freq.to(u.GHz)
 
     # calculate equivalent wavelength
     wave = freq.to(u.cm, equivalencies=u.spectral()) 
@@ -76,12 +79,20 @@ def calc_etamb(freq, Jupiter=False):
         
     return (eta_a, eta_mb)
 
-def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):
+
+
+
+def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, minRadius=None):
     wtvals = np.squeeze(fits.getdata(wtsFile))
     badmask = ~(wtvals > (weightCut * wtvals.max()))
     yy, xx = np.indices(wtvals.shape)
-    dist = (yy - y0)**2 + (xx - x0)**2
+    dist = np.sqrt((yy - y0)**2 + (xx - x0)**2)
     mindist = np.min(dist[badmask])
+    if minRadius is not None:
+        pixsize = wcs.utils.proj_plane_pixel_scales(cube.wcs) * u.deg
+        minradpix = (minRadius / pixsize[0]).to(u.dimensionless_unscaled).value
+        if mindist < minradpix:
+            mindist = minradpix
     mask = dist < mindist
     cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
     cube = cube.with_mask(cubemask)
@@ -118,14 +129,16 @@ def cleansplit(filename, galaxy=None,
                blorder=3, HanningLoops=0,
                maskfile=None,
                circleMask=True,
+               minRadius=1.3 * u.arcmin,
                edgeMask=False,
                weightCut=0.2,
                spectralSetup=None,
+               CatalogFile=None,
                spatialSmooth=1.0):
     """
     Takes a raw DEGAS cube and produces individual cubes for each
     spectral line.
-    
+
     Paramters
     ---------
     filename : str
@@ -157,8 +170,9 @@ def cleansplit(filename, galaxy=None,
     """
 
     Cube = SpectralCube.read(filename)
-    CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
-                                        package='degas')
+    if CatalogFile is None:
+        CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
+                                            package='degas')
     Catalog = Table.read(CatalogFile, format='ascii')
 
     # Find which galaxy in our catalog corresponds to the object we
@@ -174,6 +188,19 @@ def cleansplit(filename, galaxy=None,
                 galcoord.ra > RABound[0] and
                 galcoord.dec < DecBound[1] and
                 galcoord.dec > DecBound[0]):
+                match[index] = True
+        MatchRow = Catalog[match]
+        galcoord = SkyCoord(MatchRow['RA'],
+                            MatchRow['DEC'],
+                            unit=(u.hourangle, u.deg))
+        Galaxy = MatchRow['NAME'].data[0]
+        print("Catalog Match with " + Galaxy)
+        V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
+
+    elif type(galaxy) is str:
+        match = np.zeros_like(Catalog, dtype=np.bool)
+        for index, row in enumerate(Catalog):
+            if galaxy in row['NAME']:
                 match[index] = True
         MatchRow = Catalog[match]
         galcoord = SkyCoord(MatchRow['RA'],
@@ -233,10 +260,18 @@ def cleansplit(filename, galaxy=None,
             x0, y0, _ = ThisCube.wcs.wcs_world2pix(galcoord.ra,
                                                    galcoord.dec,
                                                    0, 0)
+            FoVFile = get_pkg_data_filename('./data/field_of_view.csv',
+                                                package='degas')
+            if FoVFile:
+                fov_table = Table.read(FoVFile)
+                if np.any(fov_table['Galaxy'] == Galaxy):
+                    minRadius = (fov_table[fov_table['Galaxy'] == Galaxy]['FoV_arcsec']) * u.arcsec
+
             ThisCube = circletrim(ThisCube,
                                   filename.replace('.fits','_wts.fits'),
                                   x0, y0,
-                                  weightCut=weightCut)
+                                  weightCut=weightCut,
+                                  minRadius=minRadius)
         if edgeMask:
             ThisCube = edgetrim(ThisCube, 
                                 filename.replace('.fits','_wts.fits'),
@@ -247,7 +282,6 @@ def cleansplit(filename, galaxy=None,
         ThisCube.write(Galaxy + '_' + ThisLine + '.fits', overwrite=True)
         StartChan = ThisCube.closest_spectral_channel(V0 - Vgalaxy)
         EndChan = ThisCube.closest_spectral_channel(V0 + Vgalaxy)
-
         if maskfile is not None:
             maskLookup = buildMaskLookup(maskfile)
             shp = ThisCube.shape
@@ -267,6 +301,7 @@ def cleansplit(filename, galaxy=None,
                     spectrum = robustBaseline(spectrum, blorder=blorder,
                                               baselineIndex=~mask)
                     data[:, y, x] = spectrum
+                    
             ThisCube = SpectralCube(data * ThisCube.unit,
                                     ThisCube.wcs, header=ThisCube.header,
                                     meta={'BUNIT':ThisCube.header['BUNIT']})
@@ -284,30 +319,29 @@ def cleansplit(filename, galaxy=None,
         # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):
-            ThisCube.spectral_smooth(Kern)
+            ThisCube = ThisCube.spectral_smooth(Kern)
             ThisCube = ThisCube[::2,:,:]
-            
+
         # Spatial Smooth
         if spatialSmooth > 1.0:
             newBeam = Beam(major=ThisCube.beam.major * spatialSmooth,
                            minor=ThisCube.beam.minor * spatialSmooth)
-            ThisCube.convolve_to(newBeam) 
+            ThisCube = ThisCube.convolve_to(newBeam)
             smoothstr = '_smooth{0}'.format(spatialSmooth)
         else:
             smoothstr = ''
 
         # apply eta_mb
         ## see equations 2 and 3 in GBT memo 302.
-        ## GBT forward efficiency is 0.99 ~= 1.0. 
+        ## GBT forward efficiency is 0.99 ~= 1.0.
         ## assumes that rest freq ~ observing freq, which should be okay for our sources.
         freq = ThisCube.header['RESTFRQ'] * u.Hz
         (eta_a, eta_mb) = calc_etamb(freq)
         ThisCube = ThisCube/eta_mb
 
         # Final Writeout
-        finalFile = Galaxy + '_' + ThisLine + \
-                       '_rebase{0}'.format(blorder) + smoothstr + \
-                       '_hanning{0}.fits'.format(HanningLoops)
+        finalFile = Galaxy + '_' + ThisLine + '_rebase{0}'.format(blorder) + smoothstr + \
+                    '_hanning{0}.fits'.format(HanningLoops)
         ThisCube.write(finalFile,
                        overwrite=True)
 
@@ -315,4 +349,4 @@ def cleansplit(filename, galaxy=None,
         finalCube = fits.open(finalFile)
         finalCube[0].header['ETAMB'] = eta_mb
         finalCube[0].header['BUNIT'] = ('K','TMB') # indicate that units are now TMB via a comment
-        finalCube.writeto(finalCube,overwrite=True)
+        finalCube[0].writeto(finalFile,overwrite=True)

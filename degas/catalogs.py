@@ -20,9 +20,10 @@ def updateLogs(output='ObservationLog.csv',release=None):
         command = 'cp '+filename+' ./ObservationLog.csv'
         return not subprocess.call(command,shell=True)
 
-def loadCatalog(release=None):
-    CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
-                                        package='degas')
+def loadCatalog(release=None, CatalogFile=None):
+    if CatalogFile is None:
+        CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
+                                            package='degas')
     Catalog = Table.read(CatalogFile, format='ascii')
     return(Catalog)
 

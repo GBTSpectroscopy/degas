@@ -15,23 +15,21 @@ from gbtpipe.Baseline import robustBaseline
 import warnings
 
 
-def calc_etamb(freq):
+def calc_etamb(freq, Jupiter=False):
 
     """
-
     For a given input frequency, calculate and return the eta_mb value
-    for the GBT using David's equation from GBT Memo 302. The equation
-    is not included in the memo and provided by private communication:
+    for the GBT using David's equation from GBT Memo 302. 
 
-    eta_jupiter = 1.23 * eta_aperture + 0.005 * (nu - 60) - 0.00003*(nu-60)**2
+    The equation is not included in the memo and provided by private 
+    communication:
+        eta_jupiter = 1.23 * eta_aperture + 0.005 * (nu - 60) - 0.00003*(nu-60)**2
     where nu is in GHz.
 
-    It comes from a polynominal fit to nu and eta_jupiter using eta_aperture 
-    as a function of frequency.
-
-    This correction assumes that our sources are approximately the
-    size of Jupiter (43" diameter), which isn't a bad assumption for
-    extended molecular gas.
+    It comes from a polynominal fit to nu and eta_jupiter using
+    eta_aperture as a function of frequency. This correction assumes
+    that our sources are approximately the size of Jupiter (43"
+    diameter)
 
     """
     
@@ -53,14 +51,29 @@ def calc_etamb(freq):
     freq = freq.to(u.GHz)            
 
     # calculate equivalent wavelength
-    wave = freq.to(u.cm, equivalencies=u.spectral())
+    wave = freq.to(u.cm, equivalencies=u.spectral()) 
 
     # aperture efficiency for GBT using Ruze equation.
     # 0.71 is the aperture efficiency of the GBT at lower frequency.
     eta_a = 0.71 * math.exp(- ( 4 * math.pi * esurf / wave)**2)
 
-    # calculate eta_mb via a polynominal fit from GBT Memo 302
-    eta_mb = 1.23 * eta_a + 0.005*(freq.value-60) - 0.00003 * (freq.value - 60)**2
+    if Jupiter:
+        # calculate eta_mb for a jupiter sized source via 
+        # polynominal fit from GBT Memo 302.  The equation is not
+        # included in the memo and provided by private communication:
+        #        eta_jupiter = 1.23 * eta_aperture + 0.005 * (nu - 60) -
+        #        0.00003*(nu-60)**2 
+        # where nu is in GHz. This correction assumes that our sources 
+        # are approximately the size of Jupiter (43" diameter)
+        eta_mb = 1.23 * eta_a + 0.005*(freq.value-60) - 0.00003 * (freq.value - 60)**2
+    # else calculate "small source" eta_mb.
+    elif freq > 100.0*u.GHz:
+        # GBT memo 302 finds that at high frequencies the eta_mb/eta_b ratio is more like 1.45 due to a slightly larger beam size factor (1.28 instead of 1.2).
+        eta_mb = 1.45 * eta_a
+    else: 
+        # GBT memo 302 finds that for frequencies of 86-90GHz you can use the expected theoretical ratio of 1.274
+        eta_mb = 1.274 * eta_a
+        
     return (eta_a, eta_mb)
 
 def circletrim(cube, wtsFile, x0, y0, weightCut=0.2):

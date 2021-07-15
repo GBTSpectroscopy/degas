@@ -3,10 +3,10 @@ from degas.gridding import gridGalaxy
 datadir='/mnt/bigdata/erosolow/surveys/DEGAS/'
 
 datadir = '/mnt/bigdata/erosolow/surveys/DEGAS/'
-ppo = True
-# gridGalaxy(galaxy='IC0342', setup='12CO',
-#            release='QA0', datadir=datadir,
-#            PostprocOnly=ppo)
+ppo = False
+gridGalaxy(galaxy='IC0342', setup='12CO',
+           release='QA0', datadir=datadir,
+           PostprocOnly=ppo)
 
 gallist = [#'IC0342',
            'NGC0337',
@@ -26,6 +26,7 @@ gallist = [#'IC0342',
            'NGC5055',
            'NGC6946']
 gallist = gallist[-2:]
+gallist = ['IC0342']
 HCNgals = gallist
 
 # HCNgals = ['NGC2903', 'NGC2146', 'IC0342']

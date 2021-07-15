@@ -318,7 +318,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
             OutputRoot = '/lustre/pipeline/scratch/DEGAS/'
 
     # Try to make the output directory
-    OutputDirectory = os.path.join(OutputRoot,Galaxy,Setup.replace('/','_'))
+    OutputDirectory = os.path.join(OutputRoot, Galaxy, Setup.replace('/','_'))
 
     if not os.access(OutputDirectory,os.W_OK):
         try:
@@ -392,7 +392,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialSpectralMask,
                                       mask=mask, wcs=w, floatvalues=True,
-                                      offpct=50)
+                                      offpct=30)
 
     else:
         warnings.warn('No mask found. Using zone of avoidance masking')

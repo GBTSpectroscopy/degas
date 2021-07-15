@@ -1,11 +1,12 @@
 from degas.analysis_setup import regridData, smoothCube
+from spectral_cube import SpectralCube
 
 import glob
 import os
 import shutil
 from astropy.table import Table
 
-release = 'IR5'
+release = 'IR6p0'
 
 releaseDir = os.path.join(os.environ['ANALYSISDIR'],release)
 coDir = os.path.join(os.environ['ANALYSISDIR'],'CO')
@@ -14,6 +15,7 @@ multiDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','multiwavelen
 regridDir = os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
 
 beam=15.0
+maxnchan = 131
 
 if not os.path.exists(regridDir):
     os.mkdir(regridDir)
@@ -27,7 +29,14 @@ for hcn in hcnlist:
     print("** processing " + name + " HCN **")
 
     # process HCN -- just need to smooth here because taking as base.
-    hcn_smooth = smoothCube(hcn, releaseDir, beam=beam)
+    
+    # first cut off any extra channels to make all cubes the same size.
+    hcnCube = SpectralCube.read(hcn)
+    hcnOutCube = hcnCube[0:maxnchan] 
+    hcnOut = hcn.replace('.fits','_maxnchan.fits')
+    hcnOutCube.write(os.path.join(releaseDir,hcnOut),overwrite=True)
+
+    hcn_smooth = smoothCube(hcnOut, releaseDir, beam=beam)
     shutil.copy(hcn_smooth,os.path.join(regridDir,os.path.basename(hcn_smooth)))
 
     print("** processing " + name + " HCO+ **")

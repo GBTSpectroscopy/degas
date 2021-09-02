@@ -13,6 +13,8 @@ import glob
 from astropy.wcs import WCS
 import os
 
+import ipdb
+
 def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
     '''
 
@@ -41,6 +43,8 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
 
     '''
     
+    from datetime import datetime
+
     # get list of dr1 galaxies
     degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
     idx = degas[release] == 1
@@ -57,6 +61,9 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
 
     # stack all the tables together
     table=vstack(tablelist)
+
+    table.meta['DATE'] = str(datetime.now())
+    table.meta['RELEASE'] = release
 
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
@@ -128,13 +135,14 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     #get the full stack result for each line
     full_stack = makeStack(galaxy, regridDir, outDir,
-                                       mom0cut = mom0cut, 
-                                       cubeCO = cubeCO,
-                                       cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
-                                       cube13CO = cube13CO, cubeC18O = cubeC18O,
-                                       velocity = velocity,
-                                       sfrmap = sfrmap, ltirmap = ltirmap, 
-                                       stellarmap=stellarmap, R_arcsec=R_arcsec) 
+                           mom0cut = mom0cut, 
+                           cubeCO = cubeCO,
+                           cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
+                           cube13CO = cube13CO, cubeC18O = cubeC18O,
+                           velocity = velocity,
+                           sfrmap = sfrmap, ltirmap = ltirmap,
+                           stellarmap=stellarmap, R_arcsec=R_arcsec) 
+
     # remove stacks that don't have CO spectra 
     nstack = len(full_stack)
     keepstack = np.full(nstack,True)
@@ -145,13 +153,13 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     full_stack = full_stack[keepstack]
             
+    # create directory for spectral line fits
     fit_plot_dir =  os.path.join(outDir,'spec_fits')
     if not os.path.exists(fit_plot_dir):
         os.mkdir(fit_plot_dir)
 
+    # calculate integrated intensity
     full_stack = addIntegratedIntensity(full_stack, fit_plot_dir)
-
-   
 
     # return the table and the stack.
     return full_stack
@@ -232,7 +240,9 @@ def makeStack(galaxy, regridDir, outDir,
                         cubeCO = cubeCO,
                         cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                         cube13CO = cube13CO, cubeC18O = cubeC18O,
-                        sfrmap = sfrmap, ltirmap = ltirmap)
+                        sfrmap = sfrmap, ltirmap = ltirmap, 
+                        stellarmap=stellarmap)
+
     r_radius.add_column(Column(np.tile('radius',len(r_radius))),name='bin_type',index=0)
 
     ## TODO ADD OTHER STACKS ONCE I HAVE BINS
@@ -253,6 +263,7 @@ def stackLines(galaxy, velocity,
                cubeC18O = None,
                sfrmap = None, 
                ltirmap = None,
+               stellarmap = None,
                maxAbsVel = 250.0):
 
     '''
@@ -286,6 +297,8 @@ def stackLines(galaxy, velocity,
 
     ltirmap: LTIR map
 
+    stellarmap: stellar mass map
+
     maxAbsVel: absolute maximum velocity to include in spectral in km/s. 
     Assumes line is centered at zero (which should be true for stacking).
     
@@ -305,7 +318,7 @@ def stackLines(galaxy, velocity,
 
     # get the relevant info on the galaxy and cube
     D = galaxy['DIST_MPC'] * u.Mpc
-    pix_area = (np.radians(np.abs(cubeCO.header['CDELT1']))*D.to(u.kpc))**2  #kpc^2 ## TODO CHECK THIS CONVERSION
+    pix_area = (np.radians(np.abs(cubeCO.header['CDELT1']))*D.to(u.pc))**2  #pc^2 
 
     # do the individual line stacks.
     # -----------------------------
@@ -361,6 +374,7 @@ def stackLines(galaxy, velocity,
     bin_area = np.zeros(len(labelvals)) * pix_area.unit
     sfr_mean = np.zeros(len(labelvals)) * sfrmap.unit
     ltir_mean = np.zeros(len(labelvals))* ltirmap.unit
+    mstar_mean = np.zeros(len(labelvals)) * stellarmap.unit
 
     spectral_axis = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
 
@@ -369,14 +383,17 @@ def stackLines(galaxy, velocity,
 
         bin_label[i] = stack['CO'][i]['label']
 
-        ## TODO CHECK THE CALCULATION BELOW FOR BINAREA
         bin_area[i]= float(sum(binmap[binmap==bin_label[i]].flatten()))*pix_area          
         # calculating the mean SFR as requested
         if sfrmap is not None:
             sfr_mean[i] = np.nanmean(sfrmap[binmap==bin_label[i]]) 
-        # calculate the mean LTIR as request
+        # calculate the mean LTIR as requested
         if ltirmap is not None:
             ltir_mean[i] = np.nanmean(ltirmap[binmap==bin_label[i]]) 
+        # calculate mean stellar mass as requested
+        if stellarmap is not None:
+            mstar_mean[i] = np.nanmean(stellarmap[binmap==bin_label[i]]) 
+
     
         # get the spectral profiles
         for line in ['CO','HCN','HCOp','13CO','C18O']:
@@ -393,16 +410,23 @@ def stackLines(galaxy, velocity,
         total_stack.add_column(Column(spectral_profile[line], name='stack_profile_'+line,unit=cubeCO.unit))
         total_stack.add_column(Column(stack_weights[line],name='stack_weights_'+line))
 
-    # TODO CHECK UNITS HERE
-    total_stack.add_column(Column(bin_area,name='bin_area'))
-    total_stack.add_column(Column(sfr_mean,name='sfr_mean')) # Msun/yr/kpc^2 -- units from input image
-    total_stack.add_column(Column(sfr_mean * bin_area),name='sfr_total') # Msun/yr/kpc^2 * kpc^2 = Msun/Yr
-    total_stack.add_column(Column(ltir_mean),name='ltir_mean') # Lsun/pc^2 -- units from input image
-    total_stack.add_column(Column(ltir_mean * 1000.0**2 *bin_area),name='ltir_total') # Lsun/pc^2 * (1000 pc/kpc)^2 * kpc^2   = Lsun
+    total_stack.add_column(Column(bin_area,name='bin_area')) # pc^2
+
+    if sfrmap is not None:
+        total_stack.add_column(Column(sfr_mean.to('Msun/(yr pc2)'),name='sfr_mean')) # Msun/yr/(kpc -> pc)^2 
+        total_stack.add_column(Column(sfr_mean.to('Msun/(yr pc2)') * bin_area),name='sfr_total') # Msun/yr/pc^2 * (pc)^2 = Msun/Yr 
+
+    if ltirmap is not None:
+        total_stack.add_column(Column(ltir_mean)  , name='ltir_mean') # Lsun/pc^2
+        total_stack.add_column(Column(ltir_mean * bin_area),name='ltir_total') # Lsun/pc^2  * pc^2   = Lsun
         
+    if stellarmap is not None:
+        total_stack.add_column(Column(mstar_mean), name='mstar_mean') # Msun/pc^2
+        total_stack.add_column(Column(mstar_mean * bin_area), name='mstar_total') # Msun
+
     return total_stack
 
-def addIntegratedIntensity(full_stack, outDir):
+def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)  /  (u.K * u.km / u.s)):
     '''
 
     calculate the integrated line flux and the associated noise
@@ -414,6 +438,8 @@ def addIntegratedIntensity(full_stack, outDir):
 
     outDir: directory for diagnostics plots
     
+    alpha_co: alpha_co value to use to calculate molecular gas mass and mass surface density.
+
     Output:
     
     stack with added columns for the integrated intensity.
@@ -507,6 +533,12 @@ def addIntegratedIntensity(full_stack, outDir):
     full_stack.add_column(Column(int_intensity_fit_err['CO'],name='int_intensity_fit_err_CO'))
     full_stack.add_column(Column(int_intensity_fit_uplim['CO'],name='int_intensity_fit_uplim_CO'))
 
+    full_stack.add_column(Column(int_intensity_sum['CO']*alpha_co,name='comass_mean'))
+
+    full_stack.add_column(full_stack['comass_mean'] * full_stack['bin_area'],name='comass_total')
+
+    full_stack.meta['alpha_co'] = alpha_co.to_string()
+
 
     # add results to data able.
     for line in ['CO','HCN','HCOp','13CO','C18O']:
@@ -517,6 +549,8 @@ def addIntegratedIntensity(full_stack, outDir):
         
 
     full_stack.add_column(Column(fwhm_fit),name='FWHM_fit')
+
+
 
     return full_stack
 
@@ -949,17 +983,16 @@ def mapStellar(galaxy, mom0cut, regridDir, outDir):
     '''
 
     # open the stellar mass
-
-    ## TODO : NEED TO UPDATE WITH NEW ANCILLAR DATA FROM SARAH
     stellarhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_mstar_gauss15_regrid.fits'))[0]
 
     stellar=stellarhdu.data
     #stellar[starmask==1.0]=np.nan #apply star mask ## AAK: I think I can skip this.
     stellar[np.isnan(mom0cut)]=np.nan #apply SN mask (SN >3)
     w=WCS(stellarhdu.header)
-    # stellarhdu.header['BUNIT']='Msun/pc^2' #not the correct unit!!  ## AAK: I think units are okay for the newdata
 
-    stellarmap=Projection(stellar,header=stellarhdu.header,wcs=w) 
+    hdrunit = stellarhdu.header['BUNIT'].replace('MSUN','Msun').replace('PC','pc')
+
+    stellarmap=Projection(stellar,header=stellarhdu.header,wcs=w, unit=hdrunit) 
     stellarmap.quicklook()
 
     plt.savefig(os.path.join(outDir,galaxy['NAME']+'_stellarmass.png'))
@@ -993,7 +1026,7 @@ def mapLTIR(galaxy, mom0cut, regridDir, outDir):
 
     data[np.isnan(mom0cut)]=np.nan #apply SN mask (SN >3)
 
-    LTIRmap=Projection(data,header=hdu.header,wcs=WCS(hdu.header)) 
+    LTIRmap=Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
     LTIRmap.quicklook()
 
     plt.savefig(os.path.join(outDir,galaxy['NAME']+'_LTIR.png'))
@@ -1017,11 +1050,13 @@ def mapSFR(galaxy, mom0cut, regridDir, outDir):
     sfr[np.isnan(mom0cut)]=np.nan
     w=WCS(sfrhdu.header)
     
-    ## TODO CHECK UNITS HERE
-    sfrhdu.header['BUNIT']='MSUN/YR/KPC^2'  #might change when getting new files from Sarah
-    sfrmap=Projection(sfr,header=sfrhdu.header,wcs=w) 
-    sfrmap.quicklook()
+    hdrunit = sfrhdu.header['BUNIT'].replace('MSUN','Msun')
+    hdrunit = hdrunit.replace("KPC","kpc")
+    hdrunit = hdrunit.replace('YR','yr')
 
+    sfrmap=Projection(sfr,header=sfrhdu.header,wcs=w, unit=hdrunit) 
+    sfrmap.quicklook()
+    
     # save plot of map
     plt.savefig(os.path.join(outDir,galaxy['NAME']+'_sfr.png'))
     plt.clf()

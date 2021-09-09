@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from matplotlib import colors
 import aplpy
-from astropy.table import Table, Column, vstack, QTable
+from astropy.table import Table, Column, vstack, QTable, MaskedColumn
 import re
 import glob 
 from astropy.wcs import WCS
@@ -100,10 +100,11 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     print("Processing " + galaxy['NAME'] + "\n")
 
     # Create associated maps needed for analysis.
+    # TODO -- double-check on mom0cut -- Is this really what i want to be doing??
     mom0cut, cubeCO, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
     stellarmap = mapStellar(galaxy, mom0cut, regridDir, outDir)
-    sfrmap = mapSFR(galaxy,mom0cut, regridDir, outDir)
-    ltirmap = mapLTIR(galaxy,mom0cut,regridDir,outDir)
+    sfrmap = mapSFR(galaxy, mom0cut, regridDir, outDir)
+    ltirmap = mapLTIR(galaxy, mom0cut, regridDir,outDir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
 
     velocity_file = galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
@@ -234,14 +235,13 @@ def makeStack(galaxy, regridDir, outDir,
     plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
     # stack on radius
-    ## TODO CHECK UNITS
-    r_radius=stackLines(galaxy, velocity,
-                        binmap, binedge,  'radius',  'arcsec',
-                        cubeCO = cubeCO,
-                        cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
-                        cube13CO = cube13CO, cubeC18O = cubeC18O,
-                        sfrmap = sfrmap, ltirmap = ltirmap, 
-                        stellarmap=stellarmap)
+    r_radius = stackLines(galaxy, velocity,
+                          binmap, binedge,  'radius',  'arcsec',
+                          cubeCO = cubeCO,
+                          cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                          cube13CO = cube13CO, cubeC18O = cubeC18O,
+                          sfrmap = sfrmap, ltirmap = ltirmap, 
+                          stellarmap = stellarmap)
 
     r_radius.add_column(Column(np.tile('radius',len(r_radius))),name='bin_type',index=0)
 
@@ -251,6 +251,7 @@ def makeStack(galaxy, regridDir, outDir,
     full_stack = r_radius
     
     full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
+
 
     return full_stack
 
@@ -311,6 +312,8 @@ def stackLines(galaxy, velocity,
     5/6/2021    A.A. Kepley     modified to fit all lines for one galaxy at 
                                 once so I can use CO FWHM to calculate upper 
                                 limits for other lines
+    9/2/2021    A.A. Kepley     Added code to calculate the stellar mass 
+                                surface density. Cleaned up units.
 
     '''
 
@@ -361,7 +364,7 @@ def stackLines(galaxy, velocity,
     t = {'bin_lower': binedge[0:-1], 
          'bin_upper': binedge[1:], 
          'bin_mean': (binedge[0:-1] + binedge[1:])/2.0}
-    total_stack = QTable(t)
+    total_stack = QTable(t,masked=True)
     
     # Then set up the structures for the bin-based profiles, etc.
     spectral_profile = {}
@@ -447,6 +450,7 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
     Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     5/13/2021   A.A. Kepley     Original Code
+    9/2/2021    A.A. Kepley     Added CO mass calculation
 
     '''
 
@@ -529,30 +533,114 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
                     int_intensity_sum_uplim[line][i] = uplim
 
 
+    # add CO measurements to table
     full_stack.add_column(Column(int_intensity_fit['CO'],name='int_intensity_fit_CO'))
     full_stack.add_column(Column(int_intensity_fit_err['CO'],name='int_intensity_fit_err_CO'))
     full_stack.add_column(Column(int_intensity_fit_uplim['CO'],name='int_intensity_fit_uplim_CO'))
-
+    
+    # calculate CO mass and add to table
     full_stack.add_column(Column(int_intensity_sum['CO']*alpha_co,name='comass_mean'))
-
     full_stack.add_column(full_stack['comass_mean'] * full_stack['bin_area'],name='comass_total')
-
     full_stack.meta['alpha_co'] = alpha_co.to_string()
 
-
-    # add results to data able.
+    # add integrated line intensity measurements to the data table.
     for line in ['CO','HCN','HCOp','13CO','C18O']:
        
         full_stack.add_column(Column(int_intensity_sum[line],name='int_intensity_sum_'+line))
         full_stack.add_column(Column(int_intensity_sum_err[line],name='int_intensity_sum_err_'+line))
         full_stack.add_column(Column(int_intensity_sum_uplim[line],name='int_intensity_sum_uplim_'+line))
         
-
     full_stack.add_column(Column(fwhm_fit),name='FWHM_fit')
 
+    # Calculate line ratios and add to data table
 
+    full_stack = calcLineRatio(full_stack,'HCN','CO')
+    full_stack = calcLineRatio(full_stack,'HCOp','CO')
+
+    full_stack = calcLineRatio(full_stack,'13CO','CO')
+    full_stack = calcLineRatio(full_stack,'C18O','CO')
+
+    full_stack = calcLineRatio(full_stack,'13CO','C18O')
+    full_stack = calcLineRatio(full_stack,'HCOp','HCN')
+
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','HCN')
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','CO')
 
     return full_stack
+
+def calcLineRatio(full_stack,line1, line2):
+    '''
+    calculate arbitrary line ratios and add to stack
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    9/9/2021    A.A. Kepley     Original Code
+    
+    '''
+    
+    if 'int_intensity_sum_'+line1 not in full_stack.columns:
+        print('line '+line1+' not in stack')
+        return
+
+    if 'int_intensity_sum_'+line2 not in full_stack.columns:
+        print('line '+line2+' not in stack')
+        return
+
+    ratio = full_stack['int_intensity_sum_'+line1] / full_stack['int_intensity_sum_'+line2]
+
+    error = ratio * \
+            np.sqrt( (full_stack['int_intensity_sum_err_'+line1]/full_stack['int_intensity_sum_'+line1])**2 + \
+                  (full_stack['int_intensity_sum_err_'+line2]/full_stack['int_intensity_sum_'+line2])**2)
+
+    valid = full_stack['int_intensity_sum_uplim_'+line1] & full_stack['int_intensity_sum_uplim_'+line2]
+
+
+    lolim = full_stack['int_intensity_sum_uplim_'+line1] & np.invert(full_stack['int_intensity_sum_uplim_'+line2])
+
+    uplim = np.invert(full_stack['int_intensity_sum_uplim_'+line1]) & full_stack['int_intensity_sum_uplim_'+line2]
+
+                  
+    full_stack.add_column(MaskedColumn(ratio.value,name='ratio_'+line1+'_'+line2,mask=valid))
+    full_stack.add_column(MaskedColumn(error.value,name='ratio_'+line1+'_'+line2+'_err',mask=valid))
+    
+    if np.any(lolim):
+        full_stack.add_column(MaskedColumn(lolim,name='ratio_'+line1+'_'+line2+'_lolim',mask=valid))
+
+    if np.any(uplim):
+        full_stack.add_column(MaskedColumn(uplim,name='ratio_'+line1+'_'+line2+'_uplim',mask=valid))
+
+    return full_stack
+
+    
+def calcOtherRatio(full_stack,quant,line):
+    '''
+    calculate ratio of arbitrary input to line
+    
+    Date        Programmer      Description of Changes
+    --------------------------------------------------
+    9/9/2021    A.A. Kepley     Original Code
+
+    '''
+
+    if quant not in full_stack.columns:
+        print(quant+' not in stack')
+        return
+
+    if 'int_intensity_sum_'+line not in full_stack.columns:
+        print('line ' + line + ' not in stack')
+        return
+
+    ratio = full_stack[quant] / full_stack['int_intensity_sum_'+line]
+
+    error = ratio * (full_stack['int_intensity_sum_err_'+line]/full_stack['int_intensity_sum_'+line])
+
+    lolim =  full_stack['int_intensity_sum_uplim_'+line]
+
+
+    full_stack.add_column(Column(ratio,name='ratio_'+quant+'_'+line))
+    full_stack.add_column(Column(error,name='ratio_'+quant+'_'+line+'_err'))
+    if np.any(lolim):
+        full_stack.add_column(Column(lolim),name='ratio_'+quant+'_'+line+'_lolim')
 
 
 def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(u.km/u.s), snThreshold=3.0):
@@ -1109,6 +1197,7 @@ def mapGCR(galaxy,  basemap):
     R_kpc=R*pxscale*Dmpc*1000 * u.kpc# map of GCR in kpc
     R_r25=R_arcsec/r25 # map of GCR in units of R25
 
+    # TODO -- Are units included in output maps here?
     Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
     Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
     Rr25_map = Projection(R_r25,header=head,wcs=w) 

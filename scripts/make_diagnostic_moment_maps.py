@@ -3,6 +3,7 @@
 # Date         Programmer       Description of Changes
 #----------------------------------------------------------------------
 # 8/3/2020      A.A. Kepley     Original Code
+# 7/29/2021     A.A. Kepley     Updates for IR6p0
 
 
 from degas.products import makeMap
@@ -11,7 +12,7 @@ import glob
 import aplpy
 import matplotlib.pyplot as plt
 
-releaseDir = os.path.join(os.environ['ANALYSISDIR'],'IR5')
+releaseDir = os.path.join(os.environ['ANALYSISDIR'],'IR6p0')
 
 fitsList = glob.glob(os.path.join(releaseDir,"*hanning1.fits"))
 

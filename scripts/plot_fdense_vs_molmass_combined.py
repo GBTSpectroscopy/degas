@@ -37,7 +37,7 @@ ax = fig.add_subplot(1,1,1)
 # for each dr1 galaxy, show radial trends for each line.
 for (galaxy,color,marker) in zip(degas[dr1],colorlist,markerlist):
     idx = ( (stack['galaxy'] == galaxy['NAME']) \
-            & (stack['bin_type'] == 'stellarmass'))
+            & (stack['bin_type'] == 'intensity'))
 
     # unit of molmass is solMass/pc^2
     alpha_co = float(stack.meta['ALPHA_CO'].split()[0])

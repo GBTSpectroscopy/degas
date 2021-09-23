@@ -203,40 +203,14 @@ def makeStack(galaxy, regridDir, outDir,
 
     '''
  
-
-    ## create intensity bins
-    binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
-    plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
-
-    # do intensity stack
-    # TODO CHECK UNITS
-    #r_intensity=stackLines(galaxy, velocity, 
-    #                  binmap, binedge, 'intensity', 'K km/s',
-    #                  cubeCO = cubeCO,
-    #                  cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
-    #                  cube13CO = cube13CO, cubeC18O = cubeC18O,
-    #                  sfrmap = sfrmap, ltirmap = ltirmap) 
-
-    ## create stellar mass bin
-    binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
-    plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
-
-    ## do stellar mass stack
-    ## TODO CHECK UNITS
-    #r_stellarmass=stackLines(galaxy, velocity,  
-    #                    binmap, binedge,  'stellarmass', 'Msun/pc^2',
-    #                    cubeCO = cubeCO,
-    #                    cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
-    #                    cube13CO = cube13CO, cubeC18O = cubeC18O,
-    #                    sfrmap = sfrmap, ltirmap = ltirmap)
-
     ## create radius bins
     binmap, binedge, binlabels = makeRadiusBins(galaxy, R_arcsec, outDir) 
     plotBins(galaxy, binmap, binedge, binlabels, 'radius', outDir) 
 
+
     # stack on radius
     r_radius = stackLines(galaxy, velocity,
-                          binmap, binedge,  'radius',  'arcsec',
+                          binmap, binedge,  'radius',  R_arcsec.unit,
                           cubeCO = cubeCO,
                           cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                           cube13CO = cube13CO, cubeC18O = cubeC18O,
@@ -245,13 +219,42 @@ def makeStack(galaxy, regridDir, outDir,
 
     r_radius.add_column(Column(np.tile('radius',len(r_radius))),name='bin_type',index=0)
 
-    ## TODO ADD OTHER STACKS ONCE I HAVE BINS
-    # put the individual stack together. 
-    #full_stack = vstack([r_intensity, r_stellarmass, r_radius])
-    full_stack = r_radius
-    
-    full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
 
+    ## create stellar mass bin
+    binmap, binedge, binlabels = makeBins(galaxy, stellarmap, 'stellarmass', outDir)  
+    plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
+
+
+    ## do stellar mass stack
+    r_stellarmass=stackLines(galaxy, velocity,  
+                             binmap, binedge,  'stellarmass', stellarmap.unit,
+                             cubeCO = cubeCO,
+                             cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                             cube13CO = cube13CO, cubeC18O = cubeC18O,
+                             sfrmap = sfrmap, ltirmap = ltirmap,
+                             stellarmap = stellarmap)
+
+    r_stellarmass.add_column(Column(np.tile('stellarmass',len(r_stellarmass))),name='bin_type',index=0)
+
+    ## create intensity bins
+    binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
+    plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+
+    # do intensity stack
+    r_intensity=stackLines(galaxy, velocity, 
+                           binmap, binedge, 'intensity', mom0cut.unit,
+                           cubeCO = cubeCO,
+                           cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                           cube13CO = cube13CO, cubeC18O = cubeC18O,
+                           sfrmap = sfrmap, ltirmap = ltirmap,
+                           stellarmap = stellarmap) 
+    
+
+    r_intensity.add_column(Column(np.tile('intensity',len(r_intensity))),name='bin_type',index=0)
+
+    full_stack = vstack([r_radius,r_stellarmass,r_intensity])
+
+    full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
 
     return full_stack
 
@@ -361,32 +364,37 @@ def stackLines(galaxy, velocity,
     # -------------------------
 
     # first add bins
-    t = {'bin_lower': binedge[0:-1], 
-         'bin_upper': binedge[1:], 
-         'bin_mean': (binedge[0:-1] + binedge[1:])/2.0}
+    t = {'bin_lower': binedge[0:-1].value, 
+         'bin_upper': binedge[1:].value, 
+         'bin_mean': (binedge[0:-1].value + binedge[1:].value)/2.0}
     total_stack = QTable(t,masked=True)
     
+    nstack = len(labelvals[labelvals != 99])
+
     # Then set up the structures for the bin-based profiles, etc.
     spectral_profile = {}
     stack_weights = {}
     for line in ['CO','HCN','HCOp','13CO','C18O']:
-        spectral_profile[line] = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) 
-        stack_weights[line] = np.zeros((len(labelvals)))
+        spectral_profile[line] = np.zeros((nstack,len(stack['CO'][0]['spectral_axis']))) 
+        stack_weights[line] = np.zeros((nstack))
  
-    bin_label = np.zeros(len(labelvals))
-    bin_area = np.zeros(len(labelvals)) * pix_area.unit
-    sfr_mean = np.zeros(len(labelvals)) * sfrmap.unit
-    ltir_mean = np.zeros(len(labelvals))* ltirmap.unit
-    mstar_mean = np.zeros(len(labelvals)) * stellarmap.unit
+    bin_label = np.zeros(nstack)
+    bin_area = np.zeros(nstack) * pix_area.unit
+    bin_unit = np.full(nstack, "")
+    sfr_mean = np.zeros(nstack) * sfrmap.unit
+    ltir_mean = np.zeros(nstack)* ltirmap.unit
+    mstar_mean = np.zeros(nstack) * stellarmap.unit
 
-    spectral_axis = np.zeros((len(labelvals),len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
+    spectral_axis = np.zeros((nstack,len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
 
-    for i in range(len(labelvals)):
+    for i in range(nstack):
         spectral_axis[i,:] = stack['CO'][i]['spectral_axis']
 
         bin_label[i] = stack['CO'][i]['label']
 
         bin_area[i]= float(sum(binmap[binmap==bin_label[i]].flatten()))*pix_area          
+        bin_unit[i] = binmap.unit.to_string()
+
         # calculating the mean SFR as requested
         if sfrmap is not None:
             sfr_mean[i] = np.nanmean(sfrmap[binmap==bin_label[i]]) 
@@ -414,6 +422,7 @@ def stackLines(galaxy, velocity,
         total_stack.add_column(Column(stack_weights[line],name='stack_weights_'+line))
 
     total_stack.add_column(Column(bin_area,name='bin_area')) # pc^2
+    total_stack.add_column(Column(bin_unit,name='bin_unit'))
 
     if sfrmap is not None:
         total_stack.add_column(Column(sfr_mean.to('Msun/(yr pc2)'),name='sfr_mean')) # Msun/yr/(kpc -> pc)^2 
@@ -478,6 +487,7 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
         int_intensity_sum_err[line] = ma.zeros(nstack) * full_stack['stack_profile_CO'].unit * full_stack['spectral_axis'].unit
         int_intensity_sum_uplim[line] = np.full(nstack,False)
         
+
     # calculate the integrated intensity from a fit and from a simple sum.
     for i in range(nstack):
         
@@ -642,6 +652,8 @@ def calcOtherRatio(full_stack,quant,line):
     if np.any(lolim):
         full_stack.add_column(Column(lolim),name='ratio_'+quant+'_'+line+'_lolim')
 
+    return full_stack
+
 
 def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(u.km/u.s), snThreshold=3.0):
     '''
@@ -685,7 +697,8 @@ def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(
     plt.plot(spectral_axis, stack_profile, label='data',color='orange')
     plt.xlabel('Velocity - ' + spectral_axis.unit.to_string())
     plt.ylabel('Average Intensity - ' + stack_profile.unit.to_string())
-    plt.title(stack['galaxy'] + ' ' + line + ' ' + stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
+
+    plt.title(stack['galaxy'] + ' ' + line + ' ' + stack['bin_type'] + ' ' + str(stack['bin_mean']))
     plt.text(0.07, 0.95, "Noise="+noisePerChan.to_string(),transform=myax.transAxes)
 
     plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
@@ -701,7 +714,7 @@ def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(
                         color='green',alpha=0.2)            
 
     plt.legend(loc='upper right')
-    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_sum.png'
+    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'])+'_sum.png'
     plt.savefig(os.path.join(outDir,plotname))
     plt.close()
 
@@ -767,8 +780,8 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     ax0.plot(spectral_axis, stack_profile,label='data')
 
     ax0.set_ylabel('Average Intensity - ' + stack_profile.unit.to_string())
-
-    ax0.set_title(stack['galaxy'] + ' ' + line + ' ' +  stack['bin_type'] + ' ' + stack['bin_mean'].to_string())
+                           
+    ax0.set_title(stack['galaxy'] + ' ' + line + ' ' +  stack['bin_type'] + ' ' + str(stack['bin_mean']))
     ax0.text(0.07,0.95,"Noise="+noisePerChan.to_string(),transform=ax0.transAxes)
     ax0.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
 
@@ -886,7 +899,7 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
         stack_fit = dcOffsetFit
 
     ax0.legend(loc='upper right')
-    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'].value)+'_fit.png'
+    plotname = stack['galaxy'] + '_' + line + '_' +  stack['bin_type'] + '_'+str(stack['bin_mean'])+'_fit.png'
     plt.savefig(os.path.join(outDir,plotname))
     plt.close()
 
@@ -909,26 +922,20 @@ def makeBins(galaxy, basemap,  bintype, outDir):
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added more comments plus moved GCR map 
                                 calculate up to other code.
+    9/16/2021   A.A. Kepley     Fixing up bins
     '''
+    
+    #Bin the basemap by brightness
+    binnum = int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
+    binedge = np.nanmin(basemap.value)*np.logspace(0, binnum, num=binnum+1, base=np.e) *basemap.unit #create bins based on dynamic range of mom0
+    bins = np.digitize(basemap.value, binedge.value) #this will automatically add an extra bin in the end for nan values
+    #binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
+    binlabels = ['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
 
-    if bintype=='intensity' or bintype=='stellarmass':
-        #Bin the basemap by brightness
-        binnum=int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
-        binedge = np.nanmin(basemap.value)*np.logspace(0, binnum, num=binnum+1, base=np.e) #create bins based on dynamic range of mom0
-        bins = np.digitize(basemap.value, binedge) #this will automatically add an extra bin in the end for nan values
-        binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
-    elif bintype=='radius':
-        binnum=5
-        binedge = np.zeros(binnum+1)
-        binedge[1:]=np.logspace(-1, np.log10(0.5), num=binnum,base=10)#create bins based on r25
-        bins = np.digitize(basemap, binedge) #this will automatically add an extra bin in the end for nan values
-        binlabels=[""]+['{0:1.2f}'.format(i)+'R25' for i in binedge]
-    else:
-        raise Exception ("bintype should either be 'radius' or 'intensity' or 'stellarmass' ")
-    # Blank NaN values
-    bins[bins==len(binedge)] = 0 
+    ## Blank NaN values
+    bins[bins==len(binedge)] = 99
     # make bins map 
-    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap = Projection(bins,wcs=basemap.wcs,header=basemap.header)
     binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
     return binmap, binedge, binlabels
 
@@ -953,11 +960,11 @@ def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
     maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
 
     binedge = np.arange(minrad, maxrad, beam)  
-    binedge = np.insert(binedge,0,0)
+    binedge = np.insert(binedge,0,0) # insert the center of the galaxy
     binedge = binedge * basemap.unit
     bins = np.digitize(basemap.value,binedge.value) 
 
-    binlabels = ['{0:1.2f}'.format(i)+' arcsec' for i in binedge]
+    binlabels = ['{0:1.2f} '.format(i) + basemap.unit.to_string() for i in binedge]
 
     # make bins map 
     binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
@@ -1198,8 +1205,8 @@ def mapGCR(galaxy,  basemap):
     R_r25=R_arcsec/r25 # map of GCR in units of R25
 
     # TODO -- Are units included in output maps here?
-    Rarcsec_map=Projection(R_arcsec,header=head,wcs=w) 
-    Rkpc_map=Projection(R_kpc,header=head,wcs=w) 
+    Rarcsec_map=Projection(R_arcsec,header=head,wcs=w, unit=R_arcsec.unit)
+    Rkpc_map=Projection(R_kpc,header=head,wcs=w,unit=R_kpc.unit) 
     Rr25_map = Projection(R_r25,header=head,wcs=w) 
 
     # map of galactocentric radius in unit of kpc, arcmin, in r25

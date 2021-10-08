@@ -39,10 +39,10 @@ ax = fig.add_subplot(1,1,1)
 # for each dr1 galaxy, show radial trends for each line.
 for (galaxy,color,marker) in zip(degas[dr1],colorlist,markerlist):
     idx = ( (stack['galaxy'] == galaxy['NAME']) \
-            & (stack['bin_type'] == 'radius'))
+            & (stack['bin_type'] == 'r25'))
 
     # radius is in arcsec. 
-    r25 = stack[idx]['bin_mean'] / (galaxy['R25_DEG'] * 3600.0)    
+    r25 = stack[idx]['bin_mean'] 
 
     lolims = stack[idx]['ratio_HCN_CO_lolim']
 

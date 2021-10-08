@@ -34,19 +34,15 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
     if not baseName:
         baseName=os.path.basename(cubeFile).replace('.fits','')
 
-    cube = SpectralCube.read(cubeFile)
-    
+    cube = SpectralCube.read(cubeFile).with_spectral_unit(u.km/u.s, velocity_convention='radio')
+
     if maskFile:
-        maskCube = SpectralCube.read(maskFile)
+        maskCube = SpectralCube.read(maskFile).with_spectral_unit(u.km/u.s, velocity_convention='radio')
         mask = (maskCube.unitless_filled_data[:,:,:] > 0.5)
         maskedCube = cube.with_mask(mask)
-    else:
-        maskedCube = cube
-
-    kmsCube = maskedCube.with_spectral_unit(u.km/u.s, velocity_convention='radio')
 
     if maptype is 'peakIntensity':
-        mymap = kmsCube.max(axis=0)
+        mymap = maskedCube.max(axis=0)
         outname = baseName+'_peakInt.fits'
 
     elif maptype is 'mask2D':
@@ -60,6 +56,9 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
     elif maptype is 'moment':
         mymap = kmsCube.moment(order=order)
         outname = baseName+'_mom'+str(order)+'.fits'
+
+        if order == 0:
+
 
     elif maptype is 'peakVelocity':
         velocity = kmsCube.spectral_axis

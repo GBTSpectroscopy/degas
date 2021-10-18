@@ -101,11 +101,12 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     # Create associated maps needed for analysis.
     # TODO -- double-check on mom0cut -- Is this really what i want to be doing??
-    mom0cut, cubeCO, sn_mask = mapSN(galaxy, regridDir, outDir, sncut=3.0)  
-    stellarmap = mapStellar(galaxy, mom0cut, regridDir, outDir)
-    sfrmap = mapSFR(galaxy, mom0cut, regridDir, outDir)
-    ltirmap = mapLTIR(galaxy, mom0cut, regridDir,outDir)
-    R_arcsec, R_kpc, R_r25 = mapGCR(galaxy,mom0cut)
+    ## FIX UP THIS TO READ IN TO MOM0 AND ASSOCIATED ERROR PRODUCED VIA ANOTHER ROUTE.
+    cubeCO, comap = mapCO(galaxy, regridDir, outDir)  
+    stellarmap = mapStellar(galaxy, regridDir, outDir) # to apply CO mask mask=mom0cut
+    sfrmap = mapSFR(galaxy, regridDir, outDir)
+    ltirmap = mapLTIR(galaxy, regridDir,outDir)
+    R_arcsec, R_kpc, R_r25 = mapGCR(galaxy, comap) # comap is just used to get coordinates
 
     velocity_file = galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
     vhdu = fits.open(os.path.join(regridDir,velocity_file))
@@ -113,22 +114,22 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     # read in HCN
     linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCN_*_hanning1_maxnchan_smooth.fits'))[0]
-    cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+    cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile))
     
     # read in HCO+
     linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCOp_*_hanning1_smooth_regrid.fits'))[0]
-    cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+    cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile))
 
     # For NGC6946, skip 13CO and C18O since we don't have that data.
     # For NGC4569, we are temporarily missing data.
     if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
         # read in 13CO
         linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))[0]
-        cube13CO = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+        cube13CO = SpectralCube.read(os.path.join(regridDir,linefile))
 
         # read in C18O
         linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*_hanning1_smooth_regrid.fits'))[0]
-        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile),mask=sn_mask)
+        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile))
         
     else:
         cube13CO = None
@@ -136,13 +137,14 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     #get the full stack result for each line
     full_stack = makeStack(galaxy, regridDir, outDir,
-                           mom0cut = mom0cut, 
                            cubeCO = cubeCO,
                            cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
                            cube13CO = cube13CO, cubeC18O = cubeC18O,
                            velocity = velocity,
+                           comap = comap, 
                            sfrmap = sfrmap, ltirmap = ltirmap,
-                           stellarmap=stellarmap, R_arcsec=R_arcsec) 
+                           stellarmap=stellarmap, R_arcsec=R_arcsec,
+                           R_r25=R_r25) 
 
     # remove stacks that don't have CO spectra 
     nstack = len(full_stack)
@@ -167,12 +169,13 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
 
 def makeStack(galaxy, regridDir, outDir,
-              mom0cut = None,
               cubeCO = None,
               cubeHCN = None, cubeHCOp=None,
               cube13CO = None, cubeC18O = None,
-              velocity = None, sfrmap = None, ltirmap = None,
-              stellarmap = None, R_arcsec = None):
+              velocity = None, comap = None,
+              sfrmap = None, ltirmap = None,
+              stellarmap = None, R_arcsec = None,
+              R_r25 = None):
     '''
     
     make stacks for all lines and ancillary data for one galaxy
@@ -209,15 +212,32 @@ def makeStack(galaxy, regridDir, outDir,
 
 
     # stack on radius
-    r_radius = stackLines(galaxy, velocity,
-                          binmap, binedge,  'radius',  R_arcsec.unit,
+    stack_radius = stackLines(galaxy, velocity,
+                          binmap, binedge,  'radius',  
                           cubeCO = cubeCO,
                           cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                           cube13CO = cube13CO, cubeC18O = cubeC18O,
                           sfrmap = sfrmap, ltirmap = ltirmap, 
                           stellarmap = stellarmap)
 
-    r_radius.add_column(Column(np.tile('radius',len(r_radius))),name='bin_type',index=0)
+    stack_radius.add_column(Column(np.tile('radius',len(stack_radius))),name='bin_type',index=0)
+
+    # create r25 bins
+    binmap, binedge, binlabels = makeRadiusBins(galaxy, R_r25, outDir,r25=True)
+    plotBins(galaxy, binmap, binedge, binlabels, 'r25', outDir)
+
+
+    # stack on R25
+    stack_r25 = stackLines(galaxy, velocity,
+                     binmap, binedge,  'r25',  
+                     cubeCO = cubeCO,
+                     cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                     cube13CO = cube13CO, cubeC18O = cubeC18O,
+                     sfrmap = sfrmap, ltirmap = ltirmap, 
+                     stellarmap = stellarmap)
+
+    stack_r25.add_column(Column(np.tile('r25',len(stack_r25))),name='bin_type',index=0)
+    
 
 
     ## create stellar mass bin
@@ -226,23 +246,23 @@ def makeStack(galaxy, regridDir, outDir,
 
 
     ## do stellar mass stack
-    r_stellarmass=stackLines(galaxy, velocity,  
-                             binmap, binedge,  'stellarmass', stellarmap.unit,
+    stack_stellarmass=stackLines(galaxy, velocity,  
+                             binmap, binedge,  'stellarmass',
                              cubeCO = cubeCO,
                              cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                              cube13CO = cube13CO, cubeC18O = cubeC18O,
                              sfrmap = sfrmap, ltirmap = ltirmap,
                              stellarmap = stellarmap)
 
-    r_stellarmass.add_column(Column(np.tile('stellarmass',len(r_stellarmass))),name='bin_type',index=0)
+    stack_stellarmass.add_column(Column(np.tile('stellarmass',len(stack_stellarmass))),name='bin_type',index=0)
 
     ## create intensity bins
-    binmap, binedge, binlabels = makeBins(galaxy, mom0cut, 'intensity', outDir)  
+    binmap, binedge, binlabels = makeBins(galaxy, comap, 'intensity', outDir)  
     plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
 
     # do intensity stack
-    r_intensity=stackLines(galaxy, velocity, 
-                           binmap, binedge, 'intensity', mom0cut.unit,
+    stack_intensity=stackLines(galaxy, velocity, 
+                           binmap, binedge, 'intensity', 
                            cubeCO = cubeCO,
                            cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                            cube13CO = cube13CO, cubeC18O = cubeC18O,
@@ -250,16 +270,16 @@ def makeStack(galaxy, regridDir, outDir,
                            stellarmap = stellarmap) 
     
 
-    r_intensity.add_column(Column(np.tile('intensity',len(r_intensity))),name='bin_type',index=0)
+    stack_intensity.add_column(Column(np.tile('intensity',len(stack_intensity))),name='bin_type',index=0)
 
-    full_stack = vstack([r_radius,r_stellarmass,r_intensity])
+    full_stack = vstack([stack_radius,stack_r25, stack_stellarmass, stack_intensity])
 
     full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
 
     return full_stack
 
 def stackLines(galaxy, velocity, 
-               binmap, binedge, bintype, binunit,
+               binmap, binedge, bintype, 
                cubeCO = None,
                cubeHCN = None,
                cubeHCOp = None,
@@ -367,6 +387,7 @@ def stackLines(galaxy, velocity,
     t = {'bin_lower': binedge[0:-1].value, 
          'bin_upper': binedge[1:].value, 
          'bin_mean': (binedge[0:-1].value + binedge[1:].value)/2.0}
+
     total_stack = QTable(t,masked=True)
     
     nstack = len(labelvals[labelvals != 99])
@@ -380,7 +401,7 @@ def stackLines(galaxy, velocity,
  
     bin_label = np.zeros(nstack)
     bin_area = np.zeros(nstack) * pix_area.unit
-    bin_unit = np.full(nstack, "")
+    bin_unit = np.full(nstack, "",dtype="S15")
     sfr_mean = np.zeros(nstack) * sfrmap.unit
     ltir_mean = np.zeros(nstack)* ltirmap.unit
     mstar_mean = np.zeros(nstack) * stellarmap.unit
@@ -393,7 +414,7 @@ def stackLines(galaxy, velocity,
         bin_label[i] = stack['CO'][i]['label']
 
         bin_area[i]= float(sum(binmap[binmap==bin_label[i]].flatten()))*pix_area          
-        bin_unit[i] = binmap.unit.to_string()
+        bin_unit[i] = binedge[0].unit.to_string()
 
         # calculating the mean SFR as requested
         if sfrmap is not None:
@@ -422,6 +443,7 @@ def stackLines(galaxy, velocity,
         total_stack.add_column(Column(stack_weights[line],name='stack_weights_'+line))
 
     total_stack.add_column(Column(bin_area,name='bin_area')) # pc^2
+
     total_stack.add_column(Column(bin_unit,name='bin_unit'))
 
     if sfrmap is not None:
@@ -604,20 +626,19 @@ def calcLineRatio(full_stack,line1, line2):
 
     valid = full_stack['int_intensity_sum_uplim_'+line1] & full_stack['int_intensity_sum_uplim_'+line2]
 
+    uplim = full_stack['int_intensity_sum_uplim_'+line1] & \
+            np.invert(full_stack['int_intensity_sum_uplim_'+line2])
 
-    lolim = full_stack['int_intensity_sum_uplim_'+line1] & np.invert(full_stack['int_intensity_sum_uplim_'+line2])
 
-    uplim = np.invert(full_stack['int_intensity_sum_uplim_'+line1]) & full_stack['int_intensity_sum_uplim_'+line2]
-
-                  
+    lolim = np.invert(full_stack['int_intensity_sum_uplim_'+line1]) & \
+             full_stack['int_intensity_sum_uplim_'+line2]
+           
     full_stack.add_column(MaskedColumn(ratio.value,name='ratio_'+line1+'_'+line2,mask=valid))
     full_stack.add_column(MaskedColumn(error.value,name='ratio_'+line1+'_'+line2+'_err',mask=valid))
     
-    if np.any(lolim):
-        full_stack.add_column(MaskedColumn(lolim,name='ratio_'+line1+'_'+line2+'_lolim',mask=valid))
+    full_stack.add_column(MaskedColumn(lolim,name='ratio_'+line1+'_'+line2+'_lolim',mask=valid))
 
-    if np.any(uplim):
-        full_stack.add_column(MaskedColumn(uplim,name='ratio_'+line1+'_'+line2+'_uplim',mask=valid))
+    full_stack.add_column(MaskedColumn(uplim,name='ratio_'+line1+'_'+line2+'_uplim',mask=valid))
 
     return full_stack
 
@@ -929,7 +950,6 @@ def makeBins(galaxy, basemap,  bintype, outDir):
     binnum = int(np.log(np.nanmax(basemap.value)/np.nanmin(basemap.value)))+1
     binedge = np.nanmin(basemap.value)*np.logspace(0, binnum, num=binnum+1, base=np.e) *basemap.unit #create bins based on dynamic range of mom0
     bins = np.digitize(basemap.value, binedge.value) #this will automatically add an extra bin in the end for nan values
-    #binlabels=[""]+['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
     binlabels = ['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to stellarmass map!!
 
     ## Blank NaN values
@@ -940,7 +960,7 @@ def makeBins(galaxy, basemap,  bintype, outDir):
     return binmap, binedge, binlabels
 
 
-def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
+def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0, r25=False):
     '''
     Create bins for the data
 
@@ -955,20 +975,39 @@ def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0):
                                 calculate up to other code.
     4/15/2021   A.A. Kepley     Changes bins to be beam width apart in radius.
     '''
-    
-    minrad = 0.0+beam/2.0
-    maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
 
-    binedge = np.arange(minrad, maxrad, beam)  
-    binedge = np.insert(binedge,0,0) # insert the center of the galaxy
-    binedge = binedge * basemap.unit
+    if r25:
+        minrad = 0.05
+        maxrad = (90.0/3600.0) / galaxy['R25_DEG'] # go out to edge of the field.
+
+        binedge = np.arange(minrad, maxrad, 0.05)  
+        binedge = np.insert(binedge,0,0) # insert the center of the galaxy
+        binedge = binedge * basemap.unit
+
+    else:
+
+        minrad = 0.0+beam/2.0
+        #maxrad = np.max(basemap).value + beam # want to add one bin beyond to capture max.
+        maxrad = 90.0 # go out to edge of field. radius ~ 60arcsec
+    
+        binedge = np.arange(minrad, maxrad, beam)  
+        binedge = np.insert(binedge,0,0) # insert the center of the galaxy
+        binedge = binedge * basemap.unit
+        
+
     bins = np.digitize(basemap.value,binedge.value) 
+
+    bins[bins==np.max(bins)] = 99 # ignore the outer bins
 
     binlabels = ['{0:1.2f} '.format(i) + basemap.unit.to_string() for i in binedge]
 
     # make bins map 
-    binmap=Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
+    binmap=Projection(bins, wcs=basemap.wcs, header=basemap.header)
+    if r25:
+        binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyr25.fits'), overwrite=True) 
+    else:
+        binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyradius.fits'), overwrite=True)
+
 
     return binmap, binedge, binlabels
 
@@ -999,10 +1038,11 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     plt.close()
 
 
-def mapSN(galaxy, regridDir, outDir, sncut=3.0):
+def mapCO(galaxy, regridDir, outDir, mask=None ):
 
     '''
-    make S/N map using MAD from cube and mask    
+    
+    get CO map for galaxy
     
     galaxy: line from degas_base.fits with galaxy properties
 
@@ -1010,54 +1050,76 @@ def mapSN(galaxy, regridDir, outDir, sncut=3.0):
 
     outDir: output directory
 
-    sncut: keyword parameter specifying S/N cut
     
      Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added comments and clarified inputs
+    10/7/2021   A.A. Kepley     Removing sncut parameter and instead reading 
+                                in mom0 and error produced earlier.
 
     '''
 
-    # read in cube
-    cube=SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits'))
-    cube=cube.with_spectral_unit(u.km / u.s)
+    # read in CO cube
+    cube = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits')).with_spectral_unit(u.km / u.s)
 
-    # read in mask
-    mask=SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
-    mask=mask.with_spectral_unit(u.km / u.s)
+    # read in CO moment map
+    hdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_12CO_mom0_regrid.fits'))[0]
+    data = hdu.data
 
-    # calculate noise
-    madstd=cube.mad_std(how='cube') #K #raw cube
-    chanwidth=np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
-    masksum=mask.sum(axis=0) #map number of unmasked pixels 
-    noise=np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s ## TODO: CHECK MATH HERE
+    if mask:
+        data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
 
-    #mask datacube
-    masked_cube=cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
-    mom0 = masked_cube.moment(order=0)
-    snmap=mom0/noise #should be unitless #mom0 is from masked cube
-    snmap[snmap==np.inf]=np.nan #convert division by zero to nan
+    comap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
+    comap.quicklook()
 
-    # write the resulting map to fits 
-    snmap.write(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.fits'), overwrite=True)
-    snmap.quicklook()
-    plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.png'))
-    plt.close()
+    plt.savefig(os.path.join(outDir,galaxy['NAME']+'_CO.png'))
     plt.clf()
+    plt.close()
 
-    #get rid of parts of mom0 where S/N < S/N cut
-    mom0cut=mom0.copy()
-    sn=np.nan_to_num(snmap.value)
-    mom0cut[sn<sncut]=np.nan #blank out low sn regions
+    return cube, comap
 
-    #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
-    mom0mask=~np.isnan(mom0cut)
-    masked_cube=cube.with_mask(mom0mask) #use for stacking later
+    # sncut=3.0
 
-    return mom0cut, masked_cube, mom0mask
+    # # read in cube
+    # cube = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits'))
+    # cube = cube.with_spectral_unit(u.km / u.s)
 
-def mapStellar(galaxy, mom0cut, regridDir, outDir):
+    # # read in mask
+    # mask = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
+    # mask = mask.with_spectral_unit(u.km / u.s)
+
+    # # calculate noise
+    # madstd = cube.mad_std(how='cube') #K #raw cube
+    # chanwidth = np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
+    # masksum = mask.sum(axis=0) #map number of unmasked pixels 
+    # noise = np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s ## TODO: CHECK MATH HERE
+
+    # #mask datacube
+    # masked_cube = cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
+    # mom0 = masked_cube.moment(order=0)
+    # snmap = mom0/noise #should be unitless #mom0 is from masked cube
+    # snmap[snmap==np.inf]=np.nan #convert division by zero to nan
+
+    # # write the resulting map to fits 
+    # snmap.write(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.fits'), overwrite=True)
+    # snmap.quicklook()
+    # plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.png'))
+    # plt.close()
+    # plt.clf()
+
+    # #get rid of parts of mom0 where S/N < S/N cut
+    # mom0cut = mom0.copy()
+    # sn = np.nan_to_num(snmap.value)
+    # mom0cut[sn<sncut] = np.nan #blank out low sn regions
+
+    # #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
+    # mom0mask = ~np.isnan(mom0cut)
+    # masked_cube = cube.with_mask(mom0mask) #use for stacking later
+
+    # return mom0cut, masked_cube, mom0mask
+
+def mapStellar(galaxy, regridDir, outDir, mask=None):
     '''
     make stellarmass map
 
@@ -1074,20 +1136,23 @@ def mapStellar(galaxy, mom0cut, regridDir, outDir):
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added comments and clarified inputs
+    10/07/2021  A.A. Kepley     made mask optional
 
     '''
 
     # open the stellar mass
-    stellarhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_mstar_gauss15_regrid.fits'))[0]
+    stellarhdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_mstar_gauss15_regrid.fits'))[0]
 
-    stellar=stellarhdu.data
+    stellar = stellarhdu.data
     #stellar[starmask==1.0]=np.nan #apply star mask ## AAK: I think I can skip this.
-    stellar[np.isnan(mom0cut)]=np.nan #apply SN mask (SN >3)
-    w=WCS(stellarhdu.header)
+    if mask:
+        stellar[np.isnan(mask)] = np.nan #apply SN mask (SN >3)
+
+    w = WCS(stellarhdu.header)
 
     hdrunit = stellarhdu.header['BUNIT'].replace('MSUN','Msun').replace('PC','pc')
 
-    stellarmap=Projection(stellar,header=stellarhdu.header,wcs=w, unit=hdrunit) 
+    stellarmap = Projection(stellar,header=stellarhdu.header,wcs=w, unit=hdrunit) 
     stellarmap.quicklook()
 
     plt.savefig(os.path.join(outDir,galaxy['NAME']+'_stellarmass.png'))
@@ -1096,7 +1161,7 @@ def mapStellar(galaxy, mom0cut, regridDir, outDir):
 
     return stellarmap
 
-def mapLTIR(galaxy, mom0cut, regridDir, outDir):
+def mapLTIR(galaxy, regridDir, outDir, mask=None):
     '''
     make LTIR map
 
@@ -1119,7 +1184,8 @@ def mapLTIR(galaxy, mom0cut, regridDir, outDir):
 
     data=hdu.data
 
-    data[np.isnan(mom0cut)]=np.nan #apply SN mask (SN >3)
+    if mask:
+        data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
 
     LTIRmap=Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
     LTIRmap.quicklook()
@@ -1130,7 +1196,7 @@ def mapLTIR(galaxy, mom0cut, regridDir, outDir):
 
     return LTIRmap
 
-def mapSFR(galaxy, mom0cut, regridDir, outDir):
+def mapSFR(galaxy, regridDir, outDir, mask=None):
     '''
     import sfr map from W4+FUV
 
@@ -1138,12 +1204,15 @@ def mapSFR(galaxy, mom0cut, regridDir, outDir):
     ----------------------------------------------------------------------
     10/29/2020  Yiqing Song     Original Code
     12/3/2020  A.A. Kepley     Added comments and clarified inputs
+    10/7/2021   A.A. Kepley     Made mask optional
     '''
     
-    sfrhdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_sfr_fuvw4_gauss15_regrid.fits'))[0]
-    sfr=sfrhdu.data
-    sfr[np.isnan(mom0cut)]=np.nan
-    w=WCS(sfrhdu.header)
+    sfrhdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_sfr_fuvw4_gauss15_regrid.fits'))[0]
+    sfr = sfrhdu.data
+    if mask:
+        sfr[np.isnan(mask)] = np.nan
+
+    w = WCS(sfrhdu.header)
     
     hdrunit = sfrhdu.header['BUNIT'].replace('MSUN','Msun')
     hdrunit = hdrunit.replace("KPC","kpc")
@@ -1175,39 +1244,38 @@ def mapGCR(galaxy,  basemap):
     dec = galaxy['DEC_DEG']
     inc = np.radians(galaxy['INCL_DEG'])
     pa = np.radians(galaxy['POSANG_DEG'])
-    r25 = galaxy['R25_DEG'] * 3600.0 # arcsec
+    r25 = galaxy['R25_DEG'] * u.deg
     Dmpc = galaxy['DIST_MPC']
     
     # get wcs
-    w=basemap.wcs
+    w = basemap.wcs
 
     # get center
-    x0,y0=w.all_world2pix(ra,dec,0,ra_dec_order=True)
+    x0,y0 = w.all_world2pix(ra,dec,0,ra_dec_order=True)
 
     # get coordinates
-    y=np.arange(0,np.shape(basemap)[0],1)
-    x=np.arange(0,np.shape(basemap)[1],1)
+    y = np.arange(0,np.shape(basemap)[0],1)
+    x = np.arange(0,np.shape(basemap)[1],1)
 
     # create a 2d image of coordinates
-    xx,yy=np.meshgrid(x,y)
+    xx,yy = np.meshgrid(x,y)
 
     # calculate the radius in pixels
-    xx_new=x0+(xx-x0)*np.cos(pa)+(yy-y0)*np.sin(pa) 
-    yy_new=y0-(xx-x0)*np.sin(pa)+(yy-y0)*np.cos(pa) 
-    R=np.sqrt((xx_new-x0)**2/np.cos(inc)**2+(yy_new-y0)**2) #pixels
+    xx_new = x0+(xx-x0)*np.cos(pa)+(yy-y0)*np.sin(pa) 
+    yy_new = y0-(xx-x0)*np.sin(pa)+(yy-y0)*np.cos(pa) 
+    R = np.sqrt((xx_new-x0)**2/np.cos(inc)**2+(yy_new-y0)**2) #pixels
 
     # now convert from pixels to actual units
-    head=basemap.header
-    pxscale=np.radians(np.abs(head['CDELT1'])) #radian/pixel
+    head = basemap.header
+    pxscale = np.radians(np.abs(head['CDELT1'])) #radian/pixel
 
-    R_arcsec=np.degrees(R*pxscale)*3600.0 * u.arcsec# map of GCR in arcsec
-    R_kpc=R*pxscale*Dmpc*1000 * u.kpc# map of GCR in kpc
-    R_r25=R_arcsec/r25 # map of GCR in units of R25
+    R_arcsec = np.degrees(R*pxscale)*3600.0 * u.arcsec# map of GCR in arcsec
+    R_kpc = R*pxscale*Dmpc*1000 * u.kpc# map of GCR in kpc
+    R_r25 = R_arcsec/r25.to(u.arcsec) # map of GCR in units of R25
 
-    # TODO -- Are units included in output maps here?
-    Rarcsec_map=Projection(R_arcsec,header=head,wcs=w, unit=R_arcsec.unit)
-    Rkpc_map=Projection(R_kpc,header=head,wcs=w,unit=R_kpc.unit) 
-    Rr25_map = Projection(R_r25,header=head,wcs=w) 
+    Rarcsec_map = Projection(R_arcsec, header=head, wcs=w, unit=R_arcsec.unit)
+    Rkpc_map = Projection(R_kpc, header=head, wcs=w, unit=R_kpc.unit) 
+    Rr25_map = Projection(R_r25, header=head, wcs=w) 
 
     # map of galactocentric radius in unit of kpc, arcmin, in r25
     return Rarcsec_map, Rkpc_map, Rr25_map 

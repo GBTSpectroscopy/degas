@@ -1,7 +1,7 @@
 from degas.analysis_stack import makeSampleTable
 import os
 
-release = 'IR6p0'
+release = 'IR6p1'
 
 scriptDir = os.environ['SCRIPTDIR']
 regridDir=os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
@@ -20,4 +20,4 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_test')
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['IC0342','NGC4414'])
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['IC0342']
 
-myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_IR6p0', release='DR1')
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1')

@@ -40,32 +40,31 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
         maskCube = SpectralCube.read(maskFile).with_spectral_unit(u.km/u.s, velocity_convention='radio')
         mask = (maskCube.unitless_filled_data[:,:,:] > 0.5)
         maskedCube = cube.with_mask(mask)
+    else:
+        maskedCube = cube
 
     if maptype is 'peakIntensity':
         mymap = maskedCube.max(axis=0)
         outname = baseName+'_peakInt.fits'
 
     elif maptype is 'mask2D':
-        mymap = kmsCube.max(axis=0)
+        mymap = maskedCube.max(axis=0)
         outname = baseName+'_mask2D.fits'
 
     elif maptype is 'linewidth':
-        mymap = kmsCube.linewidth_fwhm()
+        mymap = maskedCube.linewidth_fwhm()
         outname = baseName+'_linewidth.fits'
 
     elif maptype is 'moment':
-        mymap = kmsCube.moment(order=order)
+        mymap = maskedCube.moment(order=order)
         outname = baseName+'_mom'+str(order)+'.fits'
 
-        if order == 0:
-
-
     elif maptype is 'peakVelocity':
-        velocity = kmsCube.spectral_axis
-        mask = np.sum(kmsCube.get_mask_array(),axis=0) > 1.0
-        newwcs = kmsCube.wcs.dropaxis(2)
+        velocity = maskedCube.spectral_axis
+        mask = np.sum(maskedCube.get_mask_array(),axis=0) > 1.0
+        newwcs = maskedCube.wcs.dropaxis(2)
 
-        peakind = kmsCube.argmax(axis=0)
+        peakind = maskedCube.argmax(axis=0)
         peakvel = velocity[peakind]         
         peakvel[peakvel==velocity[0]] = np.nan
         

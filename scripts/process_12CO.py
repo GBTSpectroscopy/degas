@@ -65,10 +65,13 @@ ovro_list = [ os.path.basename(image).split('.')[0].upper() for image in glob.gl
 for galaxy in degas_table[idx_dr1]:
 
     generateMoments = True
-    outName = galaxy['NAME']+'_12CO_mask.fits'
 
     #for IC 0342 use Jialu's 12CO
     if galaxy['NAME'] == 'IC0342':
+
+        line='10'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
 
         cubeFile = os.path.join(otherDataDir,'jialu',
                                 'ic0342_regrid_12co_cube_Tmb_10kms_gauss15.fits')
@@ -85,6 +88,11 @@ for galaxy in degas_table[idx_dr1]:
       
     ## use phangs first
     elif galaxy['NAME'] in phangs_list:
+        
+        line='21'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
+
         cubeFile = os.path.join(otherDataDir,'phangs',
                                 galaxy['NAME'].lower() + '_12m+7m+tp_co21_10kms_gauss15.fits')
 
@@ -100,6 +108,10 @@ for galaxy in degas_table[idx_dr1]:
 
     ## use heracles second
     elif galaxy['NAME'] in heracles_list:
+
+        line='21'
+        
+        outName = galaxy['NAME']+'_12CO_mask.fits'
 
         cubeFile = os.path.join(otherDataDir,'heracles',
                                   galaxy['NAME']+'_heracles_gauss15_fixed_kms.fits')
@@ -125,6 +137,10 @@ for galaxy in degas_table[idx_dr1]:
 
     ## use extra HERA data from adam next 
     elif galaxy['NAME'] in extra_hera_adam_list:
+
+        line='21'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
         
         cubeFile = os.path.join(otherDataDir,'everyHeracles_fromadam_20210318',
                                 galaxy['NAME'].lower()+'_hera_co21_native_fixed_10kms_gauss15.fits')
@@ -165,6 +181,10 @@ for galaxy in degas_table[idx_dr1]:
 
     ## use HERA data from Andreas next (everyHERACLES)
     elif galaxy['NAME'] in extra_hera_list:
+
+        line='21'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
         
         cubeFile = os.path.join(otherDataDir,'co_from_andreas',
                                 galaxy['NAME'].lower()+'_hera_co21.cube_fixed_10kms_gauss15.fits')
@@ -227,6 +247,10 @@ for galaxy in degas_table[idx_dr1]:
 
     ## use bima third
     elif galaxy['NAME'] in bima_list:
+
+        line='10'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
         
         # single pointing case
         if galaxy['NAME'] == 'NGC4414':
@@ -257,6 +281,10 @@ for galaxy in degas_table[idx_dr1]:
     ## use ovro next
     elif galaxy['NAME'] in ovro_list:
 
+        line='10'
+
+        outName = galaxy['NAME']+'_12CO_mask.fits'
+        
         cubeFile = os.path.join(otherDataDir,'temp_co',
                               galaxy['NAME'].lower()+'.co.cmmsk_gauss15_fixed.fits')
 
@@ -269,6 +297,9 @@ for galaxy in degas_table[idx_dr1]:
 
     ##
     elif galaxy['NAME'] == 'NGC4038':
+
+        line='10'
+        outName = galaxy['NAME']+'_12CO_mask.fits'
         
         cubeFile = os.path.join(otherDataDir,'ngc4038_from_chris',
                               'ngc_4038_4039_7m_co10_fixed_gauss15.fits')
@@ -295,18 +326,18 @@ for galaxy in degas_table[idx_dr1]:
         # add other features in and to make sure that the header is
         # sanitized.
         cube = SpectralCube.read(cubeFile)
-        cube.write(os.path.join(maskDir,galaxy['NAME']+'_12CO.fits'),overwrite=True)
+        cube.write(os.path.join(maskDir,galaxy['NAME']+'_12CO'+line+'.fits'),overwrite=True)
         
         # Mom0
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME']+'_12CO',
+                baseName=galaxy['NAME']+'_12CO'+line,
                 maptype='moment',order=0)
         
         # peakInt
         makeMap(cubeFile,maskDir,
                 maskFile = os.path.join(maskDir,outName),
-                baseName=galaxy['NAME']+'_12CO',
+                baseName=galaxy['NAME']+'_12CO'+line,
                 maptype='peakIntensity')
 
         # moment 1

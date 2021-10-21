@@ -1061,10 +1061,18 @@ def mapCO(galaxy, regridDir, outDir, mask=None ):
     '''
 
     # read in CO cube
-    cube = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits')).with_spectral_unit(u.km / u.s)
-
+    cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_r21_simple_regrid.fits')
+    if not os.path.exists(cofile):
+        cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_regrid.fits')
+    
+    cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)       
+              
     # read in CO moment map
-    hdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_12CO_mom0_regrid.fits'))[0]
+    mom0file = os.path.join(regridDir,galaxy['NAME']+'_12CO10_r21_simple_mom0_regrid.fits')
+    if not os.path.exists(mom0file):
+        mom0file =  os.path.join(regridDir,galaxy['NAME']+'_12CO10_mom0_regrid.fits')
+
+    hdu = fits.open(mom0file)[0]
     data = hdu.data
 
     if mask:

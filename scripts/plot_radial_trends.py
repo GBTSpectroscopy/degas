@@ -3,7 +3,7 @@ from astropy.table import Table
 import matplotlib.pyplot as plt
 
 # setup information sources
-stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_test','stack_IR6p0_mom1.fits'))
+stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_test','stack_IR6p1_mom1.fits'))
 plotDir = os.path.join(os.environ['ANALYSISDIR'],'plots','radial_plots')
 
 degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
@@ -115,8 +115,7 @@ for galaxy in degas[dr1]:
     if docoratio:
 
         for coratio in ['ratio_HCN_CO','ratio_HCOp_CO','ratio_13CO_CO','ratio_C18O_CO']:
-            ## THIS NEEDS TO BE CHANGED WHEN I FIX UP THE STACK.
-            uplims = stack[idx][coratio+'_lolim']
+            uplims = stack[idx][coratio+'_uplim']
             
             ratio = stack[idx][coratio]
 
@@ -146,8 +145,8 @@ for galaxy in degas[dr1]:
     if doratio:
         
         for myratio in ['ratio_HCOp_HCN']:
-            uplims = stack[idx][myratio+'_lolim']
-            lolims = stack[idx][myratio+'_uplim']
+            uplims = stack[idx][myratio+'_uplim']
+            lolims = stack[idx][myratio+'_lolim']
 
             ratio = stack[idx][myratio]
 

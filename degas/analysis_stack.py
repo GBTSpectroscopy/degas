@@ -5,7 +5,7 @@ import numpy.ma as ma
 import astropy.units as u
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from matplotlib import colors
+from matplotlib import colors, cm
 import aplpy
 from astropy.table import Table, Column, vstack, QTable, MaskedColumn
 import re
@@ -1090,18 +1090,20 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     ##          for cscale, I want to probably set_extremes(under=None,over=None) so I can set the 99 values to gray or red and the masked values to gray or red as well.
     ##  plt.imshow(c=cscale)
 
+    cmap = cm.get_cmap('viridis').copy()
+    cmap.set_over(color='gray')
+    cmap.set_under(color='gray')
 
     maxval = np.max(binmap[binmap.value != 99].value)
-    mapvals = np.arange(1.0,maxval+1 )   
-
+    mapvals = np.arange(1.0,maxval+1)
 
     plt.subplot(projection=binmap.wcs)
-    heatmap = plt.imshow(binmap.value,origin='lower',vmin=1,vmax=maxval)
-
-    plt.colorbar(heatmap, boundaries=binedge, values=mapvals)
-
+    heatmap = plt.imshow(binmap.value,origin='lower', vmin=1,vmax=maxval,cmap=cmap)
+    
     plt.xlabel('RA (J2000)')
     plt.ylabel('Dec (J2000)')
+
+    plt.colorbar(heatmap, boundaries=binedge, values=mapvals,drawedges=True)
 
     plt.savefig(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.png'))
     plt.clf()

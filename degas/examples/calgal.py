@@ -17,14 +17,14 @@ gallist = ['IC0342',
            'NGC4535',
            'NGC4569',
            'NGC5055',
-           'NGC6946'
+           'NGC6946',
            'NGC7331',
            'NGC5248']
-gallist = gallist[-2:]
+gallist = gallist[13:]
 # gallist = ['NGC2146', 'IC0342', 'NGC2903']
 
 degasdir = '/mnt/bigdata/erosolow/surveys/DEGAS/'
 from degas import catalogs
 catalogs.updateLogs('ObservationLog.csv')
 pipeline.reduceAll(release='QA0', galaxyList=gallist,
-                   OffType='PCA')
+                   OffType='PCA', nProc=1)

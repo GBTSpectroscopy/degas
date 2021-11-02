@@ -5,6 +5,8 @@ import astropy.units as u
 from corner import corner
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as ss
+
 empdir = '/mnt/space/erosolow/surveys/empire/'
 degasdir = '/mnt/space/erosolow/surveys/DEGAS/'
 maskdir = '/mnt/space/erosolow/surveys/DEGAS/masks/'
@@ -49,6 +51,16 @@ for g in gals:
         topfrac = np.logical_or((emp > np.nanpercentile(emp, 99)),
                                 (deg > np.nanpercentile(deg, 99)))
         medrat = np.nanmedian(deg[topfrac] / emp[topfrac])
+
+        val, bins, _ = ss.binned_statistic(emp[idx], deg[idx],
+                                           bins=np.linspace(p001, p999, 31),
+                                           statistic='median')
+        yval, ybins, _ = ss.binned_statistic(deg[idx], emp[idx],
+                                             bins=np.linspace(p001, p999, 31),
+                                             statistic='median')
+
+        xctr = 0.5 * (bins[0:-1] + bins[1:])
+        yctr = 0.5 * (ybins[0:-1] + ybins[1:])
         f = corner(np.c_[emp[idx], deg[idx]], bins=100)
         f.axes[2].set_xlim([p001, p999])
         f.axes[2].set_ylim([p001, p999])
@@ -61,6 +73,8 @@ for g in gals:
         f.axes[2].plot([p001, p999], [p001 * medrat,
                                       p999 * medrat],
                        color='b',linewidth=3, linestyle='--', alpha=0.4)
+        f.axes[2].plot(xctr, val, 'ro', markersize=4)
+        f.axes[2].plot(yval, yctr,'bx',markersize=4)
         f.text(0.6, 0.76, 
                '{0} {1}'.format(g.upper(), species), transform=plt.gcf().transFigure)
         f.text(0.6, 0.68, 'Median DEGAS/EMPIRE: {0:4.2f}'.format(medrat))

@@ -8,7 +8,7 @@ gridGalaxy(galaxy='IC0342', setup='12CO',
            release='QA0', datadir=datadir,
            PostprocOnly=ppo)
 
-gallist = [#'IC0342',
+gallist = ['IC0342',
            'NGC0337',
            'NGC2146',
            'NGC2903',
@@ -25,8 +25,8 @@ gallist = [#'IC0342',
            'NGC4569',
            'NGC5055',
            'NGC6946']
-gallist = gallist[-2:]
-gallist = ['IC0342']
+# gallist = gallist[-2:]
+# gallist = ['IC0342']
 HCNgals = gallist
 
 # HCNgals = ['NGC2903', 'NGC2146', 'IC0342']

@@ -291,6 +291,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                OutputRoot = None, overwrite=False, 
                MaskName=None,
                CatalogFile=None,
+               nProc=1,
                **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
@@ -400,6 +401,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                                       center=galaxy_center)
                                       
     # offselect = ArgusCal.NoMask
+    print('Using {0} Processor(s)'.format(nProc))
     ArgusCal.calscans(RawDataDir + SessionDir + '/' + SessionSubDir, 
                       start=StartScan,
                       stop=EndScan,
@@ -411,7 +413,8 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                       OffType=OffType,
                       suffix=suffixname,
                       center=galaxy_center,
-                      radius=1 * u.arcmin)
+                      radius=1 * u.arcmin,
+                      nProc=nProc)
     
     # Clean up permissions
     fl = glob.glob(OutputDirectory + '/*fits')

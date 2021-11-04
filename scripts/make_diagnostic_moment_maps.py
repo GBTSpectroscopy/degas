@@ -12,7 +12,7 @@ import glob
 import aplpy
 import matplotlib.pyplot as plt
 
-releaseDir = os.path.join(os.environ['ANALYSISDIR'],'IR6p0')
+releaseDir = os.path.join(os.environ['ANALYSISDIR'],'IR6p1')
 
 fitsList = glob.glob(os.path.join(releaseDir,"*hanning1.fits"))
 

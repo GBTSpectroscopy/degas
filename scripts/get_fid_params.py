@@ -5,6 +5,7 @@
 #       -- z0mgs data table from Leroy et al.  2019 (2019 ApJS 244 24)
 #       -- gal_base from Adam Leroy (private communication)
 #       -- gal_base_local from Adam Leroy (private communication)
+#       -- degas_re.csv from Adam Leroy (private communication). Based on PHANGS data base (galaxy_table.fits"
 
 # Notes:
 #       -- I don't know how gal_base and gal_base_local differ from one another.
@@ -29,8 +30,9 @@
 #       -- stellar mass
 #       -- distance
 #       -- R25 (include error and reference)
-#       -- MORPH? (including reference)
-#       -- BAR??
+#       -- MORPH (including reference)
+#       -- BAR (including reference)
+#       -- RE (including reference)
 
 #       From degas:
 #               -- observed RA
@@ -76,6 +78,8 @@ scriptDir = os.environ['SCRIPTDIR']
 degas = ascii.read(os.path.join(databaseDir,'dense_survey.cat'))
 z0mgs = ascii.read(os.path.join(databaseDir,'apjsab3925t4_mrt.txt'),format='cds')
 gal_base = Table.read(os.path.join(databaseDir,'gal_base.fits'),format='fits')
+degas_re = ascii.read(os.path.join(databaseDir,'degas_re.csv'))
+
 
 degas_cols = ['NAME','RA','DEC','CATVEL','PGC','DR1']
 gal_base_cols = ['RA_DEG','DEC_DEG','REF_POS', 
@@ -117,6 +121,13 @@ for line in degas:
 
     if math.isnan(galaxy['E_POSANG']):
         galaxy['E_POSANG'] = 10.0
+
+    # get re from degas_re.csv
+    idx = degas_re['NAME'] == line['NAME']
+    if np.any(idx):
+        galaxy['RE_ARCSEC'] = degas_re[idx]['RE_ARCSEC']
+        galaxy['REF_RE'] = degas_re[idx]['SOURCE']
+        galaxy['NOTES_RE'] = degas_re[idx]['NOTES']
 
     # get info from z0mgs
     idx = z0mgs['PGC'] == galaxy['PGC']

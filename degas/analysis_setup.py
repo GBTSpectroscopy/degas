@@ -14,6 +14,8 @@ from astropy import wcs
 
 import re
 
+import ipdb
+
 def fixBIMA(bimafile):
     '''
 
@@ -827,7 +829,8 @@ def simpleR21scale(infile, r21, r21_ref=None):
 
 
 def sfrR21scale(infile, sigmaSFRfile, galaxy=None,
-                re=None, sfr=None, r21=None, r21_ref=None):
+                re=None, sfr=None, r21=None, r21_ref=None,
+                r21_lim=0.4):
     '''
 
     scale the R21 value by the sigma_SFR value using relationship from
@@ -838,14 +841,19 @@ def sfrR21scale(infile, sigmaSFRfile, galaxy=None,
     10/20/21    A. Kepley               Original Code
     '''
     
+    import math
+
     hdu = fits.open(infile)
     hdr_in = hdu[0].header
-    data_in = hdr[0].data
+    data_in = hdu[0].data
     hdu.close()
 
     hdu = fits.open(sigmaSFRfile)
     hdr_sigmaSFR = hdu[0].header
     sigmaSFR = hdu[0].data
+    hdu.close()
+
+    hdr_in['R21'] = (r21, r21_ref)
 
     sigmaSFR_avg = 0.5 * sfr / ( math.pi * re**2)
 
@@ -857,12 +865,20 @@ def sfrR21scale(infile, sigmaSFRfile, galaxy=None,
 
     logR21ratio = a * Q + b
 
-    logR21 = logR21ratio - np.log10(r21)
+    logR21 = logR21ratio + np.log10(r21)
 
     R21_scaled = 10**logR21
 
-    fits.writeto(galaxy+"_R21.fits",R21_scaled,header=hdr_in,overwrite=True)
+    R21_scaled[np.where(R21_scaled < r21_lim)] = r21_lim
 
-    fits.writeto(infile.replace("12CO21","12CO10_r21_sigmaSFR"),header=hdr_in, overwriter=True)
+    data_scaled = data_in / R21_scaled
+
+    indir = os.path.dirname(infile)
+    hdr_out = hdr_in
+    hdr_out['BUNIT'] = ''
+
+    fits.writeto(os.path.join(indir,galaxy+"_R21.fits"),R21_scaled,header=hdr_out,overwrite=True)
+
+    fits.writeto(infile.replace("12CO21","12CO10_r21_sigmaSFR"),data_scaled, header=hdr_in, overwrite=True)
 
     

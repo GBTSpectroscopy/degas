@@ -13,7 +13,9 @@ import glob
 import numpy as np
 from spectral_cube import SpectralCube
 from astropy.io import fits
-from degas.analysis_setup import simpleR21scale
+from degas.analysis_setup import simpleR21scale, sfrR21scale
+import astropy.units as u
+import ipdb
 
 release = 'IR6p1'
 
@@ -23,14 +25,17 @@ scriptDir = os.environ['SCRIPTDIR']
 dataDir = os.path.join(analysisDir,release+'_regrid')
 
 # read in degas table
-degas_table = Table.read(os.path.join(scriptDir,"degas_base.fits"))
-idx_dr1 = degas_table['DR1'] == 1
+degas = Table.read(os.path.join(scriptDir,"degas_base.fits"))
+idx_dr1 = degas['DR1'] == 1
 
 # set fiducial value
 r21 = 0.65 # mean R21 value from Leroy+ 2021
 r21_ref = 'Leroy+2021' 
 
-for galaxy in degas_table[idx_dr1]:
+# read in R21 table
+r21_table = Table.read(os.path.join(analysisDir,'database','int_corat_tab.ecsv'))
+
+for galaxy in degas[idx_dr1]:
 
     if ( (galaxy['MASK'] == 'HERACLES') |
          (galaxy['MASK'] == 'everyHERACLES') |
@@ -47,10 +52,51 @@ for galaxy in degas_table[idx_dr1]:
         simpleR21scale(mom0,r21,r21_ref=r21_ref)
         simpleR21scale(peakInt,r21,r21_ref=r21_ref)
 
-        # now do the more complex scaling by sigma_SFR
-        ## TODO 
-        ##      -- get re from Adam
-        ##      -- confirm what sfr to use
-        ##      -- decide whether to use galaxy specific r21
-        #sfrR21scale(cube, sigmaSFR, galaxy=galaxy['NAME'],
-        #            re=re, sfr=sfr, r21=r21, r21_ref=r21_ref)
+        # pick R21
+        idx = (r21_table['GALAXY'] == galaxy['NAME'].lower()) & (r21_table['RATNAME'] == 'R21') 
+        galaxy_ratios = r21_table[idx]
+
+        if 'PHANGSCOMING' in galaxy_ratios['SURVEY_PAIR']:
+            idx = galaxy_ratios['SURVEY_PAIR'] == 'PHANGSCOMING'
+            r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+        elif 'PHANGSNROATLAS' in galaxy_ratios['SURVEY_PAIR']:
+            idx = galaxy_ratios['SURVEY_PAIR'] == 'PHANGSNROATLAS'
+            r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+        elif 'HERACOMING' in galaxy_ratios['SURVEY_PAIR']:
+            idx = galaxy_ratios['SURVEY_PAIR'] == 'HERACOMING'
+            r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+        elif 'HERANROATLAS' in galaxy_ratios['SURVEY_PAIR']:
+            idx = galaxy_ratios['SURVEY_PAIR'] == 'HERANROATLAS'
+            r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+        else:
+            print('No galaxy-specific R21 value found for '+galaxy['NAME']+ ". Using fiducial value.")
+            r21_gal = r21
+
+        # convert Re to to kpc
+        # The input map is in Mstar/yr/kpc^2, so I think I want the output unit to be Mstar/yr/kpc^2.
+        re_kpc = (( galaxy['RE_ARCSEC']*u.arcsec) * (galaxy['DIST_MPC']*u.Mpc)).to(u.kpc,equivalencies=u.dimensionless_angles())
+
+
+        # now do more complex spatial scaling
+        sfrR21scale(cube,sigmaSFR, 
+                    galaxy=galaxy['NAME'],
+                    re = re_kpc.value, 
+                    sfr = 10**galaxy['LOGSFR'],
+                    r21 = r21_gal, 
+                    r21_ref = r21_ref)
+
+        sfrR21scale(mom0,sigmaSFR, 
+                    galaxy=galaxy['NAME'],
+                    re = re_kpc.value, 
+                    sfr = 10**galaxy['LOGSFR'],
+                    r21 = r21_gal, 
+                    r21_ref = r21_ref)
+
+
+        sfrR21scale(peakInt,sigmaSFR, 
+                    galaxy=galaxy['NAME'],
+                    re = re_kpc.value, 
+                    sfr = 10**galaxy['LOGSFR'],
+                    r21 = r21_gal, 
+                    r21_ref = r21_ref)
+

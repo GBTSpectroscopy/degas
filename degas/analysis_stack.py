@@ -100,9 +100,7 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     print("Processing " + galaxy['NAME'] + "\n")
 
     # Create associated maps needed for analysis.
-    # TODO -- double-check on mom0cut -- Is this really what i want to be doing??
-    ## FIX UP THIS TO READ IN TO MOM0 AND ASSOCIATED ERROR PRODUCED VIA ANOTHER ROUTE.
-    cubeCO, comap = mapCO(galaxy, regridDir, outDir)  
+    cubeCO, comap = mapCO(galaxy, regridDir, outDir, sncut=3)  
     stellarmap = mapStellar(galaxy, regridDir, outDir) # to apply CO mask mask=mom0cut
     sfrmap = mapSFR(galaxy, regridDir, outDir)
     ltirmap = mapLTIR(galaxy, regridDir,outDir)
@@ -241,7 +239,7 @@ def makeStack(galaxy, regridDir, outDir,
 
 
     ## create stellar mass bin
-    binmap, binedge, binlabels = makeStellarmassBins(galaxy, stellarmap, 'stellarmass', outDir)  
+    binmap, binedge, binlabels = makeStellarmassBins(galaxy, stellarmap, outDir,binspace=0.2)  
     plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
 
 
@@ -278,43 +276,43 @@ def makeStack(galaxy, regridDir, outDir,
     print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stellarmass stack")
 
     ## create intensity bins
-    #binmap, binedge, binlabels = makeBins(galaxy, comap, 'intensity', outDir)  
-    #plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+    binmap, binedge, binlabels = makeCOBins(galaxy, comap, outDir, binspace=0.2)  
+    plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
 
     # do intensity stack
-    #stack_intensity=stackLines(galaxy, velocity, 
-    #                       binmap, binedge, 'intensity', 
-    #                       cubeCO = cubeCO,
-    #                      cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
-    #                      cube13CO = cube13CO, cubeC18O = cubeC18O,
-    #                      sfrmap = sfrmap, ltirmap = ltirmap,
-    #                      stellarmap = stellarmap) 
+    stack_intensity=stackLines(galaxy, velocity, 
+                               binmap, binedge, 'intensity', 
+                               cubeCO = cubeCO,
+                               cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                               cube13CO = cube13CO, cubeC18O = cubeC18O,
+                               sfrmap = sfrmap, ltirmap = ltirmap,
+                               stellarmap = stellarmap) 
 
-    # stack_intensity.add_column(Column(np.tile('intensity',len(stack_intensity))),name='bin_type',index=0)
+    stack_intensity.add_column(Column(np.tile('intensity',len(stack_intensity))),name='bin_type',index=0)
 
-    # # remove excess bins by requiring that the number of spectra in the stack
-    # # keeping increasing.
-    # stack_intensity.sort('bin_mean',reverse=True)
-    # print(stack_intensity['bin_type','bin_mean','stack_weights'])
+    # remove excess bins by requiring that the number of spectra in the stack
+    # keeping increasing.
+    stack_intensity.sort('bin_mean',reverse=True)
+    print(stack_intensity['bin_type','bin_mean','stack_weights'])
 
-    # delta_pix = stack_intensity['stack_weights'][1:] - stack_intensity['stack_weights'][0:-1]
+    delta_pix = stack_intensity['stack_weights'][1:] - stack_intensity['stack_weights'][0:-1]
     
-    # # if difference is very small skip.
-    # delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
+    # if difference is very small skip.
+    delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
 
-    # lastidx = np.argmax(delta_pix < 0)+1
+    lastidx = np.argmax(delta_pix < 0)+1
     
-    # if lastidx == 0:
-    #     lastidx = len(stack_intensity)
+    if lastidx == 0:
+        lastidx = len(stack_intensity)
 
-    # orig_len = len(stack_intensity)
-    # stack_intensity = stack_intensity[0:lastidx]
-    # new_len = len(stack_intensity)
-
-    # print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from intensity stack")
+    orig_len = len(stack_intensity)
+    stack_intensity = stack_intensity[0:lastidx]
+    new_len = len(stack_intensity)
     
-    #full_stack = vstack([stack_radius,stack_r25, stack_stellarmass, stack_intensity])
-    full_stack = vstack([stack_radius,stack_r25, stack_stellarmass])
+    print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from intensity stack")
+    
+    full_stack = vstack([stack_radius,stack_r25, stack_stellarmass, stack_intensity])
+    #full_stack = vstack([stack_radius,stack_r25, stack_stellarmass])
 
     full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
 
@@ -969,14 +967,12 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     return stack_int, stack_int_err, stack_fit, uplim
 
 
-def makeStellarmassBins(galaxy, basemap,  bintype, outDir, binspace=0.25):
+def makeStellarmassBins(galaxy, basemap, outDir, binspace=0.25):
     '''
     Create bins for the data
 
     basemap: map used to create bins (SpectralCube Projection)
 
-    bintype: type of bins ('intensity','stellarmass', 'radius')
-    
     outDir: directory to write output bin image
 
      Date        Programmer      Description of Changes
@@ -1012,7 +1008,49 @@ def makeStellarmassBins(galaxy, basemap,  bintype, outDir, binspace=0.25):
 
     # make bins map 
     binmap = Projection(bins,wcs=basemap.wcs,header=basemap.header)
-    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsby'+bintype+'.fits'), overwrite=True)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbystellarmass.fits'), overwrite=True)
+    
+    return binmap, binedge, binlabels
+
+
+def makeCOBins(galaxy, basemap, outDir, binspace=0.25):
+    '''
+    Create bins for CO data
+
+    basemap: map used to create bins (SpectralCube Projections)
+
+    outDir: directory to write output bin image
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    12/02/2021  A.A. Kepley     Original Code
+    '''
+
+    #Bin the basemap by brightness
+    # go a little lower and a little higher to make sure that you get
+    # the whole range and avoid rounding issues
+    minval = np.nanmin(basemap.value)*0.999
+    logminval = np.log10(minval*0.999)
+    logmaxval = np.log10(np.nanmax(basemap.value)*1.001)
+    
+    nbins = int(np.round((logmaxval - logminval)/binspace))
+    binedge = np.logspace(logminval, logmaxval, num=nbins, base=10) * basemap.unit
+
+    bins = np.digitize(basemap.value, binedge.value) #this will automatically add an extra bin in the end for nan values
+    binlabels = ['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to map!!
+
+    ## Set nan values to nonsense
+    bins[np.isnan(basemap.value)]  = 99
+
+    # warn if valid valures are outside map min
+    if 0 in np.unique(bins):
+       print('WARNING: Value below map minimum\n') 
+    if len(binedge) in np.unique(bins):
+        print('WARNING: Value above map maximum\n')
+
+    # make bins map 
+    binmap = Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyintensity.fits'), overwrite=True)
     
     return binmap, binedge, binlabels
 
@@ -1090,7 +1128,10 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     ##          for cscale, I want to probably set_extremes(under=None,over=None) so I can set the 99 values to gray or red and the masked values to gray or red as well.
     ##  plt.imshow(c=cscale)
 
-    cmap = cm.get_cmap('viridis').copy()
+    import copy
+    
+    #cmap = cm.get_cmap('viridis').copy()
+    cmap = copy.copy(cm.get_cmap('viridis'))
     cmap.set_over(color='gray')
     cmap.set_under(color='gray')
 
@@ -1110,7 +1151,7 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     plt.close()
 
 
-def mapCO(galaxy, regridDir, outDir, mask=None ):
+def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
 
     '''
     
@@ -1138,27 +1179,67 @@ def mapCO(galaxy, regridDir, outDir, mask=None ):
         cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_regrid.fits')
     
     cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)       
-              
-    # read in CO moment map
-    mom0file = os.path.join(regridDir,galaxy['NAME']+'_12CO10_r21_simple_mom0_regrid.fits')
-    if not os.path.exists(mom0file):
-        mom0file =  os.path.join(regridDir,galaxy['NAME']+'_12CO10_mom0_regrid.fits')
 
-    hdu = fits.open(mom0file)[0]
-    data = hdu.data
+    # read in mask calculated earlier for each CO data set
+    mask = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
+    mask = mask.with_spectral_unit(u.km / u.s)
+
+    # calculate noise
+    madstd = cube.mad_std(how='cube') #K #raw cube
+    chanwidth = np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
+    masksum = mask.sum(axis=0) #map number of unmasked pixels 
+    noise = np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s 
+
+    # mask datacube
+    masked_cube = cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
+    mom0 = masked_cube.moment(order=0)
+    snmap = mom0/noise #should be unitless #mom0 is from masked cube
+    snmap[snmap==np.inf]=np.nan #convert division by zero to nan
+
+    # #get rid of parts of mom0 where S/N < S/N cut
+    mom0masked = mom0.copy()
+    sn = np.nan_to_num(snmap.value)
+    mom0masked[sn<sncut] = np.nan #blank out low sn regions
+
+
+    # write the resulting maps to fits 
+    snmap.write(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.fits'), overwrite=True)
+    snmap.quicklook()
+    plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.png'))
+    plt.close()
+    plt.clf()
+
+    # write the resulting map to fits 
+    mom0masked.write(os.path.join(outDir, galaxy['NAME'].upper()+'_mom0masked.fits'), overwrite=True)
+    mom0masked.quicklook()
+    plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_mom0masked.png'))
+    plt.close()
+    plt.clf()
+
+    return cube, mom0masked
+ 
+    
+    
+    # read in CO moment map
+    #mom0file = os.path.join(regridDir,galaxy['NAME']+'_12CO10_r21_simple_mom0_regrid.fits')
+    #if not os.path.exists(mom0file):
+    #    mom0file =  os.path.join(regridDir,galaxy['NAME']+'_12CO10_mom0_regrid.fits')
+
+    #hdu = fits.open(mom0file)[0]
+    #data = hdu.data
 
     ## is this what I want below?
-    if mask:
-        data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
+    #if mask:
+    #    data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
 
-    comap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
-    comap.quicklook()
+    #comap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
+    #comap.quicklook()
 
-    plt.savefig(os.path.join(outDir,galaxy['NAME']+'_CO.png'))
-    plt.clf()
-    plt.close()
+    #plt.savefig(os.path.join(outDir,galaxy['NAME']+'_CO.png'))
+    #plt.clf()
+    #plt.close()
 
-    return cube, comap
+    #return cube, comap
 
     # sncut=3.0
 

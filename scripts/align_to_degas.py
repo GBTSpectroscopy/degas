@@ -6,7 +6,7 @@ import os
 import shutil
 from astropy.table import Table
 
-release = 'IR6p0'
+release = 'IR6p1'
 
 releaseDir = os.path.join(os.environ['ANALYSISDIR'],release)
 coDir = os.path.join(os.environ['ANALYSISDIR'],'CO')
@@ -65,13 +65,16 @@ for hcn in hcnlist:
     print("** processing " + name + " 12CO **")
 
     # process 12CO -- regrid only -- already smoothed
-    co = os.path.join(coDir,name+'_12CO.fits')
+    co = glob.glob(os.path.join(coDir,name+'_12CO??.fits'))[0]
     if os.path.exists(co):
         regridData(hcn_smooth,co,regridDir)
 
     # process CO products -- regrid only -- already smoothed.
     for product in ['mask','mask2D','mom0','mom1','peakInt','peakVelocity']:
-        coproduct = os.path.join(coDir,name+'_12CO_'+product+'.fits')
+        if ( (product == 'mom0') or (product == 'peakInt')):
+            coproduct = glob.glob(os.path.join(coDir,name+'_12CO??_'+product+'.fits'))[0]
+        else:
+            coproduct = os.path.join(coDir,name+'_12CO_'+product+'.fits')
         if os.path.exists(coproduct):
             if ((product is 'mask') or (product is 'mask2D')):
                 regridData(hcn_smooth,coproduct,regridDir,mask=True)

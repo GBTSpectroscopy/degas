@@ -45,5 +45,8 @@ The full analysis is:
 # set up data for analysis
 %run align_to_degas.py # -- a whole bunch of regridding, etc for analysis.
 
+# rescale the 12CO(2-1) data.
+%run do_CO21_rescale.py # more convenient here because the sigma_SFR map is already regridded.
+
 # run the stacking analysis
 %run do_stack.py

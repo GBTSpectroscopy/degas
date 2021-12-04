@@ -14,6 +14,8 @@ from astropy import wcs
 
 import re
 
+import ipdb
+
 def fixBIMA(bimafile):
     '''
 
@@ -99,6 +101,7 @@ def fixHeracles(fitsimage):
 
     cube = SpectralCube.read(newimage)
     cube_kms = cube.with_spectral_unit(u.km / u.s)
+
     cube_kms.write(newimage.replace('.fits','_kms.fits'),overwrite=True)
 
 def fixOVRO(fitsimage,beam=15.0):
@@ -132,11 +135,26 @@ def fixNRO(fitsimage):
     beam_cube.write(fitsimage.replace('.FITS','_fixed.fits'),overwrite=True)
     
 
-def fixExtraHERA(fitsimage,beam=15.0):
+def fixExtraHERA(fitsimage,beam=15.0, eff=1.58621):
     '''
+
     Fix the extra heracles data.
 
-    TBD: need to add an efficiency correction to these data.
+    This data needs an efficiency correction added. From the IRAM 30m
+    docs, the correction at 230GHz is:
+    Beff = 0.59
+    Feff= 0.92
+    Ta*/TMB = Feff/Beff = 0.92/0.59 = 1.559322
+
+    1/1.559322 = 0.6413
+
+    From the header on some of Adam's data the value is 
+    Feff / Beff = 0.92/0.58 = 1.58621
+
+    1/1.58621 = 0.630433
+
+    Ta*/1.58621 = Tmb
+
     '''
     
     f = fits.open(fitsimage)
@@ -173,6 +191,10 @@ def fixExtraHERA(fitsimage,beam=15.0):
 
     interpCube = spSmoothCube.spectral_interpolate(new_axis,
                                                    suppress_smooth_warning=True)
+
+    if eff:
+        interpCube = interpCube / eff
+        interpCube.meta['EFF'] = eff
 
     # write out
     interpCube.write(newimage.replace('.fits','_10kms_gauss15.fits'),
@@ -247,6 +269,7 @@ def fixPhangs(image,beam=15.0):
 
     #interpCube.allow_huge_operations=True
     smoothCube = interpCube.convolve_to(newBeam)
+
     smoothCube.write(image.replace('_7p5as.fits','_10kms_gauss15.fits'),overwrite=True)
 
 def fixJialu(image,beam=15.0):
@@ -783,7 +806,79 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     else:
         print("Number of dimensions of other data set is not 2 or 3.")
 
+def simpleR21scale(infile, r21, r21_ref=None):
+    '''
+
+    do a simple scaling of 12CO(2-1) data based a single R21 values.
+
+    Date        Programmer      Description of Code
+    ----------------------------------------------------------------------
+    10/20/2021  A.A. Kepley     Original Code
+
+    '''
+    
+    hdu = fits.open(infile)
+    hdr = hdu[0].header
+    data_rescaled = hdu[0].data/r21
+
+    hdr['R21'] = (r21, r21_ref)
+
+    fits.writeto(infile.replace('12CO21','12CO10_r21_simple'),data_rescaled, header=hdr, overwrite=True)
+
+    hdu.close()
 
 
+def sfrR21scale(infile, sigmaSFRfile, galaxy=None,
+                re=None, sfr=None, r21=None, r21_ref=None,
+                r21_lim=0.4):
+    '''
 
+    scale the R21 value by the sigma_SFR value using relationship from
+    Leroy+2021.
 
+    Date        Programmer              Description of Code
+    ----------------------------------------------------------------------
+    10/20/21    A. Kepley               Original Code
+    '''
+    
+    import math
+
+    hdu = fits.open(infile)
+    hdr_in = hdu[0].header
+    data_in = hdu[0].data
+    hdu.close()
+
+    hdu = fits.open(sigmaSFRfile)
+    hdr_sigmaSFR = hdu[0].header
+    sigmaSFR = hdu[0].data
+    hdu.close()
+
+    hdr_in['R21'] = (r21, r21_ref)
+
+    sigmaSFR_avg = 0.5 * sfr / ( math.pi * re**2)
+
+    Q = np.log10(sigmaSFR / sigmaSFR_avg)
+
+    # coefficients from Leroy+ 2021 Table 5
+    a = 0.129
+    b = 0.019
+
+    logR21ratio = a * Q + b
+
+    logR21 = logR21ratio + np.log10(r21)
+
+    R21_scaled = 10**logR21
+
+    R21_scaled[np.where(R21_scaled < r21_lim)] = r21_lim
+
+    data_scaled = data_in / R21_scaled
+
+    indir = os.path.dirname(infile)
+    hdr_out = hdr_in
+    hdr_out['BUNIT'] = ''
+
+    fits.writeto(os.path.join(indir,galaxy+"_R21.fits"),R21_scaled,header=hdr_out,overwrite=True)
+
+    fits.writeto(infile.replace("12CO21","12CO10_r21_sigmaSFR"),data_scaled, header=hdr_in, overwrite=True)
+
+    

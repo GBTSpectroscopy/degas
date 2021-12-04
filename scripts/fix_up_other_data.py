@@ -26,7 +26,6 @@ otherDataDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data')
 common_beam = 15.0 #arcsec
 
 
-
 ## fix BIMA data
 ##----------------
 
@@ -82,9 +81,9 @@ analysis_setup.fixJialu(image,beam=common_beam)
 
 # NGC3631 and NGC4030 are the same cubes as from adam below.
 
-print("processing extra HERA data from Andreas")
+## this data doesn't include an eta_mb efficiency correction. The correction is applied below vis fixExtraHERA
 
-### NEED TO ADD EFFICIENCY CORRECTIONS. ####
+print("processing extra HERA data from Andreas")
 
 extra_hera_list = glob.glob(os.path.join(otherDataDir,'co_from_andreas','*hera_co21.cube.fits'))
 
@@ -111,6 +110,8 @@ print("Processing NGC4038 data from  Chris Wilson.")
 
 image = os.path.join(otherDataDir,'ngc4038_from_chris','ngc_4038_4039_7m_co10.fits')
 
+## TODO -- move the code below to a function in analysis_setup.py
+
 ## getting rid of some suspicious headers
 hdu = fits.open(image)
 hdr = hdu[0].header
@@ -121,7 +122,7 @@ hdr.remove('ALTRVAL')
 hdr.remove('OBSGEO-X')
 hdr.remove('OBSGEO-Y')
 hdr.remove('OBSGEO-Z')
-hdr.remove('MJD-OBS')
+#hdr.remove('MJD-OBS')
 hdr.remove('DATE-OBS')
 hdr.remove('DISTANCE')
 

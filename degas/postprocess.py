@@ -170,6 +170,7 @@ def cleansplit(filename, galaxy=None,
     """
 
     Cube = SpectralCube.read(filename)
+    Cube.allow_huge_operations=True
     if CatalogFile is None:
         CatalogFile = get_pkg_data_filename('./data/dense_survey.cat',
                                             package='degas')
@@ -316,6 +317,7 @@ def cleansplit(filename, galaxy=None,
                                         blorder=blorder)
         ThisCube = SpectralCube.read(Galaxy + '_' + ThisLine +
                                      '_rebase{0}'.format(blorder) + '.fits')
+        ThisCube.allow_huge_operations=True
         # Smooth
         Kern = Kernel1D(array=np.array([0.5, 1.0, 0.5]))
         for i in range(HanningLoops):

@@ -15,6 +15,101 @@ import os
 
 import ipdb
 
+def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
+
+    '''
+    Prune out stacks
+
+    outDir: directory with result table
+
+    inTable: input table name
+
+    outTable: output table name
+
+    overrideFile: file with overwrites for each galaxy. The format is
+        galaxy_name,   stack_name,    min_val
+        
+        where min_val is the minimum value to keep.
+    
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    12/9/2021   A.A. Kepley     Original Code
+
+    '''
+
+    # read in original file
+    stack_orig = Table.read(os.path.join(outDir,inTable))
+    stack_orig.add_column(True,name='keep') # add column for accounting
+
+    # read in override file
+    if overrideFile:
+        manual = Table.read(os.path.join(outDir,overrideFile))
+
+    # get list of galaxies and bins
+    galaxyList = np.unique(stack_orig['galaxy'])
+    binList = np.unique(stack_orig['bin_type'])
+
+    # go through list of galaxies and bins
+    for galaxy in galaxyList:
+        print("Pruning " + galaxy + ".")
+
+        for mybin in binList:
+
+            # skip r25 bin since we set the outlier limit of the bins when we create these bins.
+            if (mybin == 'r25') | (mybin=='radius'):
+                print("Skipping pruning " + mybin + " bin.")
+                continue
+
+            # prune stellar mass or intensity bings
+            elif (mybin == 'stellarmass') | (mybin == 'intensity'):
+                print("Pruning "+mybin+".")
+                
+                idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)
+
+                # use manual override parameters
+                if (galaxy in manual['galaxy']) and (mybin in manual['bin_type']):
+                    print("Using parameters in override file")
+
+                    # keep everything greater than min_val
+                    min_val = manual[(manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)]['min_val']
+                    stack_orig['keep'][idx] = stack_orig['bin_mean'][idx] > min_val 
+
+                # use trend in number of pixels in region
+                else:
+
+                    # get bin info
+                    bin_mean = np.flip(stack_orig[idx]['bin_mean'])
+                    stack_weights = np.flip(stack_orig[idx]['stack_weights'])
+                    keep = np.flip(stack_orig[idx]['keep'])
+                    orig_len = np.sum(keep)
+
+                    # figure out when the  number of pixels in a region stops increasing
+                    delta_pix = stack_weights[1:] - stack_weights[0:-1]
+                    delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
+
+                    lastidx = np.argmax(delta_pix < 0)+1
+                    if lastidx == 1:
+                        lastidx = len(stack_weights)
+                    keep[lastidx:] = False
+
+                    # set keep
+                    stack_orig['keep'][idx] = np.flip(keep)
+                    new_len = np.sum(keep) 
+                    
+                    print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stack")
+
+                print(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
+            
+            else:
+                print("Bin not recognized. Skipping.")    
+
+    stack_pruned = stack_orig[stack_orig['keep']]
+
+    stack_pruned.write(os.path.join(outDir,outTable),overwrite=True)
+    
+    return stack_pruned
+    
+
 def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
     '''
 
@@ -254,26 +349,26 @@ def makeStack(galaxy, regridDir, outDir,
 
     stack_stellarmass.add_column(Column(np.tile('stellarmass',len(stack_stellarmass))),name='bin_type',index=0)
 
-    # remove excess bins by requiring that the number of spectra in the stack 
-    # keep increasing.
-    stack_stellarmass.sort('bin_mean',reverse=True)
-    print(stack_stellarmass['bin_type','bin_mean','stack_weights'])
+    # # remove excess bins by requiring that the number of spectra in the stack 
+    # # keep increasing.
+    # stack_stellarmass.sort('bin_mean',reverse=True)
+    # print(stack_stellarmass['bin_type','bin_mean','stack_weights'])
     
-    delta_pix = stack_stellarmass['stack_weights'][1:] - stack_stellarmass['stack_weights'][0:-1]
+    # delta_pix = stack_stellarmass['stack_weights'][1:] - stack_stellarmass['stack_weights'][0:-1]
     
-    # if difference is very small ignore.
-    delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
+    # # if difference is very small ignore.
+    # delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
 
-    lastidx = np.argmax(delta_pix < 0)+1
+    # lastidx = np.argmax(delta_pix < 0)+1
 
-    if lastidx == 1:
-        lastidx = len(stack_stellarmass)
+    # if lastidx == 1:
+    #     lastidx = len(stack_stellarmass)
 
-    orig_len = len(stack_stellarmass)
-    stack_stellarmass = stack_stellarmass[0:lastidx]
-    new_len = len(stack_stellarmass)
+    # orig_len = len(stack_stellarmass)
+    # stack_stellarmass = stack_stellarmass[0:lastidx]
+    # new_len = len(stack_stellarmass)
     
-    print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stellarmass stack")
+    # print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stellarmass stack")
 
     ## create intensity bins
     binmap, binedge, binlabels = makeCOBins(galaxy, comap, outDir, binspace=0.2)  
@@ -290,26 +385,26 @@ def makeStack(galaxy, regridDir, outDir,
 
     stack_intensity.add_column(Column(np.tile('intensity',len(stack_intensity))),name='bin_type',index=0)
 
-    # remove excess bins by requiring that the number of spectra in the stack
-    # keeping increasing.
-    stack_intensity.sort('bin_mean',reverse=True)
-    print(stack_intensity['bin_type','bin_mean','stack_weights'])
+    # # remove excess bins by requiring that the number of spectra in the stack
+    # # keeping increasing.
+    # stack_intensity.sort('bin_mean',reverse=True)
+    # print(stack_intensity['bin_type','bin_mean','stack_weights'])
 
-    delta_pix = stack_intensity['stack_weights'][1:] - stack_intensity['stack_weights'][0:-1]
+    # delta_pix = stack_intensity['stack_weights'][1:] - stack_intensity['stack_weights'][0:-1]
     
-    # if difference is very small skip.
-    delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
+    # # if difference is very small skip.
+    # delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
 
-    lastidx = np.argmax(delta_pix < 0)+1
+    # lastidx = np.argmax(delta_pix < 0)+1
     
-    if lastidx == 0:
-        lastidx = len(stack_intensity)
+    # if lastidx == 0:
+    #     lastidx = len(stack_intensity)
 
-    orig_len = len(stack_intensity)
-    stack_intensity = stack_intensity[0:lastidx]
-    new_len = len(stack_intensity)
+    # orig_len = len(stack_intensity)
+    # stack_intensity = stack_intensity[0:lastidx]
+    # new_len = len(stack_intensity)
     
-    print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from intensity stack")
+    # print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from intensity stack")
     
     full_stack = vstack([stack_radius,stack_r25, stack_stellarmass, stack_intensity])
     #full_stack = vstack([stack_radius,stack_r25, stack_stellarmass])

@@ -37,6 +37,16 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
 
     '''
 
+    import logging
+    import sys
+    logging.basicConfig(level=logging.DEBUG,
+                        handlers = [
+                            logging.FileHandler(os.path.join(outDir,'prune.log'),mode='w'),
+                            logging.StreamHandler(sys.stdout)
+                            ]
+                        )
+
+
     # read in original file
     stack_orig = Table.read(os.path.join(outDir,inTable))
     stack_orig.add_column(True,name='keep') # add column for accounting
@@ -51,24 +61,24 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
 
     # go through list of galaxies and bins
     for galaxy in galaxyList:
-        print("Pruning " + galaxy + ".")
+        logging.warn("Pruning " + galaxy + ".")
 
         for mybin in binList:
 
             # skip r25 bin since we set the outlier limit of the bins when we create these bins.
             if (mybin == 'r25') | (mybin=='radius'):
-                print("Skipping pruning " + mybin + " bin.")
+                logging.info("Skipping pruning " + mybin + " bin.")
                 continue
 
             # prune stellar mass or intensity bings
             elif (mybin == 'stellarmass') | (mybin == 'intensity'):
-                print("Pruning "+mybin+".")
+                logging.info("Pruning "+mybin+".")
                 
                 idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)
 
                 # use manual override parameters
                 if (galaxy in manual['galaxy']) and (mybin in manual['bin_type']):
-                    print("Using parameters in override file")
+                    logging.info("Using parameters in override file")
 
                     # keep everything greater than min_val
                     min_val = manual[(manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)]['min_val']
@@ -96,12 +106,12 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
                     stack_orig['keep'][idx] = np.flip(keep)
                     new_len = np.sum(keep) 
                     
-                    print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stack")
+                    logging.info("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stack")
 
-                print(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
+                logging.info(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
             
             else:
-                print("Bin not recognized. Skipping.")    
+                logging.info("Bin not recognized. Skipping.")    
 
     stack_pruned = stack_orig[stack_orig['keep']]
 

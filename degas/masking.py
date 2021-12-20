@@ -289,7 +289,8 @@ def deduplicate_keywords(hdr):
 
 
 def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
-               dilate=0, emissionfile=None):
+               grow_v=0, grow_xy=0, setups=['HCN_HCO+','13CO_C18O','12CO'],
+               emissionfile=None, galname=None, zsource=0):
     """Builds masks for use in DEGAS imaging pipeline. 
 
     Parameters
@@ -315,8 +316,8 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     outdir : str
         Directory for output masks to be stored in
 
-    dilate : int
-        Spectrally dilate the mask by this number of channels
+    grow_v : int
+        Spectrally grow_v the mask by this number of channels
 
     """
 
@@ -345,6 +346,10 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     # Read in original cube, ensure in velocity space
     s = SpectralCube.read(filename)
     s = s.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+    if galname is None:
+        galname = os.path.split(filename)[1].split('_')[0]
+
+
     vmid = s.spectral_axis[len(s.spectral_axis)//2].value
     if emissionfile:
         cube = SpectralCube.read(emissionfile)
@@ -357,142 +362,163 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     else:
         dtype = np.bool
         outtype = np.uint8
+
     # HCN_HCO+
     # Build a mask with a spectral width of 2 GHz and the same spatial 
     # dimensions as the original mask
-  
-    s_hcn = s.with_spectral_unit(u.Hz, rest_value=88.631847 * u.GHz)
-    s_hcop = s.with_spectral_unit(u.Hz, rest_value=89.188518 * u.GHz)
+    if 'HCN_HCO+' in setups:
+        s_hcn = s.with_spectral_unit(u.Hz, rest_value=88.631847 * u.GHz)
+        s_hcop = s.with_spectral_unit(u.Hz, rest_value=89.188518 * u.GHz)
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
-    hdr = s_hcn.wcs.to_header()
-    hdr['CRPIX3'] = 1000
-    hdr['CDELT3'] = width / nChan
-    hdr['CRVAL3'] = (89.188518 + 88.631847) / 2 * 1e9 * (1 - vmid / c)
-    hdr['NAXIS'] = 3
-    hdr['NAXIS1'] = mask.shape[0]
-    hdr['NAXIS2'] = mask.shape[1]
-    hdr['NAXIS3'] = mask.shape[2]
-    hdr['SIMPLE'] = 'T'
-    hdr['BITPIX'] = 8
-    hdr['EXTEND'] = 'T'
+        mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
+        hdr = s_hcn.wcs.to_header()
+        hdr['CRPIX3'] = 1000
+        hdr['CDELT3'] = width / nChan
+        hdr['CRVAL3'] = (89.188518 + 88.631847) / 2 * 1e9 * (1 - vmid / c)
+        hdr['NAXIS'] = 3
+        hdr['NAXIS1'] = mask.shape[0]
+        hdr['NAXIS2'] = mask.shape[1]
+        hdr['NAXIS3'] = mask.shape[2]
+        hdr['SIMPLE'] = 'T'
+        hdr['BITPIX'] = 8
+        hdr['EXTEND'] = 'T'
 
-    hdr = deduplicate_keywords(hdr)
-    w = wcs.WCS(hdr)
-    maskcube = SpectralCube(mask, w, header=hdr)
-    for zz in range(nChan):
-        nu = maskcube.spectral_axis[zz]
-        _, _, zz_hcn = s_hcn.wcs.wcs_world2pix(hdr['CRVAL1'],
-                                               hdr['CRVAL2'],
-                                               nu, 0)
-        zz_hcn = int(zz_hcn)
-        _, _, zz_hcop = s_hcop.wcs.wcs_world2pix(hdr['CRVAL1'],
-                                                 hdr['CRVAL2'],
-                                                 nu, 0)
-        zz_hcop = int(zz_hcop)
-        if 0 <= zz_hcn < s_hcn.shape[0]:
-            mask[zz, :, :] = np.array(s_hcn.filled_data[zz_hcn, :, :],
-                                      dtype=dtype)
-        if 0 <= zz_hcop < s_hcop.shape[0]:
-            mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
-                                      dtype=dtype)
-    if dilate > 0 and (dtype == np.bool):
-        mask = binary_dilation(mask,
-                               np.ones((int(2 * dilate + 1), 1, 1),
-                                       dtype=dtype))
-    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
-    galname = os.path.split(filename)[1].split('_')[0]
-    
-    maskcube.write(outdir + galname+'.hcn_hcop.mask.fits',
-                   overwrite=True)
+        hdr = deduplicate_keywords(hdr)
+        w = wcs.WCS(hdr)
+        maskcube = SpectralCube(mask, w, header=hdr)
+        for zz in range(nChan):
+            nu = maskcube.spectral_axis[zz]
+            _, _, zz_hcn = s_hcn.wcs.wcs_world2pix(hdr['CRVAL1'],
+                                                   hdr['CRVAL2'],
+                                                   nu, 0)
+            zz_hcn = int(zz_hcn)
+            _, _, zz_hcop = s_hcop.wcs.wcs_world2pix(hdr['CRVAL1'],
+                                                     hdr['CRVAL2'],
+                                                     nu, 0)
+            zz_hcop = int(zz_hcop)
+            if 0 <= zz_hcn < s_hcn.shape[0]:
+                mask[zz, :, :] = np.array(s_hcn.filled_data[zz_hcn, :, :],
+                                          dtype=dtype)
+            if 0 <= zz_hcop < s_hcop.shape[0]:
+                mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
+                                          dtype=dtype)
+        if grow_v > 0 and (dtype == np.bool):
+            mask = binary_dilation(mask,
+                                   np.ones((int(2 * grow_v + 1), 1, 1),
+                                           dtype=dtype))
 
+        if grow_xy > 0 and dtype == np.bool:
+            mask = binary_dilation(mask,
+                                   np.ones((1,
+                                            int(2 * grow_xy + 1),
+                                            int(2 * grow_xy + 1)),
+                                           dtype=dtype))
+
+        maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
+        maskcube.write(outdir + galname+'.hcn_hcop.mask.fits',
+                       overwrite=True)
+
+        
     # C18O/13CO
     # Build a mask with a spectral width of 2 GHz and the same spatial
     # dimensions as the original mask
 
-    s_13co = s.with_spectral_unit(u.Hz, rest_value=110.20135 * u.GHz)
-    s_c18o = s.with_spectral_unit(u.Hz, rest_value=109.78217 * u.GHz)
+    if '13CO_C18O' in setups:
+        s_13co = s.with_spectral_unit(u.Hz, rest_value=110.20135 * u.GHz)
+        s_c18o = s.with_spectral_unit(u.Hz, rest_value=109.78217 * u.GHz)
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
-    hdr = s_13co.wcs.to_header()
-    hdr['CRPIX3'] = 1000
-    hdr['CDELT3'] = width / nChan
-    hdr['CRVAL3'] = (110.20135 + 109.78217) / 2 * 1e9 * (1 - vmid / c)
-    hdr['NAXIS'] = 3
-    hdr['NAXIS1'] = mask.shape[0]
-    hdr['NAXIS2'] = mask.shape[1]
-    hdr['NAXIS3'] = mask.shape[2]
-    hdr['SIMPLE'] = 'T'
-    hdr['BITPIX'] = 8
-    hdr['EXTEND'] = 'T'
-    w = wcs.WCS(hdr)
-    hdr = deduplicate_keywords(hdr)
-    
-    maskcube = SpectralCube(mask, w, header=hdr)
-    for zz in range(nChan):
-        nu = maskcube.spectral_axis[zz]
-        _, _, zz_13co = s_13co.wcs.wcs_world2pix(hdr['CRVAL1'],
-                                               hdr['CRVAL2'],
-                                               nu, 0)
-        zz_13co = int(zz_13co)
-        _, _, zz_c18o = s_c18o.wcs.wcs_world2pix(hdr['CRVAL1'],
-                                                 hdr['CRVAL2'],
-                                                 nu, 0)
-        zz_c18o = int(zz_c18o)
-        if 0 <= zz_13co < s_13co.shape[0]:
-            mask[zz, :, :] = np.array(s_13co.filled_data[zz_13co, :, :],
-                                      dtype=dtype)
-        if 0 <= zz_c18o < s_c18o.shape[0]:
-            mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
-                                      dtype=dtype)
-    if dilate > 0 and dtype == np.bool:
-        mask = binary_dilation(mask,
-                               np.ones((int(2 * dilate + 1), 1, 1),
-                                       dtype=dtype))
+        mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
+        hdr = s_13co.wcs.to_header()
+        hdr['CRPIX3'] = 1000
+        hdr['CDELT3'] = width / nChan
+        hdr['CRVAL3'] = (110.20135 + 109.78217) / 2 * 1e9 * (1 - vmid / c)
+        hdr['NAXIS'] = 3
+        hdr['NAXIS1'] = mask.shape[0]
+        hdr['NAXIS2'] = mask.shape[1]
+        hdr['NAXIS3'] = mask.shape[2]
+        hdr['SIMPLE'] = 'T'
+        hdr['BITPIX'] = 8
+        hdr['EXTEND'] = 'T'
+        w = wcs.WCS(hdr)
+        hdr = deduplicate_keywords(hdr)
 
-    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
-    maskcube.write(outdir + galname + '.13co_c18o.mask.fits',
-                   overwrite=True)
+        maskcube = SpectralCube(mask, w, header=hdr)
+        for zz in range(nChan):
+            nu = maskcube.spectral_axis[zz]
+            _, _, zz_13co = s_13co.wcs.wcs_world2pix(hdr['CRVAL1'],
+                                                   hdr['CRVAL2'],
+                                                   nu, 0)
+            zz_13co = int(zz_13co)
+            _, _, zz_c18o = s_c18o.wcs.wcs_world2pix(hdr['CRVAL1'],
+                                                     hdr['CRVAL2'],
+                                                     nu, 0)
+            zz_c18o = int(zz_c18o)
+            if 0 <= zz_13co < s_13co.shape[0]:
+                mask[zz, :, :] = np.array(s_13co.filled_data[zz_13co, :, :],
+                                          dtype=dtype)
+            if 0 <= zz_c18o < s_c18o.shape[0]:
+                mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
+                                          dtype=dtype)
+        if grow_v > 0 and dtype == np.bool:
+            mask = binary_dilation(mask,
+                                   np.ones((int(2 * grow_v + 1), 1, 1),
+                                           dtype=dtype))
+        if grow_xy > 0 and dtype == np.bool:
+            mask = binary_dilation(mask,
+                                   np.ones((1,
+                                            int(2 * grow_xy + 1),
+                                            int(2 * grow_xy + 1)),
+                                           dtype=dtype))
+
+        maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
+        maskcube.write(outdir + galname + '.13co_c18o.mask.fits',
+                       overwrite=True)
     
     # 12CO
     # Build a mask with a spectral width of 2 GHz and the same spatial
     # dimensions as the original mask
+    if '12CO' in setups:
+        s_12co = s.with_spectral_unit(u.Hz, rest_value=115.271204 * u.GHz)
 
-    s_12co = s.with_spectral_unit(u.Hz, rest_value=115.271204 * u.GHz)
 
+        mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
+        hdr = s_12co.wcs.to_header()
+        hdr['CRPIX3'] = 1000
+        hdr['CDELT3'] = width / nChan
+        hdr['CRVAL3'] = (115.271204) * 1e9 * (1 - vmid / c)
+        hdr['NAXIS'] = 3
+        hdr['NAXIS1'] = mask.shape[0]
+        hdr['NAXIS2'] = mask.shape[1]
+        hdr['NAXIS3'] = mask.shape[2]
+        hdr['SIMPLE'] = 'T'
+        hdr['BITPIX'] = 8
+        hdr['EXTEND'] = 'T'
+        w = wcs.WCS(hdr)
+        hdr = deduplicate_keywords(hdr)
 
-    mask = np.zeros((nChan, s.shape[1], s.shape[2]), dtype=outtype)
-    hdr = s_12co.wcs.to_header()
-    hdr['CRPIX3'] = 1000
-    hdr['CDELT3'] = width / nChan
-    hdr['CRVAL3'] = (115.271204) * 1e9
-    hdr['NAXIS'] = 3
-    hdr['NAXIS1'] = mask.shape[0]
-    hdr['NAXIS2'] = mask.shape[1]
-    hdr['NAXIS3'] = mask.shape[2]
-    hdr['SIMPLE'] = 'T'
-    hdr['BITPIX'] = 8
-    hdr['EXTEND'] = 'T'
-    w = wcs.WCS(hdr)
-    hdr = deduplicate_keywords(hdr)
-    
-    maskcube = SpectralCube(mask, w, header=hdr)
-    for zz in range(nChan):
-        nu = maskcube.spectral_axis[zz]
-        _, _, zz_12co = s_12co.wcs.wcs_world2pix(hdr['CRVAL1'],
-                                               hdr['CRVAL2'],
-                                               nu, 0)
-        zz_12co = int(zz_12co)
-        if 0 <= zz_12co < s_12co.shape[0]:
-            mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
-                                      dtype=dtype)
-    if dilate > 0 and dtype == np.bool:
-        mask = binary_dilation(mask,
-                               np.ones((int(2 * dilate + 1), 1, 1),
-                                       dtype=dtype))
+        maskcube = SpectralCube(mask, w, header=hdr)
+        for zz in range(nChan):
+            nu = maskcube.spectral_axis[zz]
+            _, _, zz_12co = s_12co.wcs.wcs_world2pix(hdr['CRVAL1'],
+                                                   hdr['CRVAL2'],
+                                                   nu, 0)
+            zz_12co = int(zz_12co)
+            if 0 <= zz_12co < s_12co.shape[0]:
+                mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
+                                          dtype=dtype)
+        if grow_v > 0 and dtype == np.bool:
+            mask = binary_dilation(mask,
+                                   np.ones((int(2 * grow_v + 1), 1, 1),
+                                           dtype=dtype))
+        if grow_xy > 0 and dtype == np.bool:
+            mask = binary_dilation(mask,
+                                   np.ones((1,
+                                            int(2 * grow_xy + 1),
+                                            int(2 * grow_xy + 1)),
+                                           dtype=dtype))
 
-    maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
-    maskcube.write(outdir + galname+'.12co.mask.fits', overwrite=True)
+        maskcube = SpectralCube(mask.astype(outtype), w, header=hdr)
+        maskcube.write(outdir + galname+'.12co.mask.fits', overwrite=True)
 
 def build_setup_masks(**kwargs):
     OutputRoot = os.environ["DEGASDIR"]

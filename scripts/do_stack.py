@@ -1,4 +1,4 @@
-from degas.analysis_stack import makeSampleTable
+from degas.analysis_stack import makeSampleTable, pruneSampleTable
 import os
 
 release = 'IR6p1'
@@ -21,3 +21,6 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_test')
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['IC0342'])
 
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1')
+
+myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+release+'_mom1_pruned.fits',overrideFile='manualOverrides.csv')
+

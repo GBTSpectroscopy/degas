@@ -22,7 +22,7 @@ style = {'CO': {'marker':'o','color':'orange','name':'CO'},
 # only look at dr1 galaxies
 dr1 = degas['DR1'] == 1
 
-# for each dr1 galaxy, show radial trends for each line.
+# For each dr1 galaxy, show radial trends for each line.
 for galaxy in degas[dr1]:
 
     plt.close()

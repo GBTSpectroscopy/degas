@@ -53,7 +53,7 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
 
     # read in override file
     if overrideFile:
-        manual = Table.read(os.path.join(outDir,overrideFile))
+        manual = Table.read(overrideFile)
 
     # get list of galaxies and bins
     galaxyList = np.unique(stack_orig['galaxy'])
@@ -71,17 +71,18 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
                 continue
 
             # prune stellar mass or intensity bings
-            elif (mybin == 'stellarmass') | (mybin == 'intensity'):
+            elif (mybin == 'mstar') | (mybin == 'ICO'):
                 logging.info("Pruning "+mybin+".")
                 
                 idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)
 
                 # use manual override parameters
-                if (galaxy in manual['galaxy']) and (mybin in manual['bin_type']):
+                man_idx = (manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)
+                if np.any(man_idx):
                     logging.info("Using parameters in override file")
 
                     # keep everything greater than min_val
-                    min_val = manual[(manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)]['min_val']
+                    min_val = manual[man_idx]['min_val']
                     stack_orig['keep'][idx] = stack_orig['bin_mean'][idx] > min_val 
 
                 # use trend in number of pixels in region
@@ -157,6 +158,9 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
     if not sourceList:
         sourceList = degas[idx]['NAME']
 
+    if not os.path.exists(outDir):
+        os.mkdir(outDir)
+
     # go though each file, create a table, and attend it to the list of tables.
     tablelist=[]
     for galaxy in degas[idx]:
@@ -225,7 +229,8 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
 
     # For NGC6946, skip 13CO and C18O since we don't have that data.
     # For NGC4569, we are temporarily missing data.
-    if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
+    #if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
+    if (galaxy['NAME'] != 'NGC6946'):
         # read in 13CO
         linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))[0]
         cube13CO = SpectralCube.read(os.path.join(regridDir,linefile))
@@ -345,77 +350,35 @@ def makeStack(galaxy, regridDir, outDir,
 
     ## create stellar mass bin
     binmap, binedge, binlabels = makeStellarmassBins(galaxy, stellarmap, outDir,binspace=0.2)  
-    plotBins(galaxy, binmap, binedge, binlabels, 'stellarmass', outDir) 
+    plotBins(galaxy, binmap, binedge, binlabels, 'mstar', outDir) 
 
 
     ## do stellar mass stack
     stack_stellarmass=stackLines(galaxy, velocity,  
-                             binmap, binedge,  'stellarmass',
+                             binmap, binedge,  'mstar',
                              cubeCO = cubeCO,
                              cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                              cube13CO = cube13CO, cubeC18O = cubeC18O,
                              sfrmap = sfrmap, ltirmap = ltirmap,
                              stellarmap = stellarmap)
 
-    stack_stellarmass.add_column(Column(np.tile('stellarmass',len(stack_stellarmass))),name='bin_type',index=0)
+    stack_stellarmass.add_column(Column(np.tile('mstar',len(stack_stellarmass))),name='bin_type',index=0)
 
-    # # remove excess bins by requiring that the number of spectra in the stack 
-    # # keep increasing.
-    # stack_stellarmass.sort('bin_mean',reverse=True)
-    # print(stack_stellarmass['bin_type','bin_mean','stack_weights'])
-    
-    # delta_pix = stack_stellarmass['stack_weights'][1:] - stack_stellarmass['stack_weights'][0:-1]
-    
-    # # if difference is very small ignore.
-    # delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
-
-    # lastidx = np.argmax(delta_pix < 0)+1
-
-    # if lastidx == 1:
-    #     lastidx = len(stack_stellarmass)
-
-    # orig_len = len(stack_stellarmass)
-    # stack_stellarmass = stack_stellarmass[0:lastidx]
-    # new_len = len(stack_stellarmass)
-    
-    # print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stellarmass stack")
-
-    ## create intensity bins
+    ## create CO intensity bins
     binmap, binedge, binlabels = makeCOBins(galaxy, comap, outDir, binspace=0.2)  
-    plotBins(galaxy, binmap, binedge, binlabels, 'intensity', outDir) 
+    plotBins(galaxy, binmap, binedge, binlabels, 'ICO', outDir) 
 
     # do intensity stack
     stack_intensity=stackLines(galaxy, velocity, 
-                               binmap, binedge, 'intensity', 
+                               binmap, binedge, 'ICO', 
                                cubeCO = cubeCO,
                                cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
                                cube13CO = cube13CO, cubeC18O = cubeC18O,
                                sfrmap = sfrmap, ltirmap = ltirmap,
                                stellarmap = stellarmap) 
 
-    stack_intensity.add_column(Column(np.tile('intensity',len(stack_intensity))),name='bin_type',index=0)
+    stack_intensity.add_column(Column(np.tile('ICO',len(stack_intensity))),name='bin_type',index=0)
 
-    # # remove excess bins by requiring that the number of spectra in the stack
-    # # keeping increasing.
-    # stack_intensity.sort('bin_mean',reverse=True)
-    # print(stack_intensity['bin_type','bin_mean','stack_weights'])
-
-    # delta_pix = stack_intensity['stack_weights'][1:] - stack_intensity['stack_weights'][0:-1]
-    
-    # # if difference is very small skip.
-    # delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
-
-    # lastidx = np.argmax(delta_pix < 0)+1
-    
-    # if lastidx == 0:
-    #     lastidx = len(stack_intensity)
-
-    # orig_len = len(stack_intensity)
-    # stack_intensity = stack_intensity[0:lastidx]
-    # new_len = len(stack_intensity)
-    
-    # print("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from intensity stack")
-    
     full_stack = vstack([stack_radius,stack_r25, stack_stellarmass, stack_intensity])
     #full_stack = vstack([stack_radius,stack_r25, stack_stellarmass])
 
@@ -711,27 +674,26 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
                     int_intensity_sum_uplim[line][i] = uplim
 
 
-    # add CO measurements to table
-    full_stack.add_column(Column(int_intensity_fit['CO'],name='int_intensity_fit_CO'))
-    full_stack.add_column(Column(int_intensity_fit_err['CO'],name='int_intensity_fit_err_CO'))
-    full_stack.add_column(Column(int_intensity_fit_uplim['CO'],name='int_intensity_fit_uplim_CO'))
-    
-    # calculate CO mass and add to table
+    # calculate CO mass and add to table 
     full_stack.add_column(Column(int_intensity_sum['CO']*alpha_co,name='comass_mean'))
     full_stack.add_column(full_stack['comass_mean'] * full_stack['bin_area'],name='comass_total')
     full_stack.meta['alpha_co'] = alpha_co.to_string()
 
+    # add CO fit to table.
+    full_stack.add_column(Column(int_intensity_fit['CO'],name='int_intensity_fit_CO'))
+    full_stack.add_column(Column(int_intensity_fit_err['CO'],name='int_intensity_fit_CO_err'))
+    full_stack.add_column(Column(int_intensity_fit_uplim['CO'],name='int_intensity_fit_CO_uplim'))
+    full_stack.add_column(Column(fwhm_fit),name='int_intensity_fit_CO_fwhm')
+    
     # add integrated line intensity measurements to the data table.
     for line in ['CO','HCN','HCOp','13CO','C18O']:
        
         full_stack.add_column(Column(int_intensity_sum[line],name='int_intensity_sum_'+line))
-        full_stack.add_column(Column(int_intensity_sum_err[line],name='int_intensity_sum_err_'+line))
-        full_stack.add_column(Column(int_intensity_sum_uplim[line],name='int_intensity_sum_uplim_'+line))
+        full_stack.add_column(Column(int_intensity_sum_err[line],name='int_intensity_sum_'+line+'_err'))
+        full_stack.add_column(Column(int_intensity_sum_uplim[line],name='int_intensity_sum_'+line+'_uplim'))
         
-    full_stack.add_column(Column(fwhm_fit),name='FWHM_fit')
 
     # Calculate line ratios and add to data table
-
     full_stack = calcLineRatio(full_stack,'HCN','CO')
     full_stack = calcLineRatio(full_stack,'HCOp','CO')
 
@@ -741,8 +703,11 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
     full_stack = calcLineRatio(full_stack,'13CO','C18O')
     full_stack = calcLineRatio(full_stack,'HCOp','HCN')
 
-    full_stack = calcOtherRatio(full_stack,'ltir_mean','HCN')
     full_stack = calcOtherRatio(full_stack,'ltir_mean','CO')
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','HCN')
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','HCOp')
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','13CO')
+    full_stack = calcOtherRatio(full_stack,'ltir_mean','C18O')
 
     return full_stack
 
@@ -767,17 +732,17 @@ def calcLineRatio(full_stack,line1, line2):
     ratio = full_stack['int_intensity_sum_'+line1] / full_stack['int_intensity_sum_'+line2]
 
     error = ratio * \
-            np.sqrt( (full_stack['int_intensity_sum_err_'+line1]/full_stack['int_intensity_sum_'+line1])**2 + \
-                  (full_stack['int_intensity_sum_err_'+line2]/full_stack['int_intensity_sum_'+line2])**2)
+            np.sqrt( (full_stack['int_intensity_sum_'+line1+'_err']/full_stack['int_intensity_sum_'+line1])**2 + \
+                     (full_stack['int_intensity_sum_'+line2+'_err']/full_stack['int_intensity_sum_'+line2])**2)
 
-    valid = full_stack['int_intensity_sum_uplim_'+line1] & full_stack['int_intensity_sum_uplim_'+line2]
+    valid = full_stack['int_intensity_sum_'+line1+'_uplim'] & full_stack['int_intensity_sum_'+line2+'_uplim']
 
-    uplim = full_stack['int_intensity_sum_uplim_'+line1] & \
-            np.invert(full_stack['int_intensity_sum_uplim_'+line2])
+    uplim = full_stack['int_intensity_sum_'+line1+'_uplim'] & \
+            np.invert(full_stack['int_intensity_sum_'+line2+'_uplim'])
 
 
-    lolim = np.invert(full_stack['int_intensity_sum_uplim_'+line1]) & \
-             full_stack['int_intensity_sum_uplim_'+line2]
+    lolim = np.invert(full_stack['int_intensity_sum_'+line1+'_uplim']) & \
+             full_stack['int_intensity_sum_'+line2+'_uplim']
            
     full_stack.add_column(MaskedColumn(ratio.value,name='ratio_'+line1+'_'+line2,mask=valid))
     full_stack.add_column(MaskedColumn(error.value,name='ratio_'+line1+'_'+line2+'_err',mask=valid))
@@ -809,9 +774,9 @@ def calcOtherRatio(full_stack,quant,line):
 
     ratio = full_stack[quant] / full_stack['int_intensity_sum_'+line]
 
-    error = ratio * (full_stack['int_intensity_sum_err_'+line]/full_stack['int_intensity_sum_'+line])
+    error = ratio * (full_stack['int_intensity_sum_'+line+'_err']/full_stack['int_intensity_sum_'+line])
 
-    lolim =  full_stack['int_intensity_sum_uplim_'+line]
+    lolim =  full_stack['int_intensity_sum_'+line+'_uplim']
 
     full_stack.add_column(Column(ratio,name='ratio_'+quant+'_'+line))
     full_stack.add_column(Column(error,name='ratio_'+quant+'_'+line+'_err'))

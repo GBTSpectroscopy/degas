@@ -39,8 +39,8 @@ if 'MASK' in degas_table.colnames:
     degas_table.remove_column('MASK')
 degas_table.add_column(Column(np.full_like(degas_table['NAME'],''),dtype='S25'),name='MASK')
 
-idx_dr1 = degas_table['DR1'] == 1
-#idx_dr1 = degas_table['NAME'] == 'NGC4038'
+#idx_dr1 = degas_table['DR1'] == 1
+idx_dr1 = degas_table['NAME'] == 'IC0342'
 
 # Extract list of galaxies via fancy list comprehension
 
@@ -66,15 +66,19 @@ for galaxy in degas_table[idx_dr1]:
 
     generateMoments = True
 
-    #for IC 0342 use Jialu's 12CO
+    #for IC 0342 use pipeline reduction of Jialu's 12CO
     if galaxy['NAME'] == 'IC0342':
 
         line='10'
 
         outName = galaxy['NAME']+'_12CO_mask.fits'
 
-        cubeFile = os.path.join(otherDataDir,'jialu',
-                                'ic0342_regrid_12co_cube_Tmb_10kms_gauss15.fits')
+        #cubeFile = os.path.join(otherDataDir,'jialu',
+        #                        'ic0342_regrid_12co_cube_Tmb_10kms_gauss15.fits')
+        
+        release = 'IR6p1'
+        cubeFile = os.path.join(analysisDir,release,'IC0342_12CO_rebase7_smooth1.3_hanning1.fits')
+        print('Warning: make sure you are using most current 12CO for IC0342. Currently using '+release+'.')
 
         cubemask(cubeFile,
                  outName,

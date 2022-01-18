@@ -331,19 +331,19 @@ def makeStack(galaxy, regridDir, outDir,
     stack_radius.add_column(Column(np.tile('radius',len(stack_radius))),name='bin_type',index=0)
 
     # create r25 bins
-    binmap, binedge, binlabels = makeRadiusBins(galaxy, R_r25, outDir,r25=True)
+    binmap, binedge, binlabels = makeRadiusBins(galaxy, R_r25, outDir, r25=True)
     plotBins(galaxy, binmap, binedge, binlabels, 'r25', outDir)
 
 
     # stack on R25
     stack_r25 = stackLines(galaxy, velocity,
-                     binmap, binedge,  'r25',  
-                     cubeCO = cubeCO,
-                     cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
-                     cube13CO = cube13CO, cubeC18O = cubeC18O,
-                     sfrmap = sfrmap, ltirmap = ltirmap, 
-                     stellarmap = stellarmap)
-
+                           binmap, binedge,  'r25',  
+                           cubeCO = cubeCO,
+                           cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                           cube13CO = cube13CO, cubeC18O = cubeC18O,
+                           sfrmap = sfrmap, ltirmap = ltirmap, 
+                           stellarmap = stellarmap)
+    
     stack_r25.add_column(Column(np.tile('r25',len(stack_r25))),name='bin_type',index=0)
     
 
@@ -1125,7 +1125,7 @@ def makeCOBins(galaxy, basemap, outDir, binspace=0.25):
     return binmap, binedge, binlabels
 
 
-def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0, r25=False):
+def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0, r25=False, r25bin=0.1):
     '''
     Create bins for the data
 
@@ -1142,12 +1142,14 @@ def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0, r25=False):
     '''
 
     if r25:
-        minrad = 0.05
+        minrad = r25bin/2.0
         maxrad = (90.0/3600.0) / galaxy['R25_DEG'] # go out to edge of the field.
 
-        binedge = np.arange(minrad, maxrad, 0.05)  
+        binedge = np.arange(minrad, maxrad, r25bin)  
         binedge = np.insert(binedge,0,0) # insert the center of the galaxy
         binedge = binedge * basemap.unit
+        
+        #ipdb.set_trace()
 
     else:
 

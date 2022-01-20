@@ -21,7 +21,7 @@ style = {'CO': {'marker':'o','color':'orange','name':'CO'},
          'mstar_mean': {'marker':'o','color':'green','name':r'$\Sigma_*$ (M$_\odot/pc^2$)'},
          'sfr_mean':{'marker':'o','color':'blue','name':r'$\Sigma_{SFR}$ (M$_\odot/yr/pc^2$)'},
          'ratio_HCN_CO': {'marker':'o','color':'green','name':'HCN/$^{12}$CO'},
-         'ratio_HCOp_CO': {'marker':'o','color':'blue','name':'HCO+/$^{12}$CO'},
+         'ratio_HCOp_CO': {'marker':'o','color':'blue','name':'HCO+/$^{12}$CO'}, 
          'ratio_13CO_CO': {'marker':'o','color':'red','name':'$^{13}$CO/$^{12}$CO'},
          'ratio_C18O_CO': {'marker':'o','color':'orange','name':'$C^{18}$O/$^{12}$CO'},
          'ratio_HCOp_HCN': {'marker':'o','color':'green','name':'HCO+/HCN'}}

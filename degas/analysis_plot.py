@@ -170,7 +170,7 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
     # setup default plot colors and markers
     nquant = len(plot_quant)
     if not styledict:
-        markers = ['o','v','^','s','*','D'] # 6 items
+        markers = ['o','v','^','s','>','D'] # 6 items
         markerlist = np.tile(markers,int(np.ceil(nquant/len(markers))))
         markerlist = markerlist[0:nquant]
 
@@ -212,7 +212,7 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
             # convert to kpc -- assuming all bins have same unit
             xvals = (stack[idx]['bin_mean'] * u.Unit(stack[idx]['bin_unit'][0])) * galaxy['DIST_MPC'] * u.Mpc
             xvals = xvals.to('kpc',equivalencies=u.dimensionless_angles())
-            xvals = xvals.data
+            xvals = xvals.value
             xlabel = r"Galactocentric Radius (kpc)"
         elif bin_type == 'r25':
             xvals = stack[idx]['bin_mean']
@@ -270,18 +270,40 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
             else:
                 lolims = False
 
-            # make plot 
 
-            # TODO -- I want empty symbols for limits and filled symbols
-            # for measurements.
+            if ((type(lolims) == bool ) & (type(uplims) == bool)):
+                lims = False
+            elif (type(lolims) == bool):
+                lims = uplims
+            elif (type(uplims) == bool):
+                lims = lolims
+            else:
+                lims = uplims | lolims
+
+            # make plot
+
             plt.errorbar(xvals, yvals,
                          yerr = yerrs,
                          uplims = uplims,
                          lolims = lolims,
                          marker = styledict[quant]['marker'], 
-                         color = styledict[quant]['color'], 
-                         linestyle = '--',
-                         label = mylabel) 
+                         markerfacecolor = 'none',
+                         markeredgecolor = styledict[quant]['color'], 
+                         color = styledict[quant]['color'],
+                         linestyle = '--')
+
+            if np.any(lims):
+                plt.scatter(xvals[~lims], yvals[~lims],
+                            marker = styledict[quant]['marker'],
+                            color = styledict[quant]['color'],
+                            label = mylabel)
+            else:
+                plt.scatter(xvals, yvals,
+                            marker = styledict[quant]['marker'],
+                            color = styledict[quant]['color'],
+                            label = mylabel)
+
+
 
             
         # add info to plot

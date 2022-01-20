@@ -26,7 +26,17 @@ myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+rele
 # testing out removing NGC4038 and it's bad  units for now.
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=mylist)
 
-#myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903'])
+from degas.analysis_stack import makeSampleTable, pruneSampleTable
+import os
+
+release = 'IR6p1'
+
+scriptDir = os.environ['SCRIPTDIR']
+regridDir=os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
+outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_test')
+
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903', 'IC0342', 'NGC3631'])
+
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903','NGC3631'])
 #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['IC0342'])
 

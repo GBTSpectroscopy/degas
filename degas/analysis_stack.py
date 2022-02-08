@@ -230,17 +230,24 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     # For NGC6946, skip 13CO and C18O since we don't have that data.
     # For NGC4569, we are temporarily missing data.
     #if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
-    if (galaxy['NAME'] != 'NGC6946'):
-        # read in 13CO
-        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))[0]
+    #if (galaxy['NAME'] != 'NGC6946'):
+    # read in 13CO
+    #ipdb.set_trace()
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))
+    if len(linefile) > 0:
+        linefile = linefile[0]
         cube13CO = SpectralCube.read(os.path.join(regridDir,linefile))
-
-        # read in C18O
-        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*_hanning1_smooth_regrid.fits'))[0]
-        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile))
-        
     else:
+        print("No 13CO file for " + galaxy['NAME'])
         cube13CO = None
+
+    # read in C18O 
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*_hanning1_smooth_regrid.fits'))
+    if len(linefile) > 0:
+        linefile = linefile[0]
+        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile))        
+    else:
+        print("No C18O file for " + galaxy['NAME'])
         cubeC18O = None
 
     #get the full stack result for each line
@@ -1246,6 +1253,7 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
     '''
 
     # read in CO cube
+    ### TODO -- ADD SWITCH HERE TO CHOOSE BETWEEN SIMPLE AND SIGMASFR?
     cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_r21_simple_regrid.fits')
     if not os.path.exists(cofile):
         cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_regrid.fits')
@@ -1290,68 +1298,6 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
 
     return cube, mom0masked
  
-    
-    
-    # read in CO moment map
-    #mom0file = os.path.join(regridDir,galaxy['NAME']+'_12CO10_r21_simple_mom0_regrid.fits')
-    #if not os.path.exists(mom0file):
-    #    mom0file =  os.path.join(regridDir,galaxy['NAME']+'_12CO10_mom0_regrid.fits')
-
-    #hdu = fits.open(mom0file)[0]
-    #data = hdu.data
-
-    ## is this what I want below?
-    #if mask:
-    #    data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
-
-    #comap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
-    #comap.quicklook()
-
-    #plt.savefig(os.path.join(outDir,galaxy['NAME']+'_CO.png'))
-    #plt.clf()
-    #plt.close()
-
-    #return cube, comap
-
-    # sncut=3.0
-
-    # # read in cube
-    # cube = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits'))
-    # cube = cube.with_spectral_unit(u.km / u.s)
-
-    # # read in mask
-    # mask = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
-    # mask = mask.with_spectral_unit(u.km / u.s)
-
-    # # calculate noise
-    # madstd = cube.mad_std(how='cube') #K #raw cube
-    # chanwidth = np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
-    # masksum = mask.sum(axis=0) #map number of unmasked pixels 
-    # noise = np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s ## TODO: CHECK MATH HERE
-
-    # #mask datacube
-    # masked_cube = cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
-    # mom0 = masked_cube.moment(order=0)
-    # snmap = mom0/noise #should be unitless #mom0 is from masked cube
-    # snmap[snmap==np.inf]=np.nan #convert division by zero to nan
-
-    # # write the resulting map to fits 
-    # snmap.write(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.fits'), overwrite=True)
-    # snmap.quicklook()
-    # plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.png'))
-    # plt.close()
-    # plt.clf()
-
-    # #get rid of parts of mom0 where S/N < S/N cut
-    # mom0cut = mom0.copy()
-    # sn = np.nan_to_num(snmap.value)
-    # mom0cut[sn<sncut] = np.nan #blank out low sn regions
-
-    # #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
-    # mom0mask = ~np.isnan(mom0cut)
-    # masked_cube = cube.with_mask(mom0mask) #use for stacking later
-
-    # return mom0cut, masked_cube, mom0mask
 
 def mapStellar(galaxy, regridDir, outDir, mask=None):
     '''

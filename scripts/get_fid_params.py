@@ -125,18 +125,18 @@ for line in degas:
     # get re from degas_re.csv
     idx = degas_re['NAME'] == line['NAME']
     if np.any(idx):
-        galaxy['RE_ARCSEC'] = degas_re[idx]['RE_ARCSEC']
-        galaxy['REF_RE'] = degas_re[idx]['SOURCE']
-        galaxy['NOTES_RE'] = degas_re[idx]['NOTES']
+        galaxy['RE_ARCSEC'] = degas_re[idx]['RE_ARCSEC'][0]
+        galaxy['REF_RE'] = degas_re[idx]['SOURCE'][0]
+        galaxy['NOTES_RE'] = degas_re[idx]['NOTES'][0]
 
     # get info from z0mgs
     idx = z0mgs['PGC'] == galaxy['PGC']
     if np.any(idx):
-        galaxy['LOGMSTAR'] = z0mgs[idx]['logM*']
-        galaxy['E_LOGMSTAR'] = z0mgs[idx]['e_logM*']
-        galaxy['LOGSFR'] = z0mgs[idx]['logSFR']
-        galaxy['E_LOGSFR'] = z0mgs[idx]['e_logSFR']
-        galaxy['REF_LOGSFR'] = z0mgs[idx]['r_logSFR']
+        galaxy['LOGMSTAR'] = z0mgs[idx]['logM*'][0]
+        galaxy['E_LOGMSTAR'] = z0mgs[idx]['e_logM*'][0]
+        galaxy['LOGSFR'] = z0mgs[idx]['logSFR'][0]
+        galaxy['E_LOGSFR'] = z0mgs[idx]['e_logSFR'][0]
+        galaxy['REF_LOGSFR'] = z0mgs[idx]['r_logSFR'][0]
     
     # append on galaxy list
     data.append(galaxy)

@@ -322,6 +322,27 @@ def fixJialu(image,beam=15.0):
                      overwrite=True)
 
 
+def fixEMPIRE(fitsimage):
+    '''
+    Purpose: fix up EMPIRE data headers to work with SpectralCube
+    '''
+
+    # switch header from M/S to m/s to fix up wcs read errors with SpectralCube
+    f = fits.open(fitsimage)
+    f[0].header['CUNIT3'] = 'm/s'
+    newimage = fitsimage.replace('.fits','_fixed.fits')
+    f.writeto(newimage,overwrite=True)
+    f.close()
+    
+    # open image
+    cube = SpectralCube.read(newimage)    
+    
+    # switch to km/s
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+
+    # write out
+    cube_kms.write(newimage.replace('.fits','_kms.fits'),overwrite=True)
+
 #----------------------------------------------------------------------
 
 def calc_stellar_mass(iracFile, MtoLFile, outFile):
@@ -710,6 +731,8 @@ def smoothCube(fitsimage,outDir, beam=15.0):
     Smoothes input cube to given resolution
     
     beam is the beam to smooth to in arcsec.
+
+    returns name of new fits file
 
     '''
 

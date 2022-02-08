@@ -17,7 +17,8 @@ from degas.analysis_setup import simpleR21scale, sfrR21scale
 import astropy.units as u
 import ipdb
 
-release = 'IR6p1'
+#release = 'IR6p1'
+release = 'IR6p0'
 
 # set up relevant directories
 analysisDir = os.environ['ANALYSISDIR']

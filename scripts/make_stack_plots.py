@@ -5,14 +5,17 @@ import numpy as np
 
 from degas.analysis_plot import plot_stack, plot_trends
 
+#release = 'IR6p1'
+release = 'IR6p0'
+
 # setup information sources
-stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_IR6p1_mom1.fits'))
-stack_pruned = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_IR6p1_mom1_pruned.fits'))
+stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_'+release, 'stack_'+release +'_mom1.fits'))
+stack_pruned = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_'+release,'stack_'+release+'_mom1_pruned.fits'))
 degas_db = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 # Plot individual stacks
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_plots')
+plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_'+release,'stack_plots')
 
 binlist = ['radius','r25','mstar','ICO']
 #binlist = ['radius']
@@ -25,7 +28,7 @@ for bin_type in binlist:
     
 # plot trends
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_trends')
+plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_'+release,'stack_trends')
 
 binlist = ['radius','r25','mstar','ICO']
 
@@ -87,7 +90,14 @@ for bin_type in binlist:
                 yaxislabel = r'Variable',
                 styledict = mystyledict,
                 xlog=xlog)
-   
+
+    plot_trends(stack, bin_type, plot_dir, degas_db,
+                ['ltir_mean','ltir_total'],
+                bin_type + '_ltir',
+                yaxislabel = r'Variable',
+                #styledict = mystyledict,
+                xlog=xlog)
+
     plot_trends(stack, bin_type, plot_dir, degas_db,
                 ['ratio_ltir_mean_HCN','ratio_ltir_mean_HCOp'],
                 bin_type + '_sfedense',
@@ -129,7 +139,7 @@ for bin_type in binlist:
 
 # plot individual stacks after pruning
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_plots_pruned')
+plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_'+release,'stack_plots_pruned')
 
 
 binlist = ['radius','r25','mstar','ICO']
@@ -142,7 +152,7 @@ for bin_type in binlist:
 
 # plot trends
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_trends_pruned')
+plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_'+release,'stack_trends_pruned')
 
 binlist = ['radius','r25','mstar','ICO']
 
@@ -173,7 +183,14 @@ for bin_type in binlist:
                 styledict = mystyledict,
                 yaxislabel = r'Variable',
                 xlog=xlog)
-            
+
+    plot_trends(stack_pruned, bin_type, plot_dir, degas_db,
+                ['ltir_mean','ltir_total'],
+                bin_type + '_ltir',
+                yaxislabel = r'Variable',
+                #styledict = mystyledict,
+                xlog=xlog)        
+
     plot_trends(stack_pruned, bin_type, plot_dir, degas_db,
                 ['ratio_ltir_mean_HCN','ratio_ltir_mean_HCOp'],
                 bin_type + '_sfedense',

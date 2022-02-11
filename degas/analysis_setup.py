@@ -5,7 +5,7 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 
-from spectral_cube import SpectralCube
+from spectral_cube import SpectralCube, Projection
 from radio_beam import Beam
 from astropy.convolution import Box1DKernel
 
@@ -738,15 +738,31 @@ def smoothCube(fitsimage,outDir, beam=15.0):
 
     from radio_beam import Beam
 
+    # determine ndim and bunit for other data sets
+    f = fits.open(fitsimage)
+    ndim = f[0].header['NAXIS']
+    bunit = f[0].header['BUNIT']
+    f.close()
+
     newFits = os.path.join(outDir,os.path.basename(fitsimage).replace(".fits","_smooth.fits"))
 
     newBeam = Beam(beam*u.arcsec)
-    
-    cube = SpectralCube.read(fitsimage)
+
+    if ndim == 3:
+        cube = SpectralCube.read(fitsimage)
+    elif ndim == 2:
+        vhdu = fits.open(fitsimage)
+        cube = Projection.from_hdu(vhdu)
+    else:
+        print("ndim not 2 or 3")
+        return
+
     smoothCube = cube.convolve_to(newBeam)
     
     smoothCube.write(newFits,overwrite=True)
     return newFits
+
+#----------------------------------------------------------------------
 
 def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     '''
@@ -794,6 +810,8 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
             finalCube = SpectralCube(newdata,newCube.wcs,mask=baseCube.mask)
         
         finalCube.with_spectral_unit(baseCube.spectral_axis.unit).write(newFits,overwrite=True)
+        
+        return newFits
 
     elif ndim == 2:
         
@@ -825,6 +843,7 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         # write out regridded data
         fits.writeto(newFits,newdata,outHdr,overwrite=True)
         
+        return newFits
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")

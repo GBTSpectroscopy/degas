@@ -1,3 +1,4 @@
+from degas.products import makeMap
 from degas.analysis_setup import regridData, smoothCube
 from spectral_cube import SpectralCube
 
@@ -33,21 +34,26 @@ for hcn in hcnlist:
         # process HCN -- just need to smooth here because taking as base.
         hcn_cube = SpectralCube.read(hcn)
         beam = hcn_cube.beam.major.to('arcsec').value # assumes bmaj=bmin
-        shutil.copy(hcn,os.path.join(regridDir,os.path.basename(hcn)))
+        hcnOut = os.path.basename(hcn).replace('EMPIRE_','').replace(name.lower(),name).replace('hcn','HCN')
+        shutil.copy(hcn, os.path.join(regridDir,hcnOut))
 
         print("** processing " + name + " HCO+ **")
 
-        # process HCO+ -- smooth and regrid
+        # process HCO+ -- regrid -- already smoothed
         hcop = hcn.replace('hcn','hcop')
-        regridData(hcn,hcop,regridDir) 
-    
+        hcop_regrid = regridData(hcn,hcop,regridDir) 
+        hcopOut = hcop_regrid.replace('EMPIRE_','').replace(name.lower(),name).replace('hcop','HCOp')
+        os.rename(hcop_regrid,hcopOut)
+        
         print("processing " + name + " 13CO")
 
         # process 13CO -- smooth and regrid
         thirteenCO = hcn.replace('hcn','13co').replace('33as','27as')
         if os.path.exists(thirteenCO):
             thirteenCO_smooth = smoothCube(thirteenCO,releaseDir,beam=beam)
-            regridData(hcn, thirteenCO_smooth,regridDir)
+            thirteenCO_regrid = regridData(hcn, thirteenCO_smooth, regridDir)
+            thirteenCO_out = thirteenCO_regrid.replace('EMPIRE_','').replace(name.lower(),name).replace('13co','13CO').replace('27as','33as')
+            os.rename(thirteenCO_regrid,thirteenCO_out)
 
         print("processing " + name + " C18O")
 
@@ -55,7 +61,9 @@ for hcn in hcnlist:
         c18o = hcn.replace('hcn','c18o').replace('33as','27as')
         if os.path.exists(c18o):
             c18o_smooth = smoothCube(c18o, releaseDir, beam=beam)
-            regridData(hcn,c18o_smooth,regridDir)
+            c18o_regrid = regridData(hcn,c18o_smooth,regridDir)
+            c18o_out = c18o_regrid.replace('EMPIRE_','').replace(name.lower(),name).replace('c18o','C18O').replace('27as','33as')
+            os.rename(c18o_regrid, c18o_out)
 
         print("** processing " + name + " 12CO **")
 
@@ -63,51 +71,42 @@ for hcn in hcnlist:
         co = glob.glob(os.path.join(coDir,name+'_12CO??.fits'))[0]
         if os.path.exists(co):
             co_smooth = smoothCube(co, releaseDir, beam=beam)
-            regridData(hcn,co_smooth,regridDir)
+            co_regrid = regridData(hcn,co_smooth,regridDir)
 
-        # process CO products 
-
-        ##### START HERE ######
-        
-        ## TODO -- need to create mom1 and peakVelocity products with
-        ## appropriate resolution? Or do? I could just regrid the
-        ## higher resolution products?
-
-        # for product in ['mask','mask2D','mom0','mom1','peakInt','peakVelocity']:
-        #     if ( (product == 'mom0') or (product == 'peakInt')):
-        #         coproduct = glob.glob(os.path.join(coDir,name+'_12CO??_'+product+'.fits'))[0]
-        #     else:
-        #         coproduct = os.path.join(coDir,name+'_12CO_'+product+'.fits')
-        # if os.path.exists(coproduct):
-        #     if ((product is 'mask') or (product is 'mask2D')):
-        #         regridData(hcn_smooth,coproduct,regridDir,mask=True)
-        #     else:
-        #         regridData(hcn_smooth,coproduct,regridDir)
+        # process CO products         
+        makeMap(co_regrid,regridDir,maptype='peakIntensity')
+        makeMap(co_regrid,regridDir,maptype='peakVelocity')
+        makeMap(co_regrid,regridDir,maptype='moment',order=0)
+        makeMap(co_regrid,regridDir,maptype='moment',order=1)
 
         print("** processing " + name + " SFR **")
 
         # process SFR 
-        ## TODO -- smooth then regrid.
         sfr = name +'_sfr_fuvw4_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):   
             sfr_smooth = smoothCube(inFile, releaseDir,beam=beam)
-            regridData(hcn_smooth,sfr_smooth,regridDir)
+            # WARNING: Could not parse unit MSUN/YR/KPC2 [spectral_cube.cube_utils]
+            ## TODO -- CHECK TO MAKE SURE THIS IS OKAY.
+            regridData(hcn,sfr_smooth,regridDir)
 
         sfr = name+'_sfr_nuvw4_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
-            regridData(hcn_smooth,inFile,regridDir)
+            sfr_smooth = smoothCube(inFile, releaseDir,beam=beam)
+            regridData(hcn,inFile,regridDir)
 
         sfr = name+'_sfr_fuvw3_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
-            regridData(hcn_smooth,inFile,regridDir)
+            sfr_smooth = smoothCube(inFile, releaseDir, beam=beam)
+            regridData(hcn,inFile,regridDir)
 
         sfr = name+'_sfr_nuvw3_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
-            regridData(hcn_smooth,inFile,regridDir)
+            sfr_smooth = smoothCube(inFile, releaseDir, beam=beam)
+            regridData(hcn,inFile,regridDir)
 
         # process the stellar mass data
         print("** processing " + name + " Mstar **")
@@ -115,9 +114,13 @@ for hcn in hcnlist:
         mstar = name + "_mstar_gauss15.fits"
    
         if os.path.exists(os.path.join(multiDir,'data','mstarirac1',mstar)):
-            regridData(hcn_smooth, os.path.join(multiDir,'data','mstarirac1',mstar), regridDir)
+            inFile = os.path.join(multiDir,'data','mstarirac1',mstar)
+            mstar_smooth = smoothCube(inFile, releaseDir, beam=beam)
+            regridData(hcn, mstar_smooth, regridDir)
         elif os.path.exists(os.path.join(multiDir,'data','mstarw1',mstar)):
-            regridData(hcn_smooth, os.path.join(multiDir,'data','mstarw1',mstar), regridDir)
+            inFile = os.path.join(multiDir,'data','mstarw1',mstar)
+            mstar_smooth = smoothCube(inFile, releaseDir, beam=beam)
+            regridData(hcn, mstar_smooth, regridDir)
         else:
             print("No stellar mass map found!")
 
@@ -125,8 +128,10 @@ for hcn in hcnlist:
         print("** processing " + name + " LTIR **")
     
         ltir = name + "_LTIR_gauss15.fits"
-        if os.path.exists(os.path.join(multiDir,'data','LTIR_calc',ltir)):
-            regridData(hcn_smooth, os.path.join(multiDir,'data','LTIR_calc',ltir),regridDir)
+        inFile = os.path.join(multiDir,'data','LTIR_calc',ltir)
+        if os.path.exists(inFile):
+            ltir_smooth = smoothCube(inFile, releaseDir, beam=beam)
+            regridData(hcn, inFile,regridDir)
         else:
             print("No LTIR map found!")
                       

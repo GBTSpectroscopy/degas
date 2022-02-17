@@ -1,5 +1,6 @@
 from degas.products import makeMap
 from degas.analysis_setup import regridData, smoothCube
+from degas.masking import cubemask
 from spectral_cube import SpectralCube
 
 import glob
@@ -73,6 +74,27 @@ for hcn in hcnlist:
             co_smooth = smoothCube(co, releaseDir, beam=beam)
             co_regrid = regridData(hcn,co_smooth,regridDir)
 
+        # calculate 12CO masks (used in stacking initial noise estimate)
+        peakCut = 5.0
+        lowCut = 3.0
+        if name in ['NGC2903','NGC4321']:
+            # use phangs parameters to create mask
+            cubemask(co_regrid,
+                     name+'_12CO_mask.fits',
+                     outDir=regridDir,
+                     peakCut=peakCut, lowCut=lowCut,
+                     minBeamFrac=2.0,
+                     minNchan=3.0)
+        elif name in ['NGC5055','NGC6946']:
+            # use heracles parameters to create mask
+            cubemask(co_regrid,
+                     name+'_12CO_mask.fits',
+                     outDir=regridDir,
+                     peakCut=peakCut,lowCut=lowCut,
+                     minBeamFrac=1.5)
+        else:
+            print("no 12CO mask created")
+      
         # process CO products         
         makeMap(co_regrid,regridDir,maptype='peakIntensity')
         makeMap(co_regrid,regridDir,maptype='peakVelocity')
@@ -94,19 +116,19 @@ for hcn in hcnlist:
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
             sfr_smooth = smoothCube(inFile, releaseDir,beam=beam)
-            regridData(hcn,inFile,regridDir)
+            regridData(hcn,sfr_smooth,regridDir)
 
         sfr = name+'_sfr_fuvw3_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
             sfr_smooth = smoothCube(inFile, releaseDir, beam=beam)
-            regridData(hcn,inFile,regridDir)
+            regridData(hcn,sfr_smooth,regridDir)
 
         sfr = name+'_sfr_nuvw3_gauss15.fits' 
         inFile = os.path.join(multiDir,'data','sfr',sfr)
         if os.path.exists(inFile):
             sfr_smooth = smoothCube(inFile, releaseDir, beam=beam)
-            regridData(hcn,inFile,regridDir)
+            regridData(hcn,sfr_smooth,regridDir)
 
         # process the stellar mass data
         print("** processing " + name + " Mstar **")

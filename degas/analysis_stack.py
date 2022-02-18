@@ -1309,7 +1309,7 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
         print("Using " + cofile + " for 12CO")
         cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)               
     elif len(cofile) == 0: # if r21 file doesn't exist try 12CO10 (no conversion)
-        cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10_[!r21]*.fits'))
+        cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10_*.fits'))
         cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name))) ]
         
         if len(cofile) == 1:
@@ -1326,7 +1326,9 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
 
     # read in mask calculated earlier for each CO data set
     ## TODO: need to get 12CO masks for EMPIRE data.
-    maskfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO_mask.fits'))
+    maskfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO_mask_*.fits'))
+    if len(maskfile) == 0:
+        maskfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO_mask.fits'))     
     if len(maskfile) == 1:
         maskfile = maskfile[0]
         print("Using " + maskfile + " for 12CO mask for " + galaxy['NAME'])

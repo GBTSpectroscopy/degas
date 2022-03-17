@@ -1310,7 +1310,7 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
         cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)               
     elif len(cofile) == 0: # if r21 file doesn't exist try 12CO10 (no conversion)
         cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10_*.fits'))
-        cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name))) ]
+        cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name)) & (not re.search('peakVelocity',name)) & (not re.search('mom1',name)) ) ]
         
         if len(cofile) == 1:
             cofile = cofile[0]

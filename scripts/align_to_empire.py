@@ -149,10 +149,9 @@ for hcn in hcnlist:
         # process the stellar mass data
         print("** processing " + name + " LTIR **")
     
-        ltir = name + "_LTIR_gauss15.fits"
-        inFile = os.path.join(multiDir,'data','LTIR_calc',ltir)
+        ltir = name + "_LTIR_gauss33.fits"
+        inFile = os.path.join(multiDir,'data','LTIR_calc_33as',ltir)
         if os.path.exists(inFile):
-            ltir_smooth = smoothCube(inFile, releaseDir, beam=beam)
             regridData(hcn, inFile,regridDir)
         else:
             print("No LTIR map found!")

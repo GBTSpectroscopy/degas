@@ -659,6 +659,9 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
         
         ## Equation in Cluver+ 2017 
         ## (Figure 3, equation 2; See erratum for correct equation.).
+
+        ## TODO: the equation is in luminosity, so  I think I need to 
+        ## convert t surface brightness. Do this per pixel or per beam?
         a = 0.915
         b = 1.96
 
@@ -675,7 +678,7 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
 
         f23.close()   
 
-         # calculate LTIR using coefficients above
+        # calculate LTIR using coefficients above
         STIR_Lsunpc2 = 10**(a * np.log10(data23) + b)
 
         # write the output file
@@ -740,8 +743,13 @@ def smoothCube(fitsimage,outDir, beam=15.0):
 
     # determine ndim and bunit for other data sets
     f = fits.open(fitsimage)
-    ndim = f[0].header['NAXIS']
-    bunit = f[0].header['BUNIT']
+    ndim = f[0].header['NAXIS'] # has to have this, so not worth checking
+    
+    if 'BUNIT' in f[0].header:
+        bunit = f[0].header['BUNIT']
+    else:
+        bunit = None
+
     f.close()
 
     newFits = os.path.join(outDir,os.path.basename(fitsimage).replace(".fits","_smooth.fits"))
@@ -752,14 +760,16 @@ def smoothCube(fitsimage,outDir, beam=15.0):
         cube = SpectralCube.read(fitsimage)
     elif ndim == 2:
         vhdu = fits.open(fitsimage)
-        bunit = vhdu[0].header['BUNIT']
-        bunit = bunit.lower().replace('msun','Msun') # fix up bunit so
-                                                     # spectral unit
-                                                     # understands the
-                                                     # units.
+
+        if bunit:
+            bunit = vhdu[0].header['BUNIT']
+            # fix up bunits
+            bunit = bunit.lower().replace('msun','Msun') 
+            bunit = bunit.replace('mjy','MJy')
+
         ## TODO -- switch from spectral cube to straight astropy?
         cube = Projection.from_hdu(vhdu)
-        if cube.unit == u.Unit(""):
+        if (cube.unit == u.Unit("")) & bool(bunit):
             cube = cube * u.Unit(bunit)
     else:
         print("ndim not 2 or 3")

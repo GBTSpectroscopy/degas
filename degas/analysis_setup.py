@@ -5,7 +5,7 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 
-from spectral_cube import SpectralCube, Projection
+from spectral_cube import SpectralCube
 from radio_beam import Beam
 from astropy.convolution import Box1DKernel
 
@@ -321,27 +321,6 @@ def fixJialu(image,beam=15.0):
     interpCube.write(image.replace('8arcsec_fixed.fits','10kms_gauss15.fits'),
                      overwrite=True)
 
-
-def fixEMPIRE(fitsimage):
-    '''
-    Purpose: fix up EMPIRE data headers to work with SpectralCube
-    '''
-
-    # switch header from M/S to m/s to fix up wcs read errors with SpectralCube
-    f = fits.open(fitsimage)
-    f[0].header['CUNIT3'] = 'm/s'
-    newimage = fitsimage.replace('.fits','_fixed.fits')
-    f.writeto(newimage,overwrite=True)
-    f.close()
-    
-    # open image
-    cube = SpectralCube.read(newimage)    
-    
-    # switch to km/s
-    cube_kms = cube.with_spectral_unit(u.km / u.s)
-
-    # write out
-    cube_kms.write(newimage.replace('.fits','_kms.fits'),overwrite=True)
 
 #----------------------------------------------------------------------
 
@@ -659,9 +638,6 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
         
         ## Equation in Cluver+ 2017 
         ## (Figure 3, equation 2; See erratum for correct equation.).
-
-        ## TODO: the equation is in luminosity, so  I think I need to 
-        ## convert t surface brightness. Do this per pixel or per beam?
         a = 0.915
         b = 1.96
 
@@ -678,7 +654,7 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
 
         f23.close()   
 
-        # calculate LTIR using coefficients above
+         # calculate LTIR using coefficients above
         STIR_Lsunpc2 = 10**(a * np.log10(data23) + b)
 
         # write the output file
@@ -735,54 +711,19 @@ def smoothCube(fitsimage,outDir, beam=15.0):
     
     beam is the beam to smooth to in arcsec.
 
-    returns name of new fits file
-
     '''
 
     from radio_beam import Beam
 
-    # determine ndim and bunit for other data sets
-    f = fits.open(fitsimage)
-    ndim = f[0].header['NAXIS'] # has to have this, so not worth checking
-    
-    if 'BUNIT' in f[0].header:
-        bunit = f[0].header['BUNIT']
-    else:
-        bunit = None
-
-    f.close()
-
     newFits = os.path.join(outDir,os.path.basename(fitsimage).replace(".fits","_smooth.fits"))
 
     newBeam = Beam(beam*u.arcsec)
-
-    if ndim == 3:
-        cube = SpectralCube.read(fitsimage)
-    elif ndim == 2:
-        vhdu = fits.open(fitsimage)
-
-        if bunit:
-            bunit = vhdu[0].header['BUNIT']
-            # fix up bunits
-            bunit = bunit.lower().replace('msun','Msun') 
-            bunit = bunit.replace('mjy','MJy')
-
-        ## TODO -- switch from spectral cube to straight astropy?
-        cube = Projection.from_hdu(vhdu)
-        if (cube.unit == u.Unit("")) & bool(bunit):
-            cube = cube * u.Unit(bunit)
-    else:
-        print("ndim not 2 or 3")
-        return
-
+    
+    cube = SpectralCube.read(fitsimage)
     smoothCube = cube.convolve_to(newBeam)
-
-    #ipdb.set_trace()
-
+    
     smoothCube.write(newFits,overwrite=True)
     return newFits
-
-#----------------------------------------------------------------------
 
 def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     '''
@@ -801,7 +742,6 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     f = fits.open(otherDataFits)
     ndim = f[0].header['NAXIS']
     bunit = f[0].header['BUNIT']
-    # TODO: save beam information here for input into 2D header
     f.close()
 
     # output image name
@@ -830,9 +770,7 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
             newdata = newCube.filled_data[:,:,:]
             finalCube = SpectralCube(newdata,newCube.wcs,mask=baseCube.mask)
         
-        finalCube.with_spectral_unit(baseCube.spectral_axis.unit).with_beam(otherCube.beam).write(newFits,overwrite=True)
-        
-        return newFits
+        finalCube.with_spectral_unit(baseCube.spectral_axis.unit).write(newFits,overwrite=True)
 
     elif ndim == 2:
         
@@ -860,12 +798,10 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         # fix up header with input image units
         outHdr = baseCube.wcs.dropaxis(2).to_header()
         outHdr.append(('BUNIT',bunit))
-        ## TODO -- add beam info from otherDataFits
 
         # write out regridded data
         fits.writeto(newFits,newdata,outHdr,overwrite=True)
         
-        return newFits
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")

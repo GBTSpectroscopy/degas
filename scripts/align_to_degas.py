@@ -7,7 +7,6 @@ import shutil
 from astropy.table import Table
 
 release = 'IR6p1'
-#release = 'IR6p0'
 
 releaseDir = os.path.join(os.environ['ANALYSISDIR'],release)
 coDir = os.path.join(os.environ['ANALYSISDIR'],'CO')

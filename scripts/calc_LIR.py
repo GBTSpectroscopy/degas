@@ -17,7 +17,7 @@ if not os.path.exists(outDir):
 degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 # add in column for data source
-IRBanads = ['IR_24micron','IR_70micron','IR_100micron','IR_160micron']
+IRBands = ['IR_24micron','IR_70micron','IR_100micron','IR_160micron']
 
 for band in IRBands:
     if band in degas.colnames:

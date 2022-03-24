@@ -44,7 +44,6 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
              'HCOp': {'marker':'s','color':'blue','name':'HCO+'}, 
              '13CO': {'marker':'*','color':'red', 'name':'13CO'}, 
              'C18O': {'marker':'D','color': 'magenta','name':'C18O'}}
-
     
     # only look at dr1 galaxies
     gallist = degas_db[release] == 1
@@ -136,7 +135,7 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
 
     plot_name: name for plot file. format will be <galaxy name>_<plot_name>.pdf or *.png
 
-    styledict: dictionary to style plots (includes labels)
+    styledict: dictionary to style plots
 
     factordict: dictionary of factors to divide data by
     
@@ -180,11 +179,27 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
         colorlist = colorlist[0:nquant]
 
         styledict = {}
+
         for (quant,marker,color) in zip(plot_quant, markerlist,colorlist):
-            styledict[quant] = {'marker': marker, 'color': color, 'label':quant}
+            styledict[quant] = {'marker': marker, 'color': color}
 
+    # setup label information 
+    ## TO DO: move this up top so read in automatically?
+    labeldict = {'int_intensity_sum_CO': 'CO',
+                 'int_intensity_sum_HCN': 'HCN',
+                 'int_intensity_sum_HCOp': 'HCO+',
+                 'int_intensity_sum_13CO': '13CO',
+                 'int_intensity_sum_C18O': 'C18O',
+                 'comass_mean': r'$\Sigma_{CO}$ (M$_\odot/pc^2$)',
+                 'mstar_mean': r'$\Sigma_*$ (M$_\odot/pc^2$)',
+                 'sfr_mean': r'$\Sigma_{SFR}$ (M$_\odot/yr/pc^2$)',
+                 'ratio_HCN_CO': r'HCN/$^{12}$CO',
+                 'ratio_HCOp_CO': r'HCO+/$^{12}$CO',
+                 'ratio_13CO_CO': r'$^{13}$CO/$^{12}$CO',
+                 'ratio_C18O_CO': r'$C^{18}$O/$^{12}$CO',
+                 'ratio_HCOp_HCN': r'HCO+/HCN',
+                 'ratio_13CO_C18O': r'$^{13}$CO/$C^{18}$O'}
 
-  
     for galaxy in degas_db[gallist]:
 
         plt.close()
@@ -215,29 +230,6 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
 
         # plot each quantity
         for quant in plot_quant:
-                
-            # set to defaults if values don't exist in dictionary
-            if quant in styledict.keys():
-                if 'label' in styledict[quant].keys():
-                    mylabel = styledict[quant]['label']
-                else:
-                    mylabel = quant
-
-                if 'marker' in styledict[quant].keys(): 
-                    mymarker = styledict[quant]['marker']
-                else:
-                    mymarker = 'o'
-                    
-                if 'color' in styledict[quant].keys():
-                    mycolor = styledict[quant]['color']
-                else:
-                    mycolor = 'green'
-
-            else:
-                mylabel = quant
-                mymarker = 'o'
-                mycolor = 'green'
-                
 
             # get factor
             if factordict:            
@@ -245,13 +237,16 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
                     factor = factordict[quant]
                     
                     if factor >= 1:
-                        mylabel = mylabel + '/' + str(factor)
+                        mylabel = labeldict[quant] + '/' + str(factor)
                     else:
-                        mylabel = mylabel + "*" + "{:5.1e}".format(1/factor)
+                        mylabel = labeldict[quant] + "*" + "{:5.1e}".format(1/factor)
                 else:
                     factor = 1.0
+                    mylabel = labeldict[quant]                
             else:
                 factor = 1.0
+                mylabel = labeldict[quant]
+                    
 
             # get values to plot
             yvals = stack[idx][quant].data / factor
@@ -286,27 +281,31 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
                 lims = uplims | lolims
 
             # make plot
+
             plt.errorbar(xvals, yvals,
                          yerr = yerrs,
                          uplims = uplims,
                          lolims = lolims,
-                         marker = mymarker, 
+                         marker = styledict[quant]['marker'], 
                          markerfacecolor = 'none',
-                         markeredgecolor = mycolor, 
-                         color = mycolor,
+                         markeredgecolor = styledict[quant]['color'], 
+                         color = styledict[quant]['color'],
                          linestyle = '--')
 
             if np.any(lims):
                 plt.scatter(xvals[~lims], yvals[~lims],
-                            marker = mymarker,
-                            color = mycolor,
+                            marker = styledict[quant]['marker'],
+                            color = styledict[quant]['color'],
                             label = mylabel)
             else:
                 plt.scatter(xvals, yvals,
-                            marker = mymarker,
-                            color = mycolor,
+                            marker = styledict[quant]['marker'],
+                            color = styledict[quant]['color'],
                             label = mylabel)
 
+
+
+            
         # add info to plot
         if ylog:
             plt.yscale('log')

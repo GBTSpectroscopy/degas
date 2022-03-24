@@ -326,8 +326,41 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
 
         plt.close()
 
+#----------------------------------------------------------------------
 
+def compare_stacks_line(stack_list, stack_name_list, 
+                        empire_db,
+                        outdir = None,
+                        line='HCN',
+                        galaxy='NGC2903',
+                        dist=None):
 
+    # compare results of different stacks
+    for (stack,stack_name) in zip(stack_list, stack_name_list):
+        idx = (stack['galaxy'] == galaxy) & (stack['bin_type'] == 'radius')
+        
+        binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
+        binval = binval.value
+        int_intensity = stack[idx]['int_intensity_sum_'+line].value
+        int_intensity_err = stack[idx]['int_intensity_sum_'+line+'_err'].value
+        plt.errorbar(binval, int_intensity, yerr=int_intensity_err, marker='o',label=stack_name)
 
+    # add empire
+    idx = empire_db['ID'] == galaxy.lower()
+    plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
+                 yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
+                 marker='o',label='EMPIRE (pub)')
 
+    plt.yscale('log')
+    plt.legend()
+    plt.title(galaxy + ' - ' + line)
+    plt.xlabel('radius (kpc)')
+    plt.ylabel('I (K km/s)')
 
+    if outdir == None:
+        outDir = './'
+    
+    plt.savefig(os.path.join(outdir,galaxy + '_' + line + '_stack_compare.png'))
+    plt.savefig(os.path.join(outdir,galaxy + '_' + line + '_stack_compare.pdf'))
+
+    plt.close()

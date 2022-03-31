@@ -5,14 +5,25 @@ import numpy as np
 
 from degas.analysis_plot import plot_stack, plot_trends
 
+release = 'IR6p1'
+stacktype = 'peakVelocity'
+
+if stacktype == 'mom1':
+    stackDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
+elif stacktype == 'peakVelocity':
+    stackDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_'+stacktype)
+else:
+    print(stacktype+" unknown. Assuming directory name of stack_release.")
+    stackDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
+
 # setup information sources
-stack = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_IR6p1_mom1.fits'))
-stack_pruned = Table.read(os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_IR6p1_mom1_pruned.fits'))
+stack = Table.read(os.path.join(stackDir,'stack_'+release+'_'+stacktype+'.fits'))
+stack_pruned = Table.read(os.path.join(stackDir,'stack_'+release+'_'+stacktype+'_pruned.fits'))
 degas_db = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 # Plot individual stacks
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_plots')
+plot_dir =  os.path.join(stackDir,'stack_plots')
 
 binlist = ['radius','r25','mstar','ICO']
 #binlist = ['radius']
@@ -25,7 +36,7 @@ for bin_type in binlist:
     
 # plot trends
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_trends')
+plot_dir =  os.path.join(stackDir,'stack_trends')
 
 binlist = ['radius','r25','mstar','ICO']
 
@@ -100,7 +111,7 @@ for bin_type in binlist:
 
 # plot individual stacks after pruning
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_plots_pruned')
+plot_dir =  os.path.join(stackDir,'stack_plots_pruned')
 
 
 binlist = ['radius','r25','mstar','ICO']
@@ -113,7 +124,7 @@ for bin_type in binlist:
 
 # plot trends
 
-plot_dir =  os.path.join(os.environ['ANALYSISDIR'],'stack_IR6p1','stack_trends_pruned')
+plot_dir =  os.path.join(stackDir,'stack_trends_pruned')
 
 binlist = ['radius','r25','mstar','ICO']
 

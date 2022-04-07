@@ -17,11 +17,11 @@ stack_name_list = ['DEGAS', 'DEGAS (33 arcsec)',  'EMPIRE (DEGAS CODE)']
 overlaplist = ['NGC2903','NGC4321','NGC5055','NGC6946']
 linelist = ['HCN','HCOp','13CO','C18O']
 
-
 for galaxy in overlaplist:
 
-    dist = degas[degas['NAME'] == galaxy]['DIST_MPC'][0] * u.Mpc
+    #dist = degas[degas['NAME'] == galaxy]['DIST_MPC'][0] * u.Mpc
 
+    
     for line in linelist:
 
         compare_stacks_line(stack_list, stack_name_list, empire_db,

@@ -371,13 +371,13 @@ for galaxy in degas_table[idx_dr1]:
 
         # moment 1
         makeMap(cubeFile, maskDir,
-                #maskFile = os.path.join(maskDir,outName),
+                maskFile = os.path.join(maskDir,outName),
                 baseName=galaxy['NAME']+'_12CO',
                 maptype='moment',order=1)
 
         # peak Vel 
         makeMap(cubeFile,maskDir,
-                #maskFile = os.path.join(maskDir,outName),
+                maskFile = os.path.join(maskDir,outName),
                 baseName=galaxy['NAME']+'_12CO',
                 maptype='peakVelocity')
 

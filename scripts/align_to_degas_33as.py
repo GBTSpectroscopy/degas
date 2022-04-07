@@ -70,11 +70,6 @@ for hcn in hcnlist:
         co_smooth = smoothCube(co, releaseDir, beam=beam)
         co_regrid = regridData(hcn_smooth,co_smooth,regridDir)
     
-        # process CO products         
-        makeMap(co_regrid,regridDir,maptype='peakIntensity')
-        makeMap(co_regrid,regridDir,maptype='peakVelocity')
-        makeMap(co_regrid,regridDir,maptype='moment',order=0)
-        makeMap(co_regrid,regridDir,maptype='moment',order=1)
     
         #calculate 12CO masks (used in stacking initial noise estimate)
         peakCut = 5.0
@@ -164,8 +159,15 @@ for hcn in hcnlist:
             print("no 12CO mask created")
       
      
+        # process CO products         
+        maskFile = os.path.join(regridDir,name+'_12CO_mask.fits')
+        makeMap(co_regrid,regridDir,maptype='peakIntensity')
+        makeMap(co_regrid,regridDir,maptype='peakVelocity',maskFile=maskFile)
+        makeMap(co_regrid,regridDir,maptype='moment',order=0)
+        makeMap(co_regrid,regridDir,maptype='moment',order=1,maskFile=maskFile)
 
-        print("** processing " + name + " SFR **")
+
+    print("** processing " + name + " SFR **")
 
     # process SFR 
     sfr = name +'_sfr_fuvw4_gauss15.fits' 

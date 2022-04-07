@@ -1,15 +1,13 @@
-This directory holds analysis scripts and the central DEGAS
-database. The analyssi scripts assume that you have the following
-paths set in a shell script.
+# This directory holds analysis scripts and the central DEGAS
+# database. The analysis scripts assume that you have the following
+# paths set in a shell script.
 
 # Data Reduction
-export DEGASDIR=/lustre/cv/users/akepley/degas/reduction
-export GBTWEATHER=/lustre/cv/users/akepley/degas/reduction/GBTWeather/
+# export DEGASDIR=/lustre/cv/users/akepley/degas/reduction
+# export GBTWEATHER=/lustre/cv/users/akepley/degas/reduction/GBTWeather/
+# export SCRIPTDIR=/lustre/cv/users/akepley/degas/reduction/code/degas/scripts
+# export ANALYSISDIR=/lustre/cv/users/akepley/degas
 
-export SCRIPTDIR=/lustre/cv/users/akepley/degas/reduction/code/degas/scripts
-
-# Analysis
-export ANALYSISDIR=/lustre/cv/users/akepley/degas
 ## CO -- masks, mom0, mom1, peakInt, peakVel for 12CO -- not transformed
 ## ancillary_data -- outside data collection
 ## database -- outside databases
@@ -18,7 +16,7 @@ export ANALYSISDIR=/lustre/cv/users/akepley/degas
 ## IR5 -- release
 ## IR5_regrid -- regridded data for IR5?
 
-The full analysis is:
+# The full analysis is:
 
 #ipython --pylab
 
@@ -53,15 +51,21 @@ The full analysis is:
 # run the stacking analysis
 %run do_stack.py
 
+%run make_stack_plots.py
+
 # empire stacks
 
-%run fix_up_empire.py -- fix up empire cubes
-%run calc_LTIR_empire.py # calculate LTIR for 33arcsec case.
+%run fix_up_empire.py # -- fix up empire cubes
+%run calc_LIR_empire.py # calculate LTIR for 33arcsec case.
 %run align_to_empire.py # -- regridding empire data to match our code conventions
-%run do_CO21_recale_empire.py # do CO21 rescaling for empire data 
+
+%run do_CO21_rescale_empire.py # do CO21 rescaling for empire data 
 %run do_stack_empire.py # stack the empire data using our code
 
 # degas stacks at empire resolution
 %run align_to_degas_33as.py
-%run do_CO21_rescale_degas_33as.py
+
+%run do_CO21_rescale_degas_33as.
+
 %run do_stack_degas_33as.py
+

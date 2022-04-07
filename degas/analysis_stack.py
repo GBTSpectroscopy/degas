@@ -848,7 +848,7 @@ def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(
 
     chanwidth = spectral_axis[1] - spectral_axis[0]
 
-    lineFreeChans =  ((spectral_axis > velrange[1])  | (spectral_axis < velrange[0])) & (stack_profile != 0)
+    lineFreeChans =  ((spectral_axis >= velrange[1])  | (spectral_axis <= velrange[0])) & (stack_profile != 0)
 
     # mad is already scaled to gaussian distribution
     noisePerChan = mad(stack_profile[lineFreeChans]) * stack_profile.unit
@@ -877,12 +877,13 @@ def sumIntegratedIntensity(stack, line, outDir, fwhm=None, velrange=[-250,250]*(
 
     plt.axhspan(-3.0*noisePerChan.value, 3.0*noisePerChan.value, color='gray', alpha=0.2)
     
-    plt.axvspan(spectral_axis[lineChans][0].value,spectral_axis[lineChans][-1].value, color='blue',alpha=0.2)
+    if np.any(lineChans):
+        plt.axvspan(spectral_axis[lineChans][0].value,spectral_axis[lineChans][-1].value, color='blue',alpha=0.2)
 
     lineFreeRegs, nregs = label(lineFreeChans)
 
     for i in range(0, nregs+1):
-        if np.all(lineFreeChans[lineFreeRegs == i]):
+        if ((len(lineFreeChans[lineFreeRegs == i]) > 0) & (np.all(lineFreeChans[lineFreeRegs == i]))):
             plt.axvspan(spectral_axis[lineFreeRegs == i][0].value,
                         spectral_axis[lineFreeRegs == i][-1].value,
                         color='green',alpha=0.2)            

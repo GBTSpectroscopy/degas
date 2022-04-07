@@ -203,6 +203,8 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     4/29/2021   A.A. Kepley     Moved all calculations for galaxy here 
                                 instead of repeating per line.
     5/6/2021    A.A. Kepley     Modified so that all lines are calculated at once.
+    2/17/2021   A.A. Kepley     Generalized file names so can apply to empire 
+                                and degas.
 
     '''
 
@@ -215,32 +217,74 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     ltirmap = mapLTIR(galaxy, regridDir,outDir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy, comap) # comap is just used to get coordinates
 
-    velocity_file = galaxy['NAME']+'_12CO_'+vtype+'_regrid.fits' 
-    vhdu = fits.open(os.path.join(regridDir,velocity_file))
-    velocity = Projection.from_hdu(vhdu)
-
+    velocity_file = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO*_*'+vtype+'*.fits' ))
+    if len(velocity_file) == 1:
+        velocity_file = velocity_file[0]
+        print("Using " + velocity_file)
+        vhdu = fits.open(velocity_file)
+        velocity = Projection.from_hdu(vhdu)
+    elif len(velocity_file) > 1:
+        print("multiple velocity files found.")
+        print("Using " + velocity_file)
+        vhdu = fits.open(velocity_file)
+        velocity = Projection.from_hdu(vhdu)
+    else:
+        print("No velocity file found.")
+        return
+        
     # read in HCN
-    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCN_*_hanning1_maxnchan_smooth.fits'))[0]
-    cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile))
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCN_*.fits'))
+    if len(linefile) == 1:
+        linefile = linefile[0]
+        print("Using " + linefile + " for HCN")
+        cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile))
+    elif len(linefile) > 1:
+        print("More than one HCN line file for " + galaxy['NAME'])
+        linefile = linefile[0]
+        print("Using " + linefile + " for HCN")
+        cubeHCN = SpectralCube.read(os.path.join(regridDir,linefile))
+    else:
+        print("No HCN file for " + galaxy['NAME'])
+        cubeHCN = None
     
     # read in HCO+
-    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCOp_*_hanning1_smooth_regrid.fits'))[0]
-    cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile))
-
-    # For NGC6946, skip 13CO and C18O since we don't have that data.
-    # For NGC4569, we are temporarily missing data.
-    #if (galaxy['NAME'] != 'NGC6946') & (galaxy['NAME'] != 'NGC4569'):
-    if (galaxy['NAME'] != 'NGC6946'):
-        # read in 13CO
-        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*_hanning1_smooth_regrid.fits'))[0]
-        cube13CO = SpectralCube.read(os.path.join(regridDir,linefile))
-
-        # read in C18O
-        linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*_hanning1_smooth_regrid.fits'))[0]
-        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile))
-        
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_HCOp_*.fits'))
+    if len(linefile) == 1:
+        linefile = linefile[0]
+        print("Using " + linefile + " for HCOp")
+        cubeHCOp = SpectralCube.read(os.path.join(regridDir,linefile))        
+    elif len(linefile) > 1:
+        print("More than one HCOp line file for " + galaxy['NAME'])
+        cubeHCOp = None
     else:
+        print("No HCOp file for " + galaxy['NAME'])
+        cubeHCOp = None
+    
+
+    # read in 13CO
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_13CO_*.fits'))
+    if len(linefile) == 1:
+        linefile = linefile[0]
+        print("Using " + linefile + " for 13CO")
+        cube13CO = SpectralCube.read(os.path.join(regridDir,linefile))
+    elif len(linefile) > 1:
+        print("More than one 13CO line file for " + galaxy['NAME'])
         cube13CO = None
+    else:
+        print("No 13CO file for " + galaxy['NAME'])
+        cube13CO = None
+
+    # read in C18O 
+    linefile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_C18O_*.fits'))
+    if len(linefile) == 1:
+        linefile = linefile[0]
+        print("Using " + linefile + " for C18O")
+        cubeC18O = SpectralCube.read(os.path.join(regridDir,linefile))        
+    elif len(linefile) > 1:
+        print("More than one C18O line file for " + galaxy['NAME'])
+        cubeC18O = None
+    else:
+        print("No C18O file for " + galaxy['NAME'])
         cubeC18O = None
 
     #get the full stack result for each line
@@ -1223,7 +1267,7 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     plt.close()
 
 
-def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
+def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
 
     '''
     
@@ -1242,20 +1286,61 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
     12/3/2020   A.A. Kepley     Added comments and clarified inputs
     10/7/2021   A.A. Kepley     Removing sncut parameter and instead reading 
                                 in mom0 and error produced earlier.
+    2/27/2021   A.A. Kepley     generalized file name selection and added switch
+                                to choose r21
 
     '''
 
     # read in CO cube
-    cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_r21_simple_regrid.fits')
-    if not os.path.exists(cofile):
-        cofile = os.path.join(regridDir, galaxy['NAME']+'_12CO10_regrid.fits')
+    ### TODO -- ADD SWITCH HERE TO CHOOSE BETWEEN SIMPLE AND SIGMASFR?
+
+    cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10*r21_'+r21type+'*.fits'))
     
-    cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)       
+    # remove the moment and peak intensity maps
+    cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name))) ]
+    
+    if len(cofile) == 1:
+        cofile = cofile[0]
+        print("Using " + cofile + " for 12CO for "+ galaxy['NAME'])
+        cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)       
+    elif len(cofile) > 1:
+        print("More than one 12CO file for "+ galaxy['NAME'])
+        cofile = cofile[0]
+        print("Using " + cofile + " for 12CO")
+        cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)               
+    elif len(cofile) == 0: # if r21 file doesn't exist try 12CO10 (no conversion)
+        cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10_*.fits'))
+        cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name)) & (not re.search('peakVelocity',name)) & (not re.search('mom1',name)) ) ]
+        
+        if len(cofile) == 1:
+            cofile = cofile[0]
+            print("Using " + cofile + " for 12CO " + galaxy['NAME'])
+            cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)   
+        elif len(cofile) > 1:
+            print("More than one 12CO file for "+ galaxy['NAME'])
+            cofile = cofile[0]
+            print("Using " + cofile + " for 12CO")
+            cube = SpectralCube.read(cofile).with_spectral_unit(u.km / u.s)     
+        else:
+            print("No CO file found for " + galaxy['NAME'])
 
     # read in mask calculated earlier for each CO data set
-    mask = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
-    mask = mask.with_spectral_unit(u.km / u.s)
-
+    ## TODO: need to get 12CO masks for EMPIRE data.
+    maskfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO_mask_*.fits'))
+    if len(maskfile) == 0:
+        maskfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO_mask.fits'))     
+    if len(maskfile) == 1:
+        maskfile = maskfile[0]
+        print("Using " + maskfile + " for 12CO mask for " + galaxy['NAME'])
+        mask = SpectralCube.read(maskfile).with_spectral_unit(u.km / u.s)
+    elif len(maskfile) > 1:
+        print("More than 12CO mask file for " + galaxy['NAME'])
+        maskfile = maskfile[0]
+        print("Using " + maskfile + " for 12CO mask for " + galaxy['NAME'])
+        mask = SpectralCube.read(maskfile).with_spectral_unit(u.km / u.s)
+    else:
+        print("No CO Mask file found for " + galaxy['NAME'])
+        
     # calculate noise
     madstd = cube.mad_std(how='cube') #K #raw cube
     chanwidth = np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
@@ -1290,68 +1375,6 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0 ):
 
     return cube, mom0masked
  
-    
-    
-    # read in CO moment map
-    #mom0file = os.path.join(regridDir,galaxy['NAME']+'_12CO10_r21_simple_mom0_regrid.fits')
-    #if not os.path.exists(mom0file):
-    #    mom0file =  os.path.join(regridDir,galaxy['NAME']+'_12CO10_mom0_regrid.fits')
-
-    #hdu = fits.open(mom0file)[0]
-    #data = hdu.data
-
-    ## is this what I want below?
-    #if mask:
-    #    data[np.isnan(mask)]=np.nan #apply SN mask (SN >3)
-
-    #comap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT']) 
-    #comap.quicklook()
-
-    #plt.savefig(os.path.join(outDir,galaxy['NAME']+'_CO.png'))
-    #plt.clf()
-    #plt.close()
-
-    #return cube, comap
-
-    # sncut=3.0
-
-    # # read in cube
-    # cube = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_regrid.fits'))
-    # cube = cube.with_spectral_unit(u.km / u.s)
-
-    # # read in mask
-    # mask = SpectralCube.read(os.path.join(regridDir, galaxy['NAME']+'_12CO_mask_regrid.fits'))
-    # mask = mask.with_spectral_unit(u.km / u.s)
-
-    # # calculate noise
-    # madstd = cube.mad_std(how='cube') #K #raw cube
-    # chanwidth = np.abs(cube.spectral_axis[0]-cube.spectral_axis[1]) #channel width is same for all channels, km/s
-    # masksum = mask.sum(axis=0) #map number of unmasked pixels 
-    # noise = np.sqrt(masksum)*(madstd*chanwidth) #moment0 error map, in K km/s ## TODO: CHECK MATH HERE
-
-    # #mask datacube
-    # masked_cube = cube.with_mask(mask==1.0*u.dimensionless_unscaled) 
-    # mom0 = masked_cube.moment(order=0)
-    # snmap = mom0/noise #should be unitless #mom0 is from masked cube
-    # snmap[snmap==np.inf]=np.nan #convert division by zero to nan
-
-    # # write the resulting map to fits 
-    # snmap.write(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.fits'), overwrite=True)
-    # snmap.quicklook()
-    # plt.savefig(os.path.join(outDir, galaxy['NAME'].upper()+'_SNmap.png'))
-    # plt.close()
-    # plt.clf()
-
-    # #get rid of parts of mom0 where S/N < S/N cut
-    # mom0cut = mom0.copy()
-    # sn = np.nan_to_num(snmap.value)
-    # mom0cut[sn<sncut] = np.nan #blank out low sn regions
-
-    # #use sigma-clipped mom0 as new 2D mask for the original cube to preserve noise in signal-free channel
-    # mom0mask = ~np.isnan(mom0cut)
-    # masked_cube = cube.with_mask(mom0mask) #use for stacking later
-
-    # return mom0cut, masked_cube, mom0mask
 
 def mapStellar(galaxy, regridDir, outDir, mask=None):
     '''
@@ -1371,11 +1394,17 @@ def mapStellar(galaxy, regridDir, outDir, mask=None):
     10/29/2020  Yiqing Song     Original Code
     12/3/2020   A.A. Kepley     Added comments and clarified inputs
     10/07/2021  A.A. Kepley     made mask optional
-
+    2/17/2022   A.A. Kepley     generalizing file names
+    
     '''
 
     # open the stellar mass
-    stellarhdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_mstar_gauss15_regrid.fits'))[0]
+    sfrfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_mstar_*.fits'))[0]
+    if os.path.exists(sfrfile):
+        stellarhdu = fits.open(sfrfile)[0]
+    else:
+        print("SFR file doesn't exist for " + galaxy['NAME'])
+        return
 
     stellar = stellarhdu.data
     #stellar[starmask==1.0]=np.nan #apply star mask ## AAK: I think I can skip this.
@@ -1411,10 +1440,16 @@ def mapLTIR(galaxy, regridDir, outDir, mask=None):
      Date        Programmer      Description of Changes
     ----------------------------------------------------------------------
     12/10/2020  A.A. Kepley      Original code based on mapStellar
+    2/17/2022   A.A. Kepley     Generalized file names.
 
     '''
 
-    hdu=fits.open(os.path.join(regridDir,galaxy['NAME']+'_LTIR_gauss15_regrid.fits'))[0]
+    ltirfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_LTIR_*.fits'))[0]
+    if os.path.exists(ltirfile):        
+        hdu=fits.open(ltirfile)[0]
+    else:
+        print("LTIR file doesn't exist for " + galaxy['NAME'])
+        return
 
     data=hdu.data
 
@@ -1441,7 +1476,9 @@ def mapSFR(galaxy, regridDir, outDir, mask=None):
     10/7/2021   A.A. Kepley     Made mask optional
     '''
     
-    sfrhdu = fits.open(os.path.join(regridDir,galaxy['NAME']+'_sfr_fuvw4_gauss15_regrid.fits'))[0]
+    sfrfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_sfr_fuvw4_*.fits'))[0]
+    if os.path.exists(sfrfile):
+        sfrhdu = fits.open(sfrfile)[0]
     sfr = sfrhdu.data
     if mask:
         sfr[np.isnan(mask)] = np.nan

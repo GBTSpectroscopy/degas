@@ -4,7 +4,8 @@
 # Date          Programmer      Description of Changes
 #----------------------------------------------------------------------
 # 10/20/21      A.A. Kepley     Original Code
-
+# 2/27/2022     A.A. Kepley     redoing for overlap galaxies between 
+#                               EMPIRE and DEGAS
 
 import os
 
@@ -18,7 +19,7 @@ import astropy.units as u
 import ipdb
 
 #release = 'IR6p1'
-release = 'IR6p0'
+release = 'empire'
 
 # set up relevant directories
 analysisDir = os.environ['ANALYSISDIR']
@@ -27,7 +28,9 @@ dataDir = os.path.join(analysisDir,release+'_regrid')
 
 # read in degas table
 degas = Table.read(os.path.join(scriptDir,"degas_base.fits"))
-idx_dr1 = degas['DR1'] == 1
+#idx_dr1 = degas['DR1'] == 1
+## select the empire/degas overlap galaxies
+idx_dr1 = ((degas['NAME'] == 'NGC2903') | (degas['NAME'] == 'NGC4321') | (degas['NAME'] == 'NGC5055') | (degas['NAME'] == 'NGC6946'))
 
 # set fiducial value
 r21 = 0.65 # mean R21 value from Leroy+ 2021
@@ -44,10 +47,10 @@ for galaxy in degas[idx_dr1]:
          (galaxy['MASK'] == 'everyHERACLES_Andreas') ):
         
         # Do the simple scaling by a single value
-        cube = os.path.join(dataDir,galaxy['NAME']+"_12CO21_regrid.fits")
-        mom0 = os.path.join(dataDir,galaxy['NAME']+"_12CO21_mom0_regrid.fits")
-        peakInt = os.path.join(dataDir,galaxy['NAME']+"_12CO21_peakInt_regrid.fits")
-        sigmaSFR = os.path.join(dataDir,galaxy['NAME']+"_sfr_fuvw4_gauss15_regrid.fits")
+        cube = os.path.join(dataDir,galaxy['NAME']+"_12CO21_smooth_regrid.fits")
+        mom0 = os.path.join(dataDir,galaxy['NAME']+"_12CO21_smooth_regrid_mom0.fits")
+        peakInt = os.path.join(dataDir,galaxy['NAME']+"_12CO21_smooth_regrid_peakInt.fits")
+        sigmaSFR = os.path.join(dataDir,galaxy['NAME']+"_sfr_fuvw4_gauss15_smooth_regrid.fits")
 
         simpleR21scale(cube,r21,r21_ref=r21_ref)
         simpleR21scale(mom0,r21,r21_ref=r21_ref)

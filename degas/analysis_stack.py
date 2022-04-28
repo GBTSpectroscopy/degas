@@ -121,7 +121,7 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
     return stack_pruned
     
 
-def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None):
+def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None, database='degas_base.fits'):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
@@ -152,8 +152,10 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
     from datetime import datetime
 
     # get list of dr1 galaxies
-    degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
+    degas = Table.read(os.path.join(scriptDir,database))
     idx = degas[release] == 1
+
+    #ipdb.set_trace()
 
     if not sourceList:
         sourceList = degas[idx]['NAME']

@@ -340,6 +340,7 @@ def compare_stacks_line(stack_list, stack_name_list,
         idx = (stack['galaxy'] == galaxy) & (stack['bin_type'] == 'radius')
         
         binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
+        #binval = dist.to('kpc') * stack[idx]['bin_lower']/206265.0
         binval = binval.value
         int_intensity = stack[idx]['int_intensity_sum_'+line].value
         int_intensity_err = stack[idx]['int_intensity_sum_'+line+'_err'].value

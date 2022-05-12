@@ -6,6 +6,7 @@ import numpy as np
 from degas.analysis_plot import plot_stack, plot_trends
 
 release = 'IR6p1'
+#stacktype = 'mom1'
 stacktype = 'peakVelocity'
 
 if stacktype == 'mom1':

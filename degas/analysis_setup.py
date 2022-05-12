@@ -729,6 +729,50 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
         
 #----------------------------------------------------------------------
 
+def colorCorrect_24micron(b24, b70, outFile, beam=30.0):
+    '''
+
+    color correct the 24micron only data with lower resolution
+    70micron data.
+
+    Date        Programmer      Description of Code
+    ----------------------------------------------------------------------
+    5/5/2022    A.A. Kepley     Original Code
+    '''
+
+    # get some names set up
+    b70_dir = os.path.dirname(b70)
+    b24_name = os.path.basename(b24)
+    galname = b24_name.split('_')[0]
+
+    # smooth 24micron data
+    # TODO -- determine the beam to smooth to
+    # from the 70micron data directly
+    b24_smoothed = smoothCube(b24,b70_dir, beam=beam)
+        
+    # calculate LTIR of smoothed data
+    LTIRFile = os.path.join(b70_dir, galname+'_LTIR_b24_b70.fits')
+    calc_LTIR(LTIRFile, b24=b24_smoothed, b70=b70)
+
+    # get necessary data
+    LTIR = fits.open(outFile)[0].data
+    b24_data = fits.open(b24)[0].data
+    b24_hdr = fits.open(b24)[0].header
+    b24_smoothed_data = fits.open(b24_smoothed)[0].data
+    
+    # calculate the 24micron to LTIR ratio for the smoothed data
+    ratio = b24_smoothed_data / LTIR
+    
+    # correct the unsmoothed 24micron data
+    LTIR_corrected = b24_data / ratio
+
+    b24_hdr['BUNIT'] = 'Lsun/pc^2'
+
+    # write out the results
+    fits.writeto(outFile, LTIR_corrected, header=b24_hdr, overwrite=True)
+
+#----------------------------------------------------------------------
+
 def smoothCube(fitsimage,outDir, beam=15.0):
     '''
     Smoothes input cube to given resolution

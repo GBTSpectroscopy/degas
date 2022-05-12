@@ -1,4 +1,4 @@
-from degas.analysis_setup import calc_LTIR
+from degas.analysis_setup import calc_LTIR, colorCorrect_24micron
 from astropy.table import Table, Column
 from astropy.io import fits
 import numpy as np
@@ -17,7 +17,7 @@ if not os.path.exists(outDir):
 degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 # add in column for data source
-IRBanads = ['IR_24micron','IR_70micron','IR_100micron','IR_160micron']
+IRBands = ['IR_24micron','IR_70micron','IR_100micron','IR_160micron']
 
 for band in IRBands:
     if band in degas.colnames:
@@ -40,6 +40,11 @@ for galaxy in degas:
     elif os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_sings_release_mips24_gauss15.fits")):
         b24 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_sings_release_mips24_gauss15.fits")
         b24_src = 'SINGS'
+
+    # look for w4 interpolated images
+    elif os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")):
+        b24 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")
+        b24_src = 'W4'
 
     else:
         b24 = None
@@ -105,13 +110,7 @@ for galaxy in degas:
    
     degas['IR_160micron'][degas['NAME'] == galaxy['NAME']] = b160_src
 
-    # look for w4 interpolated images
-    if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")):
-        w4 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w4_gauss15_interpol.fits")
-    else:
-        w4 = None
-        print("w4 image not found.")    
-     
+  
     # look for w3 interpolated images
     # if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")):
     #     w3 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")
@@ -119,8 +118,21 @@ for galaxy in degas:
     #     w3 = None
     #     print("w3 image not found.")
 
- 
+    ## color correct the images that have only 24micron, but do have
+    ## lower resolution 70micron.
     outFile = os.path.join(outDir,galaxy['NAME']+"_LTIR_gauss15.fits")
-    calc_LTIR(outFile,b24=b24,b70=b70, b100=b100,b160=b160, w4=w4)
+    if b24 and not b70 and not b100 and not b160 and b24_src is 'LVL':
+
+        print('LVL only -- color correcting LTIR')
+
+        TIRDir_30arc = TIRDir.replace('convolved15arc','over15arc')
+
+        b70 = os.path.join(TIRDir_30arc,galaxy['NAME'].lower()+'_lvl_release_mips70_gauss30.fits')
+        if os.path.exists(b70):
+            colorCorrect_24micron(b24, b70,outFile)
+
+    # otherwise just calculate the LTIR at the given resolution
+    else:
+        calc_LTIR(outFile,b24=b24,b70=b70, b100=b100,b160=b160)
 
 degas.write(os.path.join(os.environ['SCRIPTDIR'],"degas_base.fits"),overwrite=True)

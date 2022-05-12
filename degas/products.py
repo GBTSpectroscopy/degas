@@ -60,6 +60,8 @@ def makeMap(cubeFile, outDir, baseName=None,maskFile='',maptype='peakIntensity',
         outname = baseName+'_mom'+str(order)+'.fits'
 
     elif maptype is 'peakVelocity':
+        ### TO DO: Is there a way to do this more directly
+        ### in spectral cube?? This seems a bit round about.
         velocity = maskedCube.spectral_axis
         mask = np.sum(maskedCube.get_mask_array(),axis=0) > 1.0
         newwcs = maskedCube.wcs.dropaxis(2)

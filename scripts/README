@@ -48,6 +48,8 @@
 # rescale the 12CO(2-1) data.
 %run do_CO21_rescale.py # more convenient here because the sigma_SFR map is already regridded.
 
+## HERE
+
 # run the stacking analysis
 %run do_stack.py
 

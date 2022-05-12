@@ -23,22 +23,25 @@ idx = degas['DR1'] == 1
 
 outfile = os.path.join(os.environ['ANALYSISDIR'],'tables','IR_data_table.tex')
 
-header = '''\\begin{deluxetable}{rrrrr}
+header = '''\\begin{deluxetable}{rrrrrrr}
 \\tablewidth{0pt}
 \\tabletypesize{\scriptsize}
-\\tablecaption{Source of Ancillary IR Data \label{tab:ir_data}}
-\\tablecolumns{5}
+\\tablecaption{Source of Ancillary Data \label{tab:ir_data}}
+\\tablecolumns{7}
 \\tablehead{
         \colhead{Name} & 
+        \colhead{\\twelveCO} &
+        \colhead{Transition} &
         \colhead{$24\micron$} &
         \colhead{$70\micron$} & 
         \colhead{$100\micron$} &
         \colhead{$160\micron$} }
+
 \startdata
 '''
 
 footer = '''\enddata
-\\tablecomments{BENDO: \citet{Bendo2012}, LVL: \citet{Dale2009}, SINGS: \citet{Kennicutt2003}, KINGFISH: \citet{Kennicutt2011}, HRS: \citet{Boselli2010}, VNGS: \citet{Bendo2012a}}
+\\tablecomments{Heracles: \citet{Leroy2009Heracles:Survey}, GBT: Li et al. in prep, PHANGS: \citet{Leroy2021}, everyHERACLES: Schruba et al. in prep, Wilson: Wilson et al. in prep, BENDO: \citet{Bendo2012}, LVL: \citet{Dale2009}, SINGS: \citet{Kennicutt2003}, KINGFISH: \citet{Kennicutt2011}, HRS: \citet{Boselli2010}, VNGS: \citet{Bendo2012a}, z0mgs: \citet{Leroy2019}}
 \\end{deluxetable}
 '''
 #----------------------------------------------------------------------
@@ -57,8 +60,20 @@ for galaxy in degas[idx]:
     for band in irbands:
         if not galaxy[band]:
             galaxy[band] = '\\nodata'
+
+    if galaxy['MASK'] == 'everyHERACLES_Andreas':
+        codata = 'everyHERACLES'
+    else:
+        codata = galaxy['MASK']
     
-    line = "{0} & {1} & {2} & {3}& {4} \\\\ \n".format(galaxy['NAME'],
+    if ((codata == 'everyHERACLES') or (codata == 'PHANGS') or (codata == 'HERACLES')):
+        coline = '\co{12}{2}{1}'
+    else:
+        coline = '\co{12}{1}{0}'
+    
+    line = "{0} & {1} & {2} & {3}& {4} & {5}& {6}\\\\ \n".format(galaxy['NAME'],
+                                                       codata,
+                                                       coline,
                                                        galaxy['IR_24micron'],
                                                        galaxy['IR_70micron'],
                                                        galaxy['IR_100micron'],

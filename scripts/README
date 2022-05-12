@@ -48,26 +48,25 @@
 # rescale the 12CO(2-1) data.
 %run do_CO21_rescale.py # more convenient here because the sigma_SFR map is already regridded.
 
-## HERE
-
 # run the stacking analysis
 %run do_stack.py
 
 %run make_stack_plots.py
 
 # empire stacks
-
 %run fix_up_empire.py # -- fix up empire cubes
 %run calc_LIR_empire.py # calculate LTIR for 33arcsec case.
 %run align_to_empire.py # -- regridding empire data to match our code conventions
-
 %run do_CO21_rescale_empire.py # do CO21 rescaling for empire data 
 %run do_stack_empire.py # stack the empire data using our code
 
 # degas stacks at empire resolution
 %run align_to_degas_33as.py
-
 %run do_CO21_rescale_degas_33as.
-
 %run do_stack_degas_33as.py
 
+# alma HCN stacks at empire resolution.
+%run fix_up_alma.py ## fix up headers on alma cubes
+%run align_to_alma.py ## smooth to 33 arcsec and regrid images
+%run do_CO21_rescale_alma.py ## do CO21 rescaling for alma data 
+%run do_stack_alma_hcn.py

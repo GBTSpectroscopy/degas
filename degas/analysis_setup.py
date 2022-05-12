@@ -343,6 +343,16 @@ def fixEMPIRE(fitsimage):
     # write out
     cube_kms.write(newimage.replace('.fits','_kms.fits'),overwrite=True)
 
+def fixALMAHCN(fitsimage):
+    '''
+    fix up ALMA HCN data
+    '''
+    
+    cube = SpectralCube.read(fitsimage)
+    cube_kms = cube.with_spectral_unit(u.km / u.s)
+    cube_kms.write(fitsimage.replace('.fits','_kms.fits'),overwrite=True)
+
+
 #----------------------------------------------------------------------
 
 def calc_stellar_mass(iracFile, MtoLFile, outFile):

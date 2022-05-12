@@ -13,9 +13,13 @@ stack = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1/stack_IR6p1_mom1_
 stack_empire = Table.read('/lustre/cv/users/akepley/degas/stack_empire/stack_empire_mom1.fits')
 stack_33as = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1_33as/stack_IR6p1_33as_mom1_pruned.fits')
 stack_empire_wempireparams = Table.read('/lustre/cv/users/akepley/degas/stack_empire_wempireparams/stack_empire_mom1.fits')
+stack_alma = Table.read('/lustre/cv/users/akepley/degas/stack_alma_hcn/stack_alma_hcn_mom1_pruned.fits')
 
-stack_list = [stack,  stack_33as, stack_empire,stack_empire_wempireparams]
-stack_name_list = ['DEGAS', 'DEGAS (33 arcsec)',  'EMPIRE (DEGAS CODE)', 'EMPIRE (DEGAS CODE, EMPIRE PARAMS)']
+#stack_list = [stack,  stack_33as, stack_empire,stack_empire_wempireparams,stack_alma]
+#stack_name_list = ['DEGAS', 'DEGAS (33 arcsec)',  'EMPIRE (DEGAS CODE)', 'EMPIRE (DEGAS CODE, EMPIRE PARAMS)','ALMA 7m+TP']
+
+stack_list = [stack_33as, stack_empire,stack_alma]
+stack_name_list = ['DEGAS (33 arcsec)',  'EMPIRE (DEGAS CODE)','ALMA 7m+TP']
 
 overlaplist = ['NGC2903','NGC4321','NGC5055','NGC6946']
 linelist = ['HCN','HCOp','13CO','C18O']
@@ -31,7 +35,9 @@ for galaxy in overlaplist:
                             outdir = '/lustre/cv/users/akepley/degas/empire_degas_comp',
                             line = line,
                             galaxy = galaxy,
-                            dist = dist)
+                            dist = dist,
+                            ylim = (0.05,5),
+                            xlim = (0,7))
 
 
 

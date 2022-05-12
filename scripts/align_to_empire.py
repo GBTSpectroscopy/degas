@@ -32,7 +32,7 @@ for hcn in hcnlist:
 
         print("** processing " + name + " HCN **")
 
-        # process HCN -- just need to smooth here because taking as base.
+        # process HCN -- don't need to smooth here because taking as base.
         hcn_cube = SpectralCube.read(hcn)
         beam = hcn_cube.beam.major.to('arcsec').value # assumes bmaj=bmin
         hcnOut = os.path.basename(hcn).replace('EMPIRE_','').replace(name.lower(),name).replace('hcn','HCN')

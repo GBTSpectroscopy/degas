@@ -947,7 +947,7 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
     # setup plot
     plt.clf()
-    fig = plt.figure(figsize=(8,6))
+    fig = plt.figure(figsize=(8,6),facecolor='white',edgecolor='white')
     gs = gridspec.GridSpec(2,1,height_ratios=[4,1])
     ax0 = plt.subplot(gs[0])
     ax1 = plt.subplot(gs[1])
@@ -986,12 +986,15 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
     pars_g1['amplitude'].min = noisePerChan.value
 
     g1Fit = g1.fit(stack_profile.value,pars_g1,x=spectral_axis.value,weights=weights)
-
+    tmp_int = integrate.trapezoid(g1Fit.best_fit*stack_profile.unit,
+                                  x=spectral_axis)
+    
     #print(g1Fit.fit_report())
 
     ax0.plot(spectral_axis,g1Fit.best_fit,label='1 Gauss')
     
-    ax0.text(0.07,0.85,'1 Gauss BIC='+str(g1Fit.bic), transform=ax0.transAxes)
+    ax0.text(0.07,0.85,'1 Gauss BIC='+str(g1Fit.bic)+"; " + str(tmp_int), transform=ax0.transAxes)
+
 
     if (dcOffsetFit.bic > g1Fit.bic):
         # single gaussian is better than line, so try a 2 gaussian fit.
@@ -1019,11 +1022,14 @@ def fitIntegratedIntensity(stack, line, outDir, fwhm=None, maxAbsVel=250 * u.km/
 
         g2Fit = g2.fit(stack_profile.value, pars_g2, x=spectral_axis.value,weights=weights)
 
+        tmp_int = integrate.trapezoid(g2Fit.best_fit*stack_profile.unit,
+                                      x=spectral_axis)
+
         # print(g2Fit.fit_report())
 
         ax0.plot(spectral_axis,g2Fit.best_fit,label='2 Gauss')
         
-        ax0.text(0.07,0.8,'2 Gauss BIC='+str(g2Fit.bic), transform=ax0.transAxes)
+        ax0.text(0.07,0.8,'2 Gauss BIC='+str(g2Fit.bic)+"; "+str(tmp_int), transform=ax0.transAxes)
 
         if g2Fit.bic > g1Fit.bic:
             # single gaussian fit best -- revert to single gaussian

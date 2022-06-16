@@ -333,10 +333,18 @@ def compare_stacks_line(stack_list, stack_name_list,
                         outdir = None,
                         line='HCN',
                         galaxy='NGC2903',
-                        dist=None):
+                        dist=None,
+                        ylim=None,
+                        xlim=None):
+    
+    nquant = len(stack_list)
+    markers = ['o','^','s','*','D','>'] # 5 items
+    markerlist = np.tile(markers,int(np.ceil(nquant/len(markers))))
+    markerlist = markerlist[0:nquant]
+    
 
     # compare results of different stacks
-    for (stack,stack_name) in zip(stack_list, stack_name_list):
+    for (stack,stack_name,marker) in zip(stack_list, stack_name_list,markerlist):
         idx = (stack['galaxy'] == galaxy) & (stack['bin_type'] == 'radius')
         
         binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
@@ -344,13 +352,20 @@ def compare_stacks_line(stack_list, stack_name_list,
         binval = binval.value
         int_intensity = stack[idx]['int_intensity_sum_'+line].value
         int_intensity_err = stack[idx]['int_intensity_sum_'+line+'_err'].value
-        plt.errorbar(binval, int_intensity, yerr=int_intensity_err, marker='o',label=stack_name)
+        plt.errorbar(binval, int_intensity, yerr=int_intensity_err, marker=marker,label=stack_name)
 
     # add empire
     idx = empire_db['ID'] == galaxy.lower()
     plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
                  yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
                  marker='o',label='EMPIRE (pub)')
+
+    if ylim:
+        plt.ylim(ylim)
+        
+
+    if xlim:
+        plt.xlim(xlim)
 
     plt.yscale('log')
     plt.legend()

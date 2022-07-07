@@ -17,7 +17,7 @@ if not os.path.exists(outDir):
 degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 # add in column for data source
-IRBands = ['IR_24micron','IR_70micron','IR_100micron','IR_160micron']
+IRBands = ['IR_24micron_only','IR_24micron','IR_70micron','IR_100micron','IR_160micron']
 
 for band in IRBands:
     if band in degas.colnames:
@@ -49,10 +49,7 @@ for galaxy in degas:
     else:
         b24 = None
         b24_src = ''
-        print("24micron image not found")
-
-    degas['IR_24micron'][degas['NAME'] == galaxy['NAME']] = b24_src
-    
+        print("24micron image not found")    
 
     # look for 70micron images
     if os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_kingfish_pacs70_gauss15.fits")):
@@ -68,7 +65,7 @@ for galaxy in degas:
         b70_src = ''
         print("70micron image not found")
 
-    degas['IR_70micron'][degas['NAME'] == galaxy['NAME']] = b70_src
+
 
 
     # look for 100micron image
@@ -88,8 +85,6 @@ for galaxy in degas:
         b100_src = ''
         print("100micron image not found")
 
-    degas['IR_100micron'][degas['NAME'] == galaxy['NAME']] = b100_src
-
     #look for 160 micron image
     if os.path.exists(os.path.join(TIRDir,galaxy['NAME'].lower()+"_kingfish_pacs160_gauss15.fits")):
         b160 = os.path.join(TIRDir,galaxy['NAME'].lower()+"_kingfish_pacs160_gauss15.fits")
@@ -108,9 +103,6 @@ for galaxy in degas:
         b160_src = ''
         print("160micron image not found")
    
-    degas['IR_160micron'][degas['NAME'] == galaxy['NAME']] = b160_src
-
-  
     # look for w3 interpolated images
     # if os.path.exists(os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")):
     #     w3 = os.path.join(z0mgsDir,galaxy['NAME'].lower()+"_w3_gauss15_interpol.fits")
@@ -131,8 +123,34 @@ for galaxy in degas:
         if os.path.exists(b70):
             colorCorrect_24micron(b24, b70,outFile)
 
-    # otherwise just calculate the LTIR at the given resolution
+        degas['IR_24micron'][degas['NAME'] == galaxy['NAME']] = b24_src
+        degas['IR_70micron'][degas['NAME'] == galaxy['NAME']] = 'LVL_gauss30'
+        degas['IR_100micron'][degas['NAME'] == galaxy['NAME']] = b100_src
+        degas['IR_160micron'][degas['NAME'] == galaxy['NAME']] = b160_src
+
+
+    # don't use W4 images to calculate LTIR if you have b70,b100,b160 otherwise
+    elif b24_src == 'W4' and (b70 or b100 or b160):
+        calc_LTIR(outFile,b70=b70,b100=b100,b160=b160)
+
+        degas['IR_24micron'][degas['NAME'] == galaxy['NAME']] = '' ## don't use W4 images to calculate LTIR if you have b70, b100, and b160
+        degas['IR_70micron'][degas['NAME'] == galaxy['NAME']] = b70_src
+        degas['IR_100micron'][degas['NAME'] == galaxy['NAME']] = b100_src
+        degas['IR_160micron'][degas['NAME'] == galaxy['NAME']] = b160_src
+
+
+    # otherwise just calculate the LTIR at the given resolution using all images.
     else:
         calc_LTIR(outFile,b24=b24,b70=b70, b100=b100,b160=b160)
+        degas['IR_24micron'][degas['NAME'] == galaxy['NAME']] = b24_src
+        degas['IR_70micron'][degas['NAME'] == galaxy['NAME']] = b70_src
+        degas['IR_100micron'][degas['NAME'] == galaxy['NAME']] = b100_src
+        degas['IR_160micron'][degas['NAME'] == galaxy['NAME']] = b160_src
+
+    # calculate just the 24micron LTIR
+    outFile = os.path.join(outDir,galaxy['NAME']+"_LTIR_24micron_gauss15.fits")
+    calc_LTIR(outFile,b24=b24)
+    degas['IR_24micron_only'][degas['NAME'] == galaxy['NAME']] = b24_src
+
 
 degas.write(os.path.join(os.environ['SCRIPTDIR'],"degas_base.fits"),overwrite=True)

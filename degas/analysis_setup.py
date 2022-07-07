@@ -581,7 +581,7 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
         outfits.writeto(outFile,overwrite=True)
 
     elif (b100 and b160): ## COLOR TERM?
-        print('calculating LTIR using 24, 100, and 160 micron data')
+        print('calculating LTIR using 100 and 160 micron data')
 
         # coefficients from Table 3 in Galametz+ 2013
         c100 = 1.239
@@ -661,6 +661,8 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
 
         print('calculating LTIR using WISE band 4 data')
 
+        ## THE BELOW ISN'T CORRECT FOR SURFACE BRIGHTNESS VALUES.
+
         ## use wise band 4 to calculate LTIR.  
 
         ## Cluver+2017 bootstraps off the SINGS/KINGFISH data to show
@@ -700,6 +702,8 @@ def calc_LTIR(outFile, b24=None, b70=None, b100=None, b160=None, w3=None, w4=Non
     elif (w3): 
 
         print('calculating LTIR using WISE band 3 data')
+
+        ## THE BELOW ISN'T CORRECT FOR SURFACE BRIGHTNESS VALUES
 
         ## use wise band 3 to calculate LTIR.  
 
@@ -772,7 +776,7 @@ def colorCorrect_24micron(b24, b70, outFile, beam=30.0):
     
     # calculate the 24micron to LTIR ratio for the smoothed data
     ratio = b24_smoothed_data / LTIR
-    
+
     # correct the unsmoothed 24micron data
     LTIR_corrected = b24_data / ratio
 
@@ -992,7 +996,7 @@ def sfrR21scale(infile, sigmaSFRfile, galaxy=None,
     data_scaled = data_in / R21_scaled
 
     indir = os.path.dirname(infile)
-    hdr_out = hdr_in
+    hdr_out = hdr_in.copy() # need to copy or hdr_in BUNIT is changed too.
     hdr_out['BUNIT'] = ''
 
     fits.writeto(os.path.join(indir,galaxy+"_R21.fits"),R21_scaled,header=hdr_out,overwrite=True)

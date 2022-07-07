@@ -117,7 +117,7 @@ for hcn in hcnlist:
     else:
         print("No stellar mass map found!")
 
-    # process the stellar mass data
+    # process the total infrared luminosity data
     print("** processing " + name + " LTIR **")
     
     ltir = name + "_LTIR_gauss15.fits"
@@ -125,6 +125,13 @@ for hcn in hcnlist:
         regridData(hcn_smooth, os.path.join(multiDir,'data','LTIR_calc',ltir),regridDir)
     else:
         print("No LTIR map found!")
-                      
 
+    # process the 24micron LTIR data
+    print("** processing " + name + " 24micron LTIR **")
+    ltir = name + "_LTIR_24micron_gauss15.fits"
+    if os.path.exists(os.path.join(multiDir,'data','LTIR_calc',ltir)):
+        regridData(hcn_smooth, os.path.join(multiDir,'data','LTIR_calc',ltir),regridDir)
+    else:
+        print("No 24micron LTIR map found!")
+    
         

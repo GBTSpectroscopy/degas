@@ -121,7 +121,7 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
     return stack_pruned
     
 
-def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None, database='degas_base.fits'):
+def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', release='DR1', sourceList=None, database='degas_base.fits', R21='simple', ltir='multi'):
     '''
 
     Calculate stacking results for each galaxy and make a fits table
@@ -167,7 +167,7 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
     tablelist=[]
     for galaxy in degas[idx]:
         if galaxy['NAME'] in sourceList:
-            full_tab = makeGalaxyTable(galaxy, vtype, regridDir, outDir)
+            full_tab = makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21=R21,ltir=ltir)
             tablelist.append(full_tab)
 
     # stack all the tables together
@@ -175,13 +175,16 @@ def makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1', outname='test', 
 
     table.meta['DATE'] = str(datetime.now())
     table.meta['RELEASE'] = release
+    table.meta['R21'] = R21
+    table.meta['LTIR'] = ltir
+    table.meta['VTYPE'] = vtype
 
     # Write out the table 
     table.write(os.path.join(outDir,outname+'_'+vtype+'.fits'),overwrite=True)
 
     return table
 
-def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
+def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi'):
     '''
 
     make fitstable containing all lines from stacking results for each galaxy
@@ -213,25 +216,25 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir):
     print("Processing " + galaxy['NAME'] + "\n")
 
     # Create associated maps needed for analysis.
-    cubeCO, comap = mapCO(galaxy, regridDir, outDir, sncut=3)  
+    cubeCO, comap = mapCO(galaxy, regridDir, outDir, sncut=3, R21=R21)  
     stellarmap = mapStellar(galaxy, regridDir, outDir) # to apply CO mask mask=mom0cut
     sfrmap = mapSFR(galaxy, regridDir, outDir)
-    ltirmap = mapLTIR(galaxy, regridDir,outDir)
+    ltirmap = mapLTIR(galaxy, regridDir,outDir, ltir=ltir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy, comap) # comap is just used to get coordinates
 
     velocity_file = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO*_*'+vtype+'*.fits' ))
     if len(velocity_file) == 1:
         velocity_file = velocity_file[0]
-        print("Using " + velocity_file)
+        print("Using " + velocity_file + "for velocity field.\n")
         vhdu = fits.open(velocity_file)
         velocity = Projection.from_hdu(vhdu)
     elif len(velocity_file) > 1:
         print("multiple velocity files found.")
-        print("Using " + velocity_file)
+        print("Using " + velocity_file + "for velocity field.\n")
         vhdu = fits.open(velocity_file)
         velocity = Projection.from_hdu(vhdu)
     else:
-        print("No velocity file found.")
+        print("No velocity file found.\n")
         return
         
     # read in HCN
@@ -1276,7 +1279,7 @@ def plotBins(galaxy, binmap, binedge, binlabels, bintype, outDir):
     plt.close()
 
 
-def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
+def mapCO(galaxy, regridDir, outDir, sncut=3.0, R21='simple' ):
 
     '''
     
@@ -1295,15 +1298,13 @@ def mapCO(galaxy, regridDir, outDir, sncut=3.0, r21type='simple' ):
     12/3/2020   A.A. Kepley     Added comments and clarified inputs
     10/7/2021   A.A. Kepley     Removing sncut parameter and instead reading 
                                 in mom0 and error produced earlier.
-    2/27/2021   A.A. Kepley     generalized file name selection and added switch
-                                to choose r21
+    2/27/2021   A.A. Kepley     generalized file name selection and 
+                                added switch for R21 value
 
     '''
 
     # read in CO cube
-    ### TODO -- ADD SWITCH HERE TO CHOOSE BETWEEN SIMPLE AND SIGMASFR?
-
-    cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10*r21_'+r21type+'*.fits'))
+    cofilelist = glob.glob(os.path.join(regridDir, galaxy['NAME']+'_12CO10*r21_'+R21+'*.fits'))
     
     # remove the moment and peak intensity maps
     cofile = [name for name in cofilelist if ( (not re.search('mom0',name)) & (not re.search('peakInt',name))) ]
@@ -1433,7 +1434,7 @@ def mapStellar(galaxy, regridDir, outDir, mask=None):
 
     return stellarmap
 
-def mapLTIR(galaxy, regridDir, outDir, mask=None):
+def mapLTIR(galaxy, regridDir, outDir, mask=None, ltir='multi'):
     '''
     make LTIR map
 
@@ -1453,9 +1454,17 @@ def mapLTIR(galaxy, regridDir, outDir, mask=None):
 
     '''
 
-    ltirfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_LTIR_*.fits'))[0]
+    if ltir == 'single':
+        ltirfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_LTIR_24micron_gauss*_regrid.fits'))[0]
+    elif ltir == 'multi':
+        ltirfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_LTIR_gauss*_regrid.fits'))[0]
+    else:
+        print(ltir + ": not a valid ltir type\n")
+        return
+
     if os.path.exists(ltirfile):        
         hdu=fits.open(ltirfile)[0]
+        print("Using " + ltirfile + "for LTIR\n")
     else:
         print("LTIR file doesn't exist for " + galaxy['NAME'])
         return

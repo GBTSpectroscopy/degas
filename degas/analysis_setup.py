@@ -769,7 +769,7 @@ def colorCorrect_24micron(b24, b70, outFile, beam=30.0):
     calc_LTIR(LTIRFile, b24=b24_smoothed, b70=b70)
 
     # get necessary data
-    LTIR = fits.open(outFile)[0].data
+    LTIR = fits.open(LTIRFile)[0].data
     b24_data = fits.open(b24)[0].data
     b24_hdr = fits.open(b24)[0].header
     b24_smoothed_data = fits.open(b24_smoothed)[0].data

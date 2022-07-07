@@ -318,8 +318,9 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi')
     if not os.path.exists(fit_plot_dir):
         os.mkdir(fit_plot_dir)
 
-    # calculate integrated intensity
-    full_stack = addIntegratedIntensity(full_stack, fit_plot_dir)
+    # calculate integrated intensity 
+    ## TODO: add inclination here as well.
+    full_stack = addIntegratedIntensity(full_stack, fit_plot_dir, incl=galaxy['INCL_DEG'])
 
     # return the table and the stack.
     return full_stack
@@ -618,7 +619,7 @@ def stackLines(galaxy, velocity,
 
     return total_stack
 
-def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)  /  (u.K * u.km / u.s)):
+def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)  /  (u.K * u.km / u.s), incl=0.0):
     '''
 
     calculate the integrated line flux and the associated noise
@@ -723,9 +724,9 @@ def addIntegratedIntensity(full_stack, outDir, alpha_co = 4.3*(u.Msun / u.pc**2)
                     int_intensity_sum_uplim[line][i] = uplim
 
 
-    # calculate CO mass and add to table 
-    full_stack.add_column(Column(int_intensity_sum['CO']*alpha_co,name='comass_mean'))
-    full_stack.add_column(full_stack['comass_mean'] * full_stack['bin_area'],name='comass_total')
+    # calculate CO mass and add to table
+    full_stack.add_column(Column(int_intensity_sum['CO']*alpha_co*np.cos(np.radians(incl)),name='comass_mean')) ## inclination corrected
+    full_stack.add_column(full_stack['comass_mean'] * full_stack['bin_area'],name='comass_total') ## inclination corrected
     full_stack.meta['alpha_co'] = alpha_co.to_string()
 
     # add CO fit to table.

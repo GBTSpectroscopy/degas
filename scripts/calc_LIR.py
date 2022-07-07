@@ -24,6 +24,8 @@ for band in IRBands:
         degas.remove_column(band)
     degas.add_column(Column(np.full_like(degas['NAME'],''),dtype='S15'),name=band)
 
+#idx = degas['NAME'] == 'NGC2903'
+
 ## should I just do dr1 galaxies here?
 for galaxy in degas:
     print("***Processing galaxy: " + galaxy['NAME'] + "***")

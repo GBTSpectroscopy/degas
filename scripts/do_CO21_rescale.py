@@ -76,7 +76,7 @@ for galaxy in degas[idx_dr1]:
         else:
             print('No galaxy-specific R21 value found for '+galaxy['NAME']+ ". Using fiducial value.")
             r21_gal = r21
-            sfr_gal = galaxy['LOGSFR']
+            sfr_gal = 10**galaxy['LOGSFR']
 
         # convert Re to to kpc
         # The input map is in Mstar/yr/kpc^2, so I think I want the output unit to be Mstar/yr/kpc^2.

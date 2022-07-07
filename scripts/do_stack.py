@@ -34,6 +34,8 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_R21spatial_pe
 
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='peakVelocity',outname='stack_'+release+'_spatialR21', release='DR1',R21='sigmaSFR')
 
+## HERE
+
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_spatialR21_peakVelocity.fits','stack_'+release+'_spatialR21_peakVelocity_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
 # stack using 24micron LTIR

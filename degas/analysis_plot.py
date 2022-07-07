@@ -329,7 +329,7 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
 #----------------------------------------------------------------------
 
 def compare_stacks_line(stack_list, stack_name_list, 
-                        empire_db,
+                        empire_db = None, ### NEED TO FIX UP OLD SCRIPTS TO POINT TO DB.
                         outdir = None,
                         line='HCN',
                         galaxy='NGC2903',
@@ -347,18 +347,23 @@ def compare_stacks_line(stack_list, stack_name_list,
     for (stack,stack_name,marker) in zip(stack_list, stack_name_list,markerlist):
         idx = (stack['galaxy'] == galaxy) & (stack['bin_type'] == 'radius')
         
-        binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
-        #binval = dist.to('kpc') * stack[idx]['bin_lower']/206265.0
+        if dist:
+            binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
+            #binval = dist.to('kpc') * stack[idx]['bin_lower']/206265.0
+        else:
+            binval =  stack[idx]['bin_upper']
+
         binval = binval.value
         int_intensity = stack[idx]['int_intensity_sum_'+line].value
         int_intensity_err = stack[idx]['int_intensity_sum_'+line+'_err'].value
         plt.errorbar(binval, int_intensity, yerr=int_intensity_err, marker=marker,label=stack_name)
 
     # add empire
-    idx = empire_db['ID'] == galaxy.lower()
-    plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
-                 yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
-                 marker='o',label='EMPIRE (pub)')
+    if empire_db:
+        idx = empire_db['ID'] == galaxy.lower()
+        plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
+                     yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
+                     marker='o',label='EMPIRE (pub)')
 
     if ylim:
         plt.ylim(ylim)

@@ -5,11 +5,13 @@ release = 'IR6p1'
 
 scriptDir = os.environ['SCRIPTDIR']
 regridDir=os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
-outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
 
-myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1')
+# stack using mom1
+#outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
 
-myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+release+'_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
+#myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1')
+
+#myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+release+'_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
 # stack using peak velocity
 
@@ -19,10 +21,30 @@ myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='peakVelocity',o
 
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_peakVelocity.fits','stack_'+release+'_peakVelocity_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
+# stack using sigmaSFR
+outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_spatialR21')
+
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release+'_spatialR21', release='DR1', R21='sigmaSFR')
+
+myresults2 = pruneSampleTable(outDir,'stack_'+release+'_spatialR21_mom1.fits','stack_'+release+'_spatialR21_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
 
+# stack using sigmaSFR and peak velocity
+outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_R21spatial_peakVelocity')
 
-## ----------------------------------------------------------------------
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='peakVelocity',outname='stack_'+release+'_spatialR21', release='DR1',R21='sigmaSFR')
+
+myresults2 = pruneSampleTable(outDir,'stack_'+release+'_spatialR21_peakVelocity.fits','stack_'+release+'_spatialR21_peakVelocity_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
+
+# stack using 24micron LTIR
+outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+"_L24micron")
+
+myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',ltir='single',outname='stack_'+release+'_L24micron', release='DR1')
+
+myresults2 = pruneSampleTable(outDir,'stack_'+release+'_L24micron_mom1.fits','stack_'+release+'_L24micron_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
+
+#----------------------------------------------------------------------
+
 
 ## stuff for testing.
 

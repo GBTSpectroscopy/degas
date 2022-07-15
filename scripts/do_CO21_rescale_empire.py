@@ -63,18 +63,23 @@ for galaxy in degas[idx_dr1]:
         if 'PHANGSCOMING' in galaxy_ratios['SURVEY_PAIR']:
             idx = galaxy_ratios['SURVEY_PAIR'] == 'PHANGSCOMING'
             r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+            sfr_gal = 10**galaxy_ratios[idx]['LOGSFR'][0]
         elif 'PHANGSNROATLAS' in galaxy_ratios['SURVEY_PAIR']:
             idx = galaxy_ratios['SURVEY_PAIR'] == 'PHANGSNROATLAS'
             r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+            sfr_gal = 10**galaxy_ratios[idx]['LOGSFR'][0]
         elif 'HERACOMING' in galaxy_ratios['SURVEY_PAIR']:
             idx = galaxy_ratios['SURVEY_PAIR'] == 'HERACOMING'
             r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+            sfr_gal = 10**galaxy_ratios[idx]['LOGSFR'][0]
         elif 'HERANROATLAS' in galaxy_ratios['SURVEY_PAIR']:
             idx = galaxy_ratios['SURVEY_PAIR'] == 'HERANROATLAS'
             r21_gal = 10**galaxy_ratios[idx]['LOGRAT'][0]
+            sfr_gal = 10**galaxy_ratios[idx]['LOGSFR'][0]
         else:
             print('No galaxy-specific R21 value found for '+galaxy['NAME']+ ". Using fiducial value.")
             r21_gal = r21
+            sfr_gal = 10**galaxy['LOGSFR']
 
         # convert Re to to kpc
         # The input map is in Mstar/yr/kpc^2, so I think I want the output unit to be Mstar/yr/kpc^2.
@@ -85,14 +90,14 @@ for galaxy in degas[idx_dr1]:
         sfrR21scale(cube,sigmaSFR, 
                     galaxy=galaxy['NAME'],
                     re = re_kpc.value, 
-                    sfr = 10**galaxy['LOGSFR'],
+                    sfr = sfr_gal,
                     r21 = r21_gal, 
                     r21_ref = r21_ref)
 
         sfrR21scale(mom0,sigmaSFR, 
                     galaxy=galaxy['NAME'],
                     re = re_kpc.value, 
-                    sfr = 10**galaxy['LOGSFR'],
+                    sfr = sfr_gal,
                     r21 = r21_gal, 
                     r21_ref = r21_ref)
 
@@ -100,7 +105,7 @@ for galaxy in degas[idx_dr1]:
         sfrR21scale(peakInt,sigmaSFR, 
                     galaxy=galaxy['NAME'],
                     re = re_kpc.value, 
-                    sfr = 10**galaxy['LOGSFR'],
+                    sfr = sfr_gal,
                     r21 = r21_gal, 
                     r21_ref = r21_ref)
 

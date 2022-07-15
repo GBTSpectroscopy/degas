@@ -23,21 +23,19 @@ idx = degas['DR1'] == 1
 
 outfile = os.path.join(os.environ['ANALYSISDIR'],'tables','IR_data_table.tex')
 
-header = '''\\begin{deluxetable}{rrrrrrrr}
+header = '''\\begin{deluxetable}{rrrrrrr}
 \\tablewidth{0pt}
 \\tabletypesize{\scriptsize}
 \\tablecaption{Source of Ancillary Data \label{tab:ir_data}}
-\\tablecolumns{8}
+\\tablecolumns{7}
 \\tablehead{
         \colhead{} & 
         \colhead{} &
         \colhead{} &
-        \colhead{} & 
         \multicolumn{4}{c}{\LTIR} \\\\
         \colhead{Name} & 
         \colhead{\\twelveCO} &
         \colhead{Transition} &
-        \colhead{\LTIR($24\micron$)} & 
         \colhead{$24\micron$} &
         \colhead{$70\micron$} & 
         \colhead{$100\micron$} &
@@ -48,7 +46,7 @@ header = '''\\begin{deluxetable}{rrrrrrrr}
 
 footer = '''\enddata
 \\tablenotetext{a}{Data at lower resolution (30\\arcsec) used to color correct 24\micron\ data.}
-\\tablecomments{Heracles: \citet{Leroy2009Heracles:Survey}, GBT: Li et al. in prep, PHANGS: \citet{Leroy2021}, everyHERACLES: Schruba et al. in prep, Wilson: Wilson et al. in prep, BENDO: \citet{Bendo2012}, LVL: \citet{Dale2009}, SINGS: \citet{Kennicutt2003}, KINGFISH: \citet{Kennicutt2011}, HRS: \citet{Boselli2010}, VNGS: \citet{Bendo2012a}, z0mgs: \citet{Leroy2019}}
+\\tablecomments{Heracles: \citet{Leroy2009Heracles:Survey}, GBT: Li et al. in prep, PHANGS: \citet{Leroy2021}, everyHERACLES: Schruba et al. in prep, Wilson: Wilson et al. in prep, BENDO: \citet{Bendo2012}, LVL: \citet{Dale2009}, SINGS: \citet{Kennicutt2003}, KINGFISH: \citet{Kennicutt2011}, HRS: \citet{Boselli2010}, VNGS: \citet{Bendo2012a}, z0mgs: \citet{Leroy2019}, W4: \citet{Wright2010ThePerformance}}
 \\end{deluxetable}
 '''
 #----------------------------------------------------------------------
@@ -83,10 +81,10 @@ for galaxy in degas[idx]:
     else:
         IR_70micron = galaxy['IR_70micron']
 
-    line = "{0} & {1} & {2} & {3}& {4} & {5}& {6} & {7}\\\\ \n".format(galaxy['NAME'],
+    line = "{0} & {1} & {2} & {3}& {4} & {5}& {6} \\\\ \n".format(galaxy['NAME'],
                                                        codata,
                                                        coline,
-                                                       galaxy['IR_24micron_only'],
+#                                                       galaxy['IR_24micron_only'],
                                                        galaxy['IR_24micron'],
                                                        IR_70micron,
                                                        galaxy['IR_100micron'],

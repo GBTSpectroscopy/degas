@@ -346,7 +346,7 @@ def compare_stacks_line(stack_list, stack_name_list,
     # compare results of different stacks
     for (stack,stack_name,marker) in zip(stack_list, stack_name_list,markerlist):
         idx = (stack['galaxy'] == galaxy) & (stack['bin_type'] == 'radius')
-        
+
         if dist:
             binval = dist.to('kpc') * stack[idx]['bin_upper']/206265.0
             #binval = dist.to('kpc') * stack[idx]['bin_lower']/206265.0
@@ -354,16 +354,36 @@ def compare_stacks_line(stack_list, stack_name_list,
             binval =  stack[idx]['bin_upper']
 
         binval = binval.value
-        int_intensity = stack[idx]['int_intensity_sum_'+line].value
-        int_intensity_err = stack[idx]['int_intensity_sum_'+line+'_err'].value
-        plt.errorbar(binval, int_intensity, yerr=int_intensity_err, marker=marker,label=stack_name)
+
+        if line in ['HCN','HCOp','13CO','C18O','CO']:
+            quant = 'int_intensity_sum_'+line
+            quant_err = 'int_intensity_sum_'+line+'_err'
+        elif line in stack.columns:
+            quant = line
+            if quant+'_err' in stack.columns:
+                quant_err = quant+'_err'
+            else:
+                quant_err = ''
+        else:
+            print("The quantity " + line + " not in data base. Returning.\n")
+            return
+
+        val = stack[idx][quant].value
+        if quant_err:
+            val_err = stack[idx][quant_err].value
+            plt.errorbar(binval, val, yerr=val_err, marker=marker,label=stack_name)
+        else:
+            plt.plot(binval, val, marker=marker,label=stack_name)
 
     # add empire
     if empire_db:
-        idx = empire_db['ID'] == galaxy.lower()
-        plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
-                     yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
-                     marker='o',label='EMPIRE (pub)')
+        if line in ['HCN','HCOp']:
+            idx = empire_db['ID'] == galaxy.lower()
+            plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
+                         yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
+                         marker='+',label='EMPIRE (pub)',color='purple')
+        else:
+            print("Value " + line + " not in empire database.\n")
 
     if ylim:
         plt.ylim(ylim)
@@ -374,9 +394,9 @@ def compare_stacks_line(stack_list, stack_name_list,
 
     plt.yscale('log')
     plt.legend()
-    plt.title(galaxy + ' - ' + line)
-    plt.xlabel('radius (kpc)')
-    plt.ylabel('I (K km/s)')
+    plt.title(galaxy + ' - ' + line.replace('HCOp','HCO+'),size='large')
+    plt.xlabel('radius (kpc)',size='medium')
+    plt.ylabel('I (K km/s)',size='medium')
 
     if outdir == None:
         outDir = './'
@@ -385,3 +405,6 @@ def compare_stacks_line(stack_list, stack_name_list,
     plt.savefig(os.path.join(outdir,galaxy + '_' + line + '_stack_compare.pdf'))
 
     plt.close()
+
+#----------------------------------------------------------------------
+

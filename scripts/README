@@ -56,13 +56,14 @@
 # empire stacks
 %run fix_up_empire.py # -- fix up empire cubes
 %run calc_LIR_empire.py # calculate LTIR for 33arcsec case.
-%run align_to_empire.py # -- regridding empire data to match our code conventions
+%run align_to_empire.py # -- regridding empire data to match our code convention
+
 %run do_CO21_rescale_empire.py # do CO21 rescaling for empire data 
 %run do_stack_empire.py # stack the empire data using our code
 
 # degas stacks at empire resolution
 %run align_to_degas_33as.py
-%run do_CO21_rescale_degas_33as.
+%run do_CO21_rescale_degas_33as.py 
 %run do_stack_degas_33as.py
 
 # alma HCN stacks at empire resolution.

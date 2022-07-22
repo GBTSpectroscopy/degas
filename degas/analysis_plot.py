@@ -408,3 +408,152 @@ def compare_stacks_line(stack_list, stack_name_list,
 
 #----------------------------------------------------------------------
 
+
+
+def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25', 
+                add_empire=True, 
+                include_uplims=False,
+                release='DR1',
+                pltname=None):
+
+    '''
+
+    Purpose: general purpose plotting routine for sfe_dense vs. x and
+    fdense vs. x 
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    7/21/2022   A.A. Kepley     Original Code
+
+    '''
+
+    # select release galaxies. TODO -- offer all option?
+    print("Only plotting release " + release + "\n")
+    release = degas[release] == 1
+    nrelease = np.sum(release)
+
+    # set up x labels
+    if xdata == 'r25':
+        xlabel = r'R/R$_{25}$'
+    elif xdata == 'mstar':
+        xlabel = r'$\Sigma_{*}$ [M$_\odot$ pc$^{-2}$]'
+    elif xdata == 'ICO':
+        xlabel = r'$\Sigma_{mol}$ [M$_\odot$ pc$^{-2}$]'
+    else:
+        print("no valid xlabel value using xdata name: " + xdata)
+        xlabel = xdata
+    
+    # set up y labels
+    if ydata == 'ratio_HCN_CO':
+        ylabel = r'HCN-to-CO'
+    elif ydata == 'ratio_ltir_mean_HCN':
+        ylabel = r'L$_{TIR}$ / HCN'
+  
+    # setup plot style
+    markers = ['o','v','^','s','>','D'] # 6 items
+    colors = ['royalblue','forestgreen','darkorange','royalblue','crimson','rebeccapurple','darkcyan','darkmagenta']
+
+    markerlist = np.tile(markers,int(np.ceil(nrelease/len(markers))))
+    markerlist = markerlist[0:nrelease]
+
+    colorlist = np.tile(colors,int(np.ceil(nrelease/len(colors))))
+    colorlist = colorlist[0:nrelease]
+    
+    # set up plot
+    fig = plt.figure(figsize=(8,6),facecolor='white',edgecolor='white')
+    fig.subplots_adjust(left=0.15,right=0.78,bottom=0.15, top=0.9)
+
+    ax = fig.add_subplot(1,1,1)
+   
+    # for each dr1 galaxy, show radial trends for each line.
+    for (galaxy,color,marker) in zip(degas[release],colorlist,markerlist):
+        idx = ( (stack['galaxy'] == galaxy['NAME']) \
+                & (stack['bin_type'] == xdata))
+
+        if xdata == 'ICO':
+            # apply alpha_co and correct for inclination
+            alpha_co = float(stack.meta['ALPHA_CO'].split(' ')[0])
+            factor = alpha_co * np.cos(np.radians(galaxy['INCL_DEG']))
+        else:
+            factor = 1.0
+
+        xvals = stack[idx]['bin_mean'] * factor
+
+
+
+        yvals = stack[idx][ydata] 
+        yvals_err = stack[idx][ydata+'_err'] 
+
+        if ydata+'_uplim' in stack.columns:
+            lims = stack[idx][ydata+'_uplim']
+        elif ydata + '_lolim' in stack.columns:
+            lims = stack[idx][ydata+'_lolim']
+            yvals_err[lims] = yvals[lims] * 0.3 
+
+        ax.errorbar(xvals[~lims], yvals[~lims],
+                    yerr = yvals_err[~lims],
+                    marker = marker,
+                    linestyle= '--',
+                    color=color,
+                    label=galaxy['NAME'],zorder=10)
+
+    ax.set_yscale('log')
+    if xdata != 'r25':
+        ax.set_xscale('log')
+    ax.set_xlabel(xlabel,fontsize=20)
+    ax.set_ylabel(ylabel,fontsize=20)
+    ax.tick_params(axis='both',labelsize=16)
+
+    # empire fit parameters
+    if add_empire:
+        xmin, xmax = ax.get_xlim()
+        if ydata == 'ratio_HCN_CO':
+            if xdata == 'r25':
+                xvals_empire = np.linspace(xmin, xmax)
+                yvals_empire = 10**(-1.5-0.8*xvals_empire)
+            elif xdata == 'mstar':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(-2.7+0.4*np.log10(xvals_empire))
+            elif xdata == 'ICO':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(-2.4 + 0.5*np.log10(xvals_empire))
+            else:
+                print("No empire equation available for " + xdata + ' vs. ' + ydata)
+        elif ydata == 'ratio_ltir_mean_HCN':
+            if xdata == 'r25': 
+                xvals_empire = np.linspace(xmin,xmax)
+                yvals_empire = 10**(2.8+0.6*xvals_empire)
+            elif xdata == 'mstar':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(4.0-0.4*np.log10(xvals_empire))
+            elif xdata == 'ICO':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(3.5-0.4*np.log10(xvals_empire))
+            else:
+                print("No empire equation available for " + xdata + ' vs. ' + ydata)
+        else:
+            print("Not a validate y data set for EMPIRE: " + ydata)
+                                
+        if xdata != 'r25':
+            ax.loglog(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
+        else:
+            ax.semilogy(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
+
+
+    # get handles
+    handles, labels = ax.get_legend_handles_labels()
+    # remove errorbars
+    new_handles = [h[0] for h in handles[1:-1]]
+    new_handles.insert(0,handles[0])
+
+
+    mylegend = ax.legend(new_handles, labels, loc='upper left',
+                         bbox_to_anchor=(1.0,1.0),handlelength=3, 
+                         borderpad=1.2)    
+
+    fig.show()
+
+    if pltname:
+        # save as both png and pdf
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')

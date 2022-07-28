@@ -36,3 +36,11 @@ for myfile in filelist:
 
 
 
+# copy fdense and sfedense plots
+filelist = glob.glob(os.path.join(baseDir,'sfe_fdense_trends','fdense_*.pdf'))
+for myfile in filelist:
+    shutil.copy(myfile, paperDir)
+
+filelist = glob.glob(os.path.join(baseDir,'sfe_fdense_trends','sfe_dense_*.pdf'))
+for myfile in filelist:
+    shutil.copy(myfile, paperDir)

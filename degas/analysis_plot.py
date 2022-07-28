@@ -414,7 +414,8 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
                 add_empire=True, 
                 include_uplims=False,
                 release='DR1',
-                pltname=None):
+                pltname=None,
+                pltlabel=None):
 
     '''
 
@@ -503,6 +504,9 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
     ax.set_xlabel(xlabel,fontsize=20)
     ax.set_ylabel(ylabel,fontsize=20)
     ax.tick_params(axis='both',labelsize=16)
+    
+    if pltlabel:
+        ax.set_title(pltlabel)
 
     # empire fit parameters
     if add_empire:

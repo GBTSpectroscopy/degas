@@ -449,6 +449,13 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         ylabel = r'HCN-to-CO'
     elif ydata == 'ratio_ltir_mean_HCN':
         ylabel = r'L$_{TIR}$ / HCN'
+    elif ydata == 'ratio_HCOp_CO':
+        ylabel = r'HCO+-to-CO'
+    elif ydata == 'ratio_ltir_mean_HCOp':
+        ylabel = r'L$_{TIR}$ / HCO+'
+    else:
+        ylabel = ydata
+
   
     # setup plot style
     markers = ['o','v','^','s','>','D'] # 6 items

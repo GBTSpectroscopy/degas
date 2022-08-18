@@ -568,3 +568,98 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         # save as both png and pdf
         fig.savefig(pltname+'.png')
         fig.savefig(pltname+'.pdf')
+
+
+def plot_correlation_coeffs(results, 
+                            corr_quant='ratio_HCN_CO',
+                            pltname=None):
+
+    '''
+    plot the correlation coefficients for each galaxy and the overall
+    sample for correlation bins and 
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    8/4/2022    A.A. Kepley     Original code
+
+    '''
+    corr_bins = ['r25','mstar','ICO']
+ 
+    fig, (ax1,ax2,ax3) = plt.subplots(3,1,sharex=True,figsize=(8,8),
+                                      edgecolor='white')
+    fig.subplots_adjust(hspace=0.2, bottom=0.12,left=0.15,top=0.95)
+    
+
+    for (mybin,myax) in zip(corr_bins,[ax1,ax2,ax3]):
+
+        idx_all = (results['galaxy'] == 'all') & (results['corr_bin'] == mybin) & (results['quant'] == corr_quant)
+        idx_gal = (results['galaxy'] != 'all') & (results['corr_bin'] == mybin) & (results['quant'] == corr_quant)
+
+        myax.set_axisbelow(True)
+        myax.grid(axis='x')
+
+        # plot correlation coefficients
+        myax.scatter(results['galaxy'][idx_gal],results['corr_val'][idx_gal],
+                     facecolor='gray',s=20,edgecolor='None',marker='o',
+                     zorder=1, label="n < 3")
+
+        # mark those with >3 values
+        large_nval = results[idx_gal]['nval'] >= 3
+        myax.scatter(results[idx_gal][large_nval]['galaxy'], 
+                     results[idx_gal][large_nval]['corr_val'],
+                     marker='o',facecolor="orange",edgecolor='None',
+                     s=30,
+                     label="n >= 3",
+                     zorder=1)
+
+        # mark the significant values
+        good_pval = results[idx_gal]['p_val'] < 0.05
+        myax.scatter(results[idx_gal][good_pval]['galaxy'], 
+                     results[idx_gal][good_pval]['corr_val'],
+                     marker='o',facecolor="None",edgecolor='black',
+                     s=40,
+                     label='p<0.05',
+                     zorder=1)
+        
+        # plot the average value
+        myax.axhline(results[idx_all]['corr_val'],color='gray',linewidth=3,
+                     zorder=2)
+        myax.axhline(0,color='gray',linewidth=1)
+
+        myax.set_ylim(-1.2,1.2)
+        myax.set_ylabel(r'$\rho$')
+
+        if mybin == 'r25':
+            mybinstr = r"R/R$_{25}$"
+        elif mybin == 'mstar':
+            #mybinstr = r"$\Sigma_*$ [M$_\odot$ pc$^{-2}$]"
+            mybinstr = r"$\Sigma_*$"
+        elif mybin == 'ICO':
+            #mybinstr = r"I$_{CO}$ [K km s$^{-1}$]"
+            mybinstr = r"I$_{CO}$"
+        else:
+            print("Bin " + mybin + " not recognized. Using bin value as text.")
+        
+        if corr_quant == 'ratio_ltir_mean_HCN':
+            #corr_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+            corr_quant_str = r"L$_{TIR}$/HCN"
+        elif corr_quant == 'ratio_HCN_CO':
+            corr_quant_str = r"HCN-to-CO"
+        else:
+            print("Correlation Quantity " + corr_quant + " not recognized. Using corr_quant value as text")
+
+        myax.set_title(corr_quant_str + ' - ' + mybinstr) 
+
+    if corr_quant == 'ratio_HCN_CO':
+        myloc = 'lower right'
+    elif corr_quant == 'ratio_ltir_mean_HCN':
+        myloc = 'upper right'
+
+    ax3.legend(loc=myloc)
+    ax3.tick_params(axis='x',which='both',labelrotation=90)
+
+    if pltname:
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')
+        
+        

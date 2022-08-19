@@ -572,7 +572,10 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
 
 def plot_correlation_coeffs(results, 
                             corr_quant='ratio_HCN_CO',
-                            pltname=None):
+                            pltname=None,
+                            corr_type='spearman',
+                            plim=0.05,
+                            nval_lim=3):
 
     '''
     plot the correlation coefficients for each galaxy and the overall
@@ -583,6 +586,18 @@ def plot_correlation_coeffs(results,
     8/4/2022    A.A. Kepley     Original code
 
     '''
+
+    corr_val = 'corr_val_'+corr_type
+    p_val = 'p_val_'+corr_type
+
+
+    if corr_type == 'kendall':
+        ylabelstr = r'Kendall $\tau$'
+    elif corr_type == 'spearman':
+        ylabelstr = r'Spearman $\rho$'
+    else:
+        ylabelstr = 'Correlation'
+
     corr_bins = ['r25','mstar','ICO']
  
     fig, (ax1,ax2,ax3) = plt.subplots(3,1,sharex=True,figsize=(8,8),
@@ -599,35 +614,35 @@ def plot_correlation_coeffs(results,
         myax.grid(axis='x')
 
         # plot correlation coefficients
-        myax.scatter(results['galaxy'][idx_gal],results['corr_val'][idx_gal],
+        myax.scatter(results['galaxy'][idx_gal],results[corr_val][idx_gal],
                      facecolor='gray',s=20,edgecolor='None',marker='o',
                      zorder=1, label="n < 3")
 
         # mark those with >3 values
-        large_nval = results[idx_gal]['nval'] >= 3
+        large_nval = results[idx_gal]['nval'] >= nval_lim
         myax.scatter(results[idx_gal][large_nval]['galaxy'], 
-                     results[idx_gal][large_nval]['corr_val'],
+                     results[idx_gal][large_nval][corr_val],
                      marker='o',facecolor="orange",edgecolor='None',
                      s=30,
-                     label="n >= 3",
+                     label="n >= "+str(nval_lim),
                      zorder=1)
 
         # mark the significant values
-        good_pval = results[idx_gal]['p_val'] < 0.05
+        good_pval = results[idx_gal][p_val] < plim
         myax.scatter(results[idx_gal][good_pval]['galaxy'], 
-                     results[idx_gal][good_pval]['corr_val'],
+                     results[idx_gal][good_pval][corr_val],
                      marker='o',facecolor="None",edgecolor='black',
                      s=40,
-                     label='p<0.05',
+                     label='p<'+str(plim),
                      zorder=1)
         
         # plot the average value
-        myax.axhline(results[idx_all]['corr_val'],color='gray',linewidth=3,
+        myax.axhline(results[idx_all][corr_val],color='gray',linewidth=3,
                      zorder=2)
         myax.axhline(0,color='gray',linewidth=1)
 
         myax.set_ylim(-1.2,1.2)
-        myax.set_ylabel(r'$\rho$')
+        myax.set_ylabel(ylabelstr)        
 
         if mybin == 'r25':
             mybinstr = r"R/R$_{25}$"
@@ -648,7 +663,7 @@ def plot_correlation_coeffs(results,
         else:
             print("Correlation Quantity " + corr_quant + " not recognized. Using corr_quant value as text")
 
-        myax.set_title(corr_quant_str + ' - ' + mybinstr) 
+        myax.set_title(corr_quant_str + ' - ' + mybinstr ) 
 
     if corr_quant == 'ratio_HCN_CO':
         myloc = 'lower right'

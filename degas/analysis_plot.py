@@ -412,6 +412,7 @@ def compare_stacks_line(stack_list, stack_name_list,
 
 def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25', 
                 add_empire=True, 
+                stack_fit=None,
                 include_uplims=False,
                 release='DR1',
                 pltname=None,
@@ -498,12 +499,15 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
             lims = stack[idx][ydata+'_lolim']
             yvals_err[lims] = yvals[lims] * 0.3 
 
-        ax.errorbar(xvals[~lims], yvals[~lims],
-                    yerr = yvals_err[~lims],
+        ax.plot(xvals[~lims],yvals[~lims],
                     marker = marker,
                     linestyle= '--',
                     color=color,
                     label=galaxy['NAME'],zorder=10)
+
+        ax.errorbar(xvals[~lims], yvals[~lims],
+                    yerr = yvals_err[~lims],
+                    fmt='none',color=color,zorder=10)
 
     ax.set_yscale('log')
     if xdata != 'r25':
@@ -550,15 +554,38 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         else:
             ax.semilogy(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
 
+    if stack_fit is not None:
+        # add fit derived from data
+        fit_idx = (stack_fit['bin'] == xdata) &  (stack_fit['column'] == ydata) 
+        slope = stack_fit[fit_idx]['slope']
+        intercept = stack_fit[fit_idx]['intercept']
+
+        xmin, xmax = ax.get_xlim()
+        if xdata == 'r25':
+            xvals_fit = np.linspace(xmin,xmax)
+            yvals_fit = 10**(slope * xvals_fit + intercept)
+        elif xdata == 'mstar':            
+            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
+            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
+        elif xdata == 'ICO':
+            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
+            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
+
+        if xdata != 'r25':
+            ax.loglog(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
+        else:
+            ax.semilogy(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
 
     # get handles
     handles, labels = ax.get_legend_handles_labels()
+
     # remove errorbars
-    new_handles = [h[0] for h in handles[1:-1]]
-    new_handles.insert(0,handles[0])
+    # TODO -- handle all combinations.
+    #new_handles = [h[0] for h in handles[2:-1]]
+    #new_handles.insert(0,handles[0:1])
 
 
-    mylegend = ax.legend(new_handles, labels, loc='upper left',
+    mylegend = ax.legend(handles, labels, loc='upper left',
                          bbox_to_anchor=(1.0,1.0),handlelength=3, 
                          borderpad=1.2)    
 

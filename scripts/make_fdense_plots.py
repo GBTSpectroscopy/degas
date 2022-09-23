@@ -21,7 +21,6 @@ ratio_plots(degas, stack, ydata='ratio_ltir_mean_HCN',xdata='mstar',stack_fit=st
 ratio_plots(degas, stack, ydata='ratio_ltir_mean_HCN',xdata='ICO',stack_fit=stack_fit,pltname=os.path.join(plotdir,"sfe_dense_vs_ICO_IR6p1_mom1"))
 
 
-
 ratio_plots(degas, stack, ydata='ratio_HCOp_CO',xdata='r25', stack_fit=stack_fit_noNGC4414,pltname=os.path.join(plotdir,"fdense_vs_r25_IR6p1_mom1_hcop"),pltlabel=r'constant R$_{21}$',add_empire=False)
 ratio_plots(degas, stack, ydata='ratio_HCOp_CO',xdata='mstar',stack_fit=stack_fit,pltname=os.path.join(plotdir,"fdense_vs_mstar_IR6p1_mom1_hcop"),pltlabel=r'constant R$_{21}$',add_empire=False)
 ratio_plots(degas, stack, ydata='ratio_HCOp_CO',xdata='ICO', stack_fit=stack_fit,pltname=os.path.join(plotdir,"fdense_vs_ICO_IR6p1_mom1_hcop"),pltlabel=r'constant R$_{21}$',add_empire=False)
@@ -41,10 +40,14 @@ ratio_plots(degas, stack2, ydata='ratio_HCN_CO',xdata='r25',stack_fit=stack2_fit
 ratio_plots(degas, stack2, ydata='ratio_HCN_CO',xdata='mstar',stack_fit=stack2_fit,pltname=os.path.join(plotdir,"fdense_vs_mstar_IR6p1_mom1_spatialR21"),pltlabel=r'spatial R$_{21}$')
 ratio_plots(degas, stack2, ydata='ratio_HCN_CO',xdata='ICO',stack_fit=stack2_fit,pltname=os.path.join(plotdir,"fdense_vs_ICO_IR6p1_mom1_spatialR21"),pltlabel=r'spatial R$_{21}$')
 
+ratio_plots(degas, stack2, ydata='ratio_ltir_mean_HCN',xdata='ICO',stack_fit=stack2_fit,pltname=os.path.join(plotdir,"sfe_dense_vs_ICO_IR6p1_mom1_spatialR21"),add_empire=True)
+
+
 ratio_plots(degas, stack2, ydata='ratio_HCOp_CO',xdata='r25',stack_fit=stack2_fit_noNGC4414, pltname=os.path.join(plotdir,"fdense_vs_r25_IR6p1_mom1_hcop_spatialR21"),pltlabel=r'spatial R$_{21}$',add_empire=False)
 ratio_plots(degas, stack2, ydata='ratio_HCOp_CO',xdata='mstar',stack_fit=stack2_fit, pltname=os.path.join(plotdir,"fdense_vs_mstar_IR6p1_mom1_hcop_spatialR21"),pltlabel=r'spatial R$_{21}$',add_empire=False)
 ratio_plots(degas, stack2, ydata='ratio_HCOp_CO',xdata='ICO',stack_fit=stack2_fit,pltname=os.path.join(plotdir,"fdense_vs_ICO_IR6p1_mom1_hcop_spatialR21"),pltlabel=r'spatial R$_{21}$',add_empire=False)
 
+ratio_plots(degas, stack2, ydata='ratio_ltir_mean_HCOp',xdata='ICO',stack_fit=stack2_fit,pltname=os.path.join(plotdir,"sfe_dense_vs_ICO_IR6p1_mom1_hcop_spatialR21"),add_empire=False)
 
 # IR6p1 mom1 33as
 stack3 = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1_33as/stack_IR6p1_33as_mom1_pruned.fits')

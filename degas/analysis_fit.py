@@ -174,6 +174,7 @@ def make_fit_table(stack,
 
     return t
     
+
     
                                 
 def fit_trend(stack, 

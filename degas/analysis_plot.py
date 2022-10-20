@@ -602,7 +602,8 @@ def plot_correlation_coeffs(results,
                             pltname=None,
                             corr_type='spearman',
                             plim=0.05,
-                            nval_lim=3):
+                            nval_lim=3,
+                            pltlabel=None):
 
     '''
     plot the correlation coefficients for each galaxy and the overall
@@ -617,7 +618,6 @@ def plot_correlation_coeffs(results,
     corr_val = 'corr_val_'+corr_type
     p_val = 'p_val_'+corr_type
 
-
     if corr_type == 'kendall':
         ylabelstr = r'Kendall $\tau$'
     elif corr_type == 'spearman':
@@ -631,6 +631,9 @@ def plot_correlation_coeffs(results,
                                       edgecolor='white')
     fig.subplots_adjust(hspace=0.2, bottom=0.12,left=0.15,top=0.95)
     
+    if pltlabel:
+        fig.suptitle(pltlabel,x=0.95,y=0.96,size=12,horizontalalignment='right',
+                     verticalalignment='bottom')
 
     for (mybin,myax) in zip(corr_bins,[ax1,ax2,ax3]):
 
@@ -705,3 +708,92 @@ def plot_correlation_coeffs(results,
         fig.savefig(pltname+'.pdf')
         
         
+def plot_fit_coeff_hist(resultspergal, results, 
+                        alt_r25=None,
+                        fit_quant='ratio_HCN_CO',                        
+                        pltname=None,
+                        pltlabel=None):
+    '''
+    Plot histogram of fit coefficients
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/13/2022  A.A. Kepley     Original Code
+    '''
+
+    corr_bins = ['r25','mstar','ICO']
+ 
+    if fit_quant == 'ratio_ltir_mean_HCN':
+        #fit_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+        fit_quant_str = r"L$_{TIR}$/HCN"
+    elif fit_quant == 'ratio_HCN_CO':
+        fit_quant_str = r"HCN-to-CO"
+    elif fit_quant == 'ratio_ltir_mean_HCOp':
+        #fit_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+        fit_quant_str = r"L$_{TIR}$/HCO+"
+    elif fit_quant == 'ratio_HCOp_CO':
+        fit_quant_str = r"HCO+-to-CO"
+    else:
+        print("Fit quantity " + fit_quant + " not recognized. Using corr_quant value as text")
+        fit_quant_str = fit_quant
+
+    fig, (ax1,ax2,ax3) = plt.subplots(3,2,figsize=(8,8),
+                                      edgecolor='white', sharey=True)
+    fig.subplots_adjust(hspace=0.2, bottom=0.08,left=0.22,top=0.92, right=0.95)
+    
+    if pltlabel:
+        fig.suptitle(pltlabel,x=0.95,y=0.93,size=14,horizontalalignment='right',
+                     verticalalignment='bottom')
+
+    for (mybin,myax) in zip(corr_bins,[ax1,ax2,ax3]):
+
+        if mybin == 'r25':
+            mybinstr = r"R/R$_{25}$"
+        elif mybin == 'mstar':
+            #mybinstr = r"$\Sigma_*$ [M$_\odot$ pc$^{-2}$]"
+            mybinstr = r"$\Sigma_*$"
+        elif mybin == 'ICO':
+            #mybinstr = r"I$_{CO}$ [K km s$^{-1}$]"
+            mybinstr = r"I$_{CO}$"
+        else:
+            print("Bin " + mybin + " not recognized. Using bin value as text.")
+        
+        idx = (resultspergal['column'] == fit_quant) & (resultspergal['bin'] == mybin)
+                
+        if mybin == 'r25' and alt_r25:
+            idxall = (alt_r25['column'] == fit_quant) & (alt_r25['bin'] == mybin)
+        else:
+            idxall = (results['column'] == fit_quant) & (results['bin'] == mybin)
+    
+
+        myax[0].hist(resultspergal[idx]['slope'],color='gray')
+        
+        if mybin == 'r25' and alt_r25:
+            myax[0].axvline(alt_r25[idxall]['slope'],color='black',linewidth=3,label='Combined')
+        else:
+            myax[0].axvline(results[idxall]['slope'],color='black',linewidth=3,label='Combined')
+
+        myax[0].set_ylabel('Number')
+        myax[0].legend()
+        
+        mylabel = fit_quant_str + "\nvs.\n" + mybinstr
+        myax[0].text(-0.4,0.5,mylabel,horizontalalignment='center',
+                     verticalalignment='center',transform=myax[0].transAxes)
+        
+        myax[1].hist(resultspergal[idx]['intercept'],color='gray')
+
+        if mybin == 'r25' and alt_r25:
+            myax[1].axvline(alt_r25[idxall]['intercept'],color='black',linewidth=3,label='Combined')
+        else:
+            myax[1].axvline(results[idxall]['intercept'],color='black',linewidth=3,label='Combined')
+
+        myax[1].legend()
+
+    myax[0].set_xlabel('Slope')
+
+    myax[1].set_xlabel('Intercept')
+
+
+    if pltname:
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')

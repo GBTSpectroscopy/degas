@@ -173,14 +173,100 @@ def make_fit_table(stack,
     t.write(outfile,overwrite=True)
 
     return t
-    
 
+
+#----------------------------------------------------------------------
+
+def make_fit_table_pergal(stack, 
+                          bins = ['r25','mstar','ICO'],
+                          columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN'],
+                          outfile = 'test.fits',
+                          exclude_gal = [],
+                          plotDir = None):
+    '''
     
-                                
+    Purpose: run fitting code for different parameters and save
+    results to table
+
+    stack: input stack
+    bins: bins to use for x vals
+    columns: columns to use for y vals
+    outfile: fits table for results
+    exclude_gal (optional): galaxies to exclude from fit
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/13/2022   A.A. Kepley     Original Code
+
+    '''
+    
+    # create results table
+    t = Table(names=('galaxy','bin','column',
+                     'slope','slope_err','intercept','intercept_err',
+                     'chisq','AIC','BIC'),
+              dtype=('S20','S20','S20',
+                     float, float,float,float,
+                     float,float,float),
+              meta=stack.meta)
+
+    # remove any galaxies we are excluding
+    if len(exclude_gal) > 0:
+        for bad_gal in exclude_gal:
+            idx = stack['galaxy'] != bad_gal
+            stack = stack[idx]
+        t.meta['EXCLUDE_GAL'] = exclude_gal
+
+
+    gal_list = np.unique(stack['galaxy'])
+
+    for gal in gal_list:
+        # do fit for each bin/column combination
+        for mybin in bins:
+
+            # select out the bins we want
+            idx = (stack['bin_type'] == mybin) & (stack['galaxy'] == gal)
+            if len(stack[idx]) == 0:
+                print("Bin " + mybin+ " not found in stack. Skipping")
+                continue
+
+            if len(stack[idx]) <= 1:
+                print("Not enough values to fit. Skipping")
+                continue
+
+            # iterate over columns    
+            for mycol in columns: 
+                if not mycol in stack.columns:
+                    print("Column "+mycol+" not in stack. Skipping")
+                    continue
+
+                myresult = fit_trend(stack[idx],bin_type=mybin,stack_col=mycol, plotDir=plotDir, plot_postfix=gal)
+                
+                if myresult:
+
+                    t.add_row([gal,mybin,mycol,
+                               myresult.params['slope'].value,
+                               myresult.params['slope'].stderr,
+                               myresult.params['intercept'].value,
+                               myresult.params['intercept'].stderr,
+                               myresult.chisqr,
+                               myresult.aic,
+                               myresult.bic])
+                else:
+                    print("Not enough points to fit: " + gal + ", " + mybin + ", " + mycol)
+
+    # write out results
+    t.write(outfile,overwrite=True)
+
+    return t
+    
+   
+#----------------------------------------------------------------------
+                                    
 def fit_trend(stack, 
               bin_type='r25', 
               stack_col = 'ratio_HCN_CO',
-              plotDir = None):
+              plotDir = None,
+              plot_postfix = ""):
     '''
 
     Purpose: fit a linear regression to a subset of data from a stack
@@ -214,6 +300,10 @@ def fit_trend(stack,
         xvals = np.log10(np.array(stack['bin_mean'][idx]))
 
     yvals = np.log10(np.array(stack[stack_col][idx]))
+
+    if len(yvals) <= 1:
+        print("not enough values to fit")
+        return False
     
     ## percent errors = errors in log space
     yvals_err = stack[stack_col+"_err"][idx]/stack[stack_col][idx]
@@ -250,7 +340,7 @@ def fit_trend(stack,
     if plotDir:
         if not os.path.exists(plotDir):
             os.mkdir(plotDir)
-        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_fit.png"))
-        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_fit.pdf"))
+        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" +plot_postfix + "_fit.png"))
+        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" + plot_postfix + "_fit.pdf"))
 
     return modresult

@@ -45,6 +45,12 @@ filelist = glob.glob(os.path.join(baseDir,'sfe_fdense_trends','sfe_dense_*.pdf')
 for myfile in filelist:
     shutil.copy(myfile, paperDir)
 
+# copy fdense and sfedense fit coeff plots
+filelist = glob.glob(os.path.join(baseDir,'sfe_fdense_trends','ratio_*hist*.pdf'))
+for myfile in filelist:
+    shutil.copy(myfile,paperDir)
+
+
 # copy correlation plots
 filelist = glob.glob(os.path.join(baseDir,"sfe_fdense_trends","*correlation_coeffs.pdf"))
 for myfile in filelist:

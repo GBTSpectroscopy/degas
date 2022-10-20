@@ -408,3 +408,392 @@ def compare_stacks_line(stack_list, stack_name_list,
 
 #----------------------------------------------------------------------
 
+
+
+def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25', 
+                add_empire=True, 
+                stack_fit=None,
+                include_uplims=False,
+                release='DR1',
+                pltname=None,
+                pltlabel=None):
+
+    '''
+
+    Purpose: general purpose plotting routine for sfe_dense vs. x and
+    fdense vs. x 
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    7/21/2022   A.A. Kepley     Original Code
+
+    '''
+
+    # select release galaxies. TODO -- offer all option?
+    print("Only plotting release " + release + "\n")
+    release = degas[release] == 1
+    nrelease = np.sum(release)
+
+    # set up x labels
+    if xdata == 'r25':
+        xlabel = r'R/R$_{25}$'
+    elif xdata == 'mstar':
+        xlabel = r'$\Sigma_{*}$ [M$_\odot$ pc$^{-2}$]'
+    elif xdata == 'ICO':
+        xlabel = r'$\Sigma_{mol}$ [M$_\odot$ pc$^{-2}$]'
+    else:
+        print("no valid xlabel value using xdata name: " + xdata)
+        xlabel = xdata
+    
+    # set up y labels
+    if ydata == 'ratio_HCN_CO':
+        ylabel = r'HCN-to-CO'
+    elif ydata == 'ratio_ltir_mean_HCN':
+        ylabel = r'L$_{TIR}$ / HCN'
+    elif ydata == 'ratio_HCOp_CO':
+        ylabel = r'HCO+-to-CO'
+    elif ydata == 'ratio_ltir_mean_HCOp':
+        ylabel = r'L$_{TIR}$ / HCO+'
+    else:
+        ylabel = ydata
+
+  
+    # setup plot style
+    markers = ['o','v','^','s','>','D'] # 6 items
+    colors = ['royalblue','forestgreen','darkorange','royalblue','crimson','rebeccapurple','darkcyan','darkmagenta']
+
+    markerlist = np.tile(markers,int(np.ceil(nrelease/len(markers))))
+    markerlist = markerlist[0:nrelease]
+
+    colorlist = np.tile(colors,int(np.ceil(nrelease/len(colors))))
+    colorlist = colorlist[0:nrelease]
+    
+    # set up plot
+    fig = plt.figure(figsize=(8,6),facecolor='white',edgecolor='white')
+    fig.subplots_adjust(left=0.15,right=0.78,bottom=0.15, top=0.9)
+
+    ax = fig.add_subplot(1,1,1)
+   
+    # for each dr1 galaxy, show radial trends for each line.
+    for (galaxy,color,marker) in zip(degas[release],colorlist,markerlist):
+        idx = ( (stack['galaxy'] == galaxy['NAME']) \
+                & (stack['bin_type'] == xdata))
+
+        if xdata == 'ICO':
+            # apply alpha_co and correct for inclination
+            alpha_co = float(stack.meta['ALPHA_CO'].split(' ')[0])
+            factor = alpha_co * np.cos(np.radians(galaxy['INCL_DEG']))
+        else:
+            factor = 1.0
+
+        xvals = stack[idx]['bin_mean'] * factor
+
+
+
+        yvals = stack[idx][ydata] 
+        yvals_err = stack[idx][ydata+'_err'] 
+
+        if ydata+'_uplim' in stack.columns:
+            lims = stack[idx][ydata+'_uplim']
+        elif ydata + '_lolim' in stack.columns:
+            lims = stack[idx][ydata+'_lolim']
+            yvals_err[lims] = yvals[lims] * 0.3 
+
+        ax.plot(xvals[~lims],yvals[~lims],
+                    marker = marker,
+                    linestyle= '--',
+                    color=color,
+                    label=galaxy['NAME'],zorder=10)
+
+        ax.errorbar(xvals[~lims], yvals[~lims],
+                    yerr = yvals_err[~lims],
+                    fmt='none',color=color,zorder=10)
+
+    ax.set_yscale('log')
+    if xdata != 'r25':
+        ax.set_xscale('log')
+    ax.set_xlabel(xlabel,fontsize=20)
+    ax.set_ylabel(ylabel,fontsize=20)
+    ax.tick_params(axis='both',labelsize=16)
+    
+    if pltlabel:
+        ax.set_title(pltlabel)
+
+    # empire fit parameters
+    if add_empire:
+        xmin, xmax = ax.get_xlim()
+        if ydata == 'ratio_HCN_CO':
+            if xdata == 'r25':
+                xvals_empire = np.linspace(xmin, xmax)
+                yvals_empire = 10**(-1.5-0.8*xvals_empire)
+            elif xdata == 'mstar':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(-2.7+0.4*np.log10(xvals_empire))
+            elif xdata == 'ICO':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(-2.4 + 0.5*np.log10(xvals_empire))
+            else:
+                print("No empire equation available for " + xdata + ' vs. ' + ydata)
+        elif ydata == 'ratio_ltir_mean_HCN':
+            if xdata == 'r25': 
+                xvals_empire = np.linspace(xmin,xmax)
+                yvals_empire = 10**(2.8+0.6*xvals_empire)
+            elif xdata == 'mstar':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(4.0-0.4*np.log10(xvals_empire))
+            elif xdata == 'ICO':
+                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
+                yvals_empire = 10**(3.5-0.4*np.log10(xvals_empire))
+            else:
+                print("No empire equation available for " + xdata + ' vs. ' + ydata)
+        else:
+            print("Not a validate y data set for EMPIRE: " + ydata)
+                                
+        if xdata != 'r25':
+            ax.loglog(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
+        else:
+            ax.semilogy(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
+
+    if stack_fit is not None:
+        # add fit derived from data
+        fit_idx = (stack_fit['bin'] == xdata) &  (stack_fit['column'] == ydata) 
+        slope = stack_fit[fit_idx]['slope']
+        intercept = stack_fit[fit_idx]['intercept']
+
+        xmin, xmax = ax.get_xlim()
+        if xdata == 'r25':
+            xvals_fit = np.linspace(xmin,xmax)
+            yvals_fit = 10**(slope * xvals_fit + intercept)
+        elif xdata == 'mstar':            
+            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
+            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
+        elif xdata == 'ICO':
+            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
+            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
+
+        if xdata != 'r25':
+            ax.loglog(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
+        else:
+            ax.semilogy(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
+
+    # get handles
+    handles, labels = ax.get_legend_handles_labels()
+
+    # remove errorbars
+    # TODO -- handle all combinations.
+    #new_handles = [h[0] for h in handles[2:-1]]
+    #new_handles.insert(0,handles[0:1])
+
+
+    mylegend = ax.legend(handles, labels, loc='upper left',
+                         bbox_to_anchor=(1.0,1.0),handlelength=3, 
+                         borderpad=1.2)    
+
+    fig.show()
+
+    if pltname:
+        # save as both png and pdf
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')
+
+
+def plot_correlation_coeffs(results, 
+                            corr_quant='ratio_HCN_CO',
+                            pltname=None,
+                            corr_type='spearman',
+                            plim=0.05,
+                            nval_lim=3,
+                            pltlabel=None):
+
+    '''
+    plot the correlation coefficients for each galaxy and the overall
+    sample for correlation bins and 
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    8/4/2022    A.A. Kepley     Original code
+
+    '''
+
+    corr_val = 'corr_val_'+corr_type
+    p_val = 'p_val_'+corr_type
+
+    if corr_type == 'kendall':
+        ylabelstr = r'Kendall $\tau$'
+    elif corr_type == 'spearman':
+        ylabelstr = r'Spearman $\rho$'
+    else:
+        ylabelstr = 'Correlation'
+
+    corr_bins = ['r25','mstar','ICO']
+ 
+    fig, (ax1,ax2,ax3) = plt.subplots(3,1,sharex=True,figsize=(8,8),
+                                      edgecolor='white')
+    fig.subplots_adjust(hspace=0.2, bottom=0.12,left=0.15,top=0.95)
+    
+    if pltlabel:
+        fig.suptitle(pltlabel,x=0.95,y=0.96,size=12,horizontalalignment='right',
+                     verticalalignment='bottom')
+
+    for (mybin,myax) in zip(corr_bins,[ax1,ax2,ax3]):
+
+        idx_all = (results['galaxy'] == 'all') & (results['corr_bin'] == mybin) & (results['quant'] == corr_quant)
+        idx_gal = (results['galaxy'] != 'all') & (results['corr_bin'] == mybin) & (results['quant'] == corr_quant)
+
+        myax.set_axisbelow(True)
+        myax.grid(axis='x')
+
+        # plot correlation coefficients
+        myax.scatter(results['galaxy'][idx_gal],results[corr_val][idx_gal],
+                     facecolor='gray',s=20,edgecolor='None',marker='o',
+                     zorder=1, label="n < 3")
+
+        # mark those with >3 values
+        large_nval = results[idx_gal]['nval'] >= nval_lim
+        myax.scatter(results[idx_gal][large_nval]['galaxy'], 
+                     results[idx_gal][large_nval][corr_val],
+                     marker='o',facecolor="orange",edgecolor='None',
+                     s=30,
+                     label="n >= "+str(nval_lim),
+                     zorder=1)
+
+        # mark the significant values
+        good_pval = results[idx_gal][p_val] < plim
+        myax.scatter(results[idx_gal][good_pval]['galaxy'], 
+                     results[idx_gal][good_pval][corr_val],
+                     marker='o',facecolor="None",edgecolor='black',
+                     s=40,
+                     label='p<'+str(plim),
+                     zorder=1)
+        
+        # plot the average value
+        myax.axhline(results[idx_all][corr_val],color='gray',linewidth=3,
+                     zorder=2)
+        myax.axhline(0,color='gray',linewidth=1)
+
+        myax.set_ylim(-1.2,1.2)
+        myax.set_ylabel(ylabelstr)        
+
+        if mybin == 'r25':
+            mybinstr = r"R/R$_{25}$"
+        elif mybin == 'mstar':
+            #mybinstr = r"$\Sigma_*$ [M$_\odot$ pc$^{-2}$]"
+            mybinstr = r"$\Sigma_*$"
+        elif mybin == 'ICO':
+            #mybinstr = r"I$_{CO}$ [K km s$^{-1}$]"
+            mybinstr = r"I$_{CO}$"
+        else:
+            print("Bin " + mybin + " not recognized. Using bin value as text.")
+        
+        if corr_quant == 'ratio_ltir_mean_HCN':
+            #corr_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+            corr_quant_str = r"L$_{TIR}$/HCN"
+        elif corr_quant == 'ratio_HCN_CO':
+            corr_quant_str = r"HCN-to-CO"
+        else:
+            print("Correlation Quantity " + corr_quant + " not recognized. Using corr_quant value as text")
+
+        myax.set_title(corr_quant_str + ' - ' + mybinstr ) 
+
+    if corr_quant == 'ratio_HCN_CO':
+        myloc = 'lower right'
+    elif corr_quant == 'ratio_ltir_mean_HCN':
+        myloc = 'upper right'
+
+    ax3.legend(loc=myloc)
+    ax3.tick_params(axis='x',which='both',labelrotation=90)
+
+    if pltname:
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')
+        
+        
+def plot_fit_coeff_hist(resultspergal, results, 
+                        alt_r25=None,
+                        fit_quant='ratio_HCN_CO',                        
+                        pltname=None,
+                        pltlabel=None):
+    '''
+    Plot histogram of fit coefficients
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    10/13/2022  A.A. Kepley     Original Code
+    '''
+
+    corr_bins = ['r25','mstar','ICO']
+ 
+    if fit_quant == 'ratio_ltir_mean_HCN':
+        #fit_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+        fit_quant_str = r"L$_{TIR}$/HCN"
+    elif fit_quant == 'ratio_HCN_CO':
+        fit_quant_str = r"HCN-to-CO"
+    elif fit_quant == 'ratio_ltir_mean_HCOp':
+        #fit_quant_str = r"L$_{TIR}$/HCN [L$_\odot$ pc$^{-2}$ (K km s$^{-1}$)$^{-1}$]"
+        fit_quant_str = r"L$_{TIR}$/HCO+"
+    elif fit_quant == 'ratio_HCOp_CO':
+        fit_quant_str = r"HCO+-to-CO"
+    else:
+        print("Fit quantity " + fit_quant + " not recognized. Using corr_quant value as text")
+        fit_quant_str = fit_quant
+
+    fig, (ax1,ax2,ax3) = plt.subplots(3,2,figsize=(8,8),
+                                      edgecolor='white', sharey=True)
+    fig.subplots_adjust(hspace=0.2, bottom=0.08,left=0.22,top=0.92, right=0.95)
+    
+    if pltlabel:
+        fig.suptitle(pltlabel,x=0.95,y=0.93,size=14,horizontalalignment='right',
+                     verticalalignment='bottom')
+
+    for (mybin,myax) in zip(corr_bins,[ax1,ax2,ax3]):
+
+        if mybin == 'r25':
+            mybinstr = r"R/R$_{25}$"
+        elif mybin == 'mstar':
+            #mybinstr = r"$\Sigma_*$ [M$_\odot$ pc$^{-2}$]"
+            mybinstr = r"$\Sigma_*$"
+        elif mybin == 'ICO':
+            #mybinstr = r"I$_{CO}$ [K km s$^{-1}$]"
+            mybinstr = r"I$_{CO}$"
+        else:
+            print("Bin " + mybin + " not recognized. Using bin value as text.")
+        
+        idx = (resultspergal['column'] == fit_quant) & (resultspergal['bin'] == mybin)
+                
+        if mybin == 'r25' and alt_r25:
+            idxall = (alt_r25['column'] == fit_quant) & (alt_r25['bin'] == mybin)
+        else:
+            idxall = (results['column'] == fit_quant) & (results['bin'] == mybin)
+    
+
+        myax[0].hist(resultspergal[idx]['slope'],color='gray')
+        
+        if mybin == 'r25' and alt_r25:
+            myax[0].axvline(alt_r25[idxall]['slope'],color='black',linewidth=3,label='Combined')
+        else:
+            myax[0].axvline(results[idxall]['slope'],color='black',linewidth=3,label='Combined')
+
+        myax[0].set_ylabel('Number')
+        myax[0].legend()
+        
+        mylabel = fit_quant_str + "\nvs.\n" + mybinstr
+        myax[0].text(-0.4,0.5,mylabel,horizontalalignment='center',
+                     verticalalignment='center',transform=myax[0].transAxes)
+        
+        myax[1].hist(resultspergal[idx]['intercept'],color='gray')
+
+        if mybin == 'r25' and alt_r25:
+            myax[1].axvline(alt_r25[idxall]['intercept'],color='black',linewidth=3,label='Combined')
+        else:
+            myax[1].axvline(results[idxall]['intercept'],color='black',linewidth=3,label='Combined')
+
+        myax[1].legend()
+
+    myax[0].set_xlabel('Slope')
+
+    myax[1].set_xlabel('Intercept')
+
+
+    if pltname:
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')

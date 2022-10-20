@@ -1,6 +1,6 @@
 galaxy, bin_type, min_val
 NGC0337, ICO, 0.5
-NGC0337, mstar, 10
+NGC0337, mstar, 20
 NGC2146, mstar, 20
 NGC2903, mstar, 200
 NGC2903, ICO, 3

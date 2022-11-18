@@ -25,38 +25,45 @@ import sys
 import ipdb
 
 #based on PHANGS-example_make_products.py
-#save the henerated noise cubes
-def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs):
+#save the generated noise cubes
+def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
+                       line_width=30*u.km/u.s, snr_cut=[3.0,4.0],
+                       vel_tolerance=30):
     #logging.basicConfig(level=logging.DEBUG, 
     #                    handlers = [logging.FileHandler(os.path.join(outDir,'product.log'), mode='w'), logging.StreamHandler(sys.stdout)])
-##########
-#    make moment maps and associated error maps for one galaxy in DEGAS
+    '''
+    make moment maps and associated error maps for one galaxy in DEGAS
 
-#    galaxy: str, galaxy name, should be the same as the beginning of the file
+    Inputs:
+        galaxy: str, galaxy name, should be the same as the beginning of the file
+        inDir: input directory relative to the base directory, where cleaned cubes are stored
 
-#    inDir: input directory relative to the base directory, where cleaned cubes are stored
+        maskDir: mask directory, where regrided 3D CO masks are stored
 
-#    maskDir: mask directory, where regrided 3D CO masks are stored
+        outDir: output directory, where generated products are stored
 
-#    outDir: output directory, where generated products are stored
+        do_map: whether to estimate noise at each pixel (False) or over a box (True)
 
-#   do_map: whether to estimate noise at each pixel (False) or over a box (True)
+        do_spec: whether to estimate noise assuming same for all channels or over several channels (True, spec_box = 1 for now)
 
-#   do_spec: whether to estimate noise assuming same for all channels or over several channels (True, spec_box = 1 for now)
+    '''
 
-##########
     #check line input
     if line not  in ['HCN', 'HCOp', '13CO', 'C18O']:
-        logger.error("Must be HCN, HCOp, 13CO or C18O!")
+        print("Must be HCN, HCOp, 13CO or C18O!")
+        return
 
     # -------noise estimation from DEGAS cube----------#
-    # grab DEGAS cube for the line and galaxy ---- might need to change the file names later to be less specific?
-    this_base_infile = glob.glob(os.path.join(inDir,galaxy+'_'+line+'_rebase7_smooth1.3_hanning1*.fits'))[0]
+    # grab DEGAS cube for the line and galaxy ----
+    this_base_infile = glob.glob(os.path.join(inDir,galaxy+'_'+line+'_*.fits'))[0]
     co_mask_file = glob.glob(os.path.join(maskDir,galaxy+'_12CO_mask_regrid.fits'))[0]
+    co_mom1_file = glob.glob(os.path.join(inDir,galaxy+"_12CO_mom1_regrid.fits"))[0]
     rms_file = os.path.join(outDir, \
                             os.path.basename(this_base_infile).replace('.fits','_rms.fits'))
-    print("Noise estimation for native res for ", this_base_infile)
-    basecube= SpectralCube.read(this_base_infile)
+
+    # calculate noise cube.
+    print("Noise estimation for for ", this_base_infile)
+    basecube = SpectralCube.read(this_base_infile)
     
     rmscube = recipe_degas_noise(incube=basecube, 
                                  mask=co_mask_file, 
@@ -64,31 +71,53 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs):
                                  noise_kwargs=noise_kwargs,
                                  overwrite=True) 
    
+    # set up mom0 files
     mom0_file = os.path.join(outDir, \
                              os.path.basename(this_base_infile).replace('.fits','_mom0.fits')) #need to change this later to NAME_LINE_RES_mom0.fits 
     emom0_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_emom0.fits')) #need to change this later to NAME_LINE_RES_emom0.fits
-    mom0,emom0=write_moment0(
-        basecube, rms=rmscube, channel_correlation=None, #not implemented yet in phangs-pipeline
-        outfile=mom0_file, 
-        errorfile=emom0_file,
-        overwrite=True, unit=None,
-        include_limits=True,
-        line_width=30 * u.km / u.s,
-        return_products=True)
-    print ('mom0: ',mom0_file, '; error map:', emom0_file)
 
+    snr_file = os.path.join(outDir,os.path.basename(this_base_infile).replace('.fits','_snr.fits'))
+    mom0_masked_file = os.path.join(outDir, \
+                             os.path.basename(this_base_infile).replace('.fits','_mom0_masked.fits'))
+
+    # calculate mom0
+    co_mask = SpectralCube.read(co_mask_file)
+    co_mask = np.array(co_mask.filled_data[:].value,dtype=np.bool)
+    basecube_masked_wco = basecube.with_mask(co_mask,inherit_mask=False) ## inherit_mask=False means any existing mask on the cube is removed.
+
+    mom0,emom0 = write_moment0(basecube_masked_wco, rms=rmscube, 
+                               channel_correlation=None, #not implemented yet in phangs-pipeline
+                               outfile=mom0_file, 
+                               errorfile=emom0_file,
+                               snrfile=snr_file,
+                               outfile_masked=mom0_masked_file,
+                               overwrite=True, unit=None,
+                               include_limits=True,
+                               line_width=line_width,
+                               snr_cut=snr_cut[0],
+                               return_products=True)
+    print('mom0: ',mom0_file, '; error map:', emom0_file)
+
+    # set up mom1 files
     mom1_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_mom1.fits')) #need to change this later to NAME_LINE_RES_mom1.fits 
     emom1_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_emom1.fits')) #need to change this later to NAME_LINE_RES_emom1.fits
-    write_moment1(
-        basecube, mom0, rms=rmscube, channel_correlation=None,
-        outfile=mom1_file, 
-        errorfile=emom1_file,
-        overwrite=True, unit=None,
-        return_products=False)
-    print ('mom1: ',mom1_file, '; error map:', emom1_file)
+
+    #calculate mom1
+    basecube_masked_wmom0 = basecube_masked_wco.with_mask(mom0 > snr_cut[1] * emom0,inherit_mask=True)
+    co_mom1 = fits.open(co_mom1_file)[0].data
+
+    write_moment1(basecube_masked_wmom0, 
+                  rms = rmscube, channel_correlation = None,
+                  outfile = mom1_file, 
+                  errorfile = emom1_file,
+                  mom1_template = co_mom1,
+                  vel_tolerance = vel_tolerance,
+                  overwrite = True, unit = None,
+                  return_products = False)
+    print('mom1: ',mom1_file, '; error map:', emom1_file)
     
-    print ('DONE. Check ', outDir, 'for products.')
-    os.chdir(outDir)
+    print('DONE. Check ', outDir, 'for products.')
+    #os.chdir(outDir)
 ##########################################
 ########## Estimate noise cube #########
 #####PHANGS: scNoiseRoutines.py###########
@@ -201,53 +230,44 @@ def noise_cube(data, mask=None,
 
         Boolean array with False indicating where data can be 
         used in the noise estimate. (i.e., True is signal). 
-        DEGAS: using masks generated from CO data from PHANGS.
     
     do_map : np.bool
     
         Estimate spatial variations in the noise. Default is True. If
         set to False, all locations in a plane have the same noise
         estimate.
-        DEGAS: using Default = True.
 
     do_spec : np.bool
     
         Estimate spectral variations in the noise. Default is True. If
         set to False, all channels in a spectrum have the same noise
         estimate.
-        DEGAS: using Default=True.
 
     box : int
 
         Spatial size of the box over which noise is calculated in
         pixels.  Default: no box, every pixel gets its own noise
         estimte.
-        DEGAS: using Defaul now, may change later. 
     
     spec_box : int
 
         Spectral size of the box overwhich the noise is calculated.
         Default: no box, each channel gets its own noise estimate.
-        DEGAS: using Defaul now, may change later.
 
     nThresh : int
         Minimum number of data to be used in an individual noise estimate.
-        DEGAS: using 10 now , may change later.
     
     iterations : int
         Number of times to iterate the noise solution to force Gaussian 
         statistics.  Default: no iterations.
-        DEGAS: using Defaul now, may change later.
     
     bandpass_smooth_window : int
         Number of channels used in bandpass smoothing kernel.  Defaults to 
         nChan / 4 where nChan number of channels.  Set to zero to suppress 
         smoothing. Uses Savitzky-Golay smoothing
-        DEGAS: using Zero now to avoid smoothing.
         
     bandpass_smooth_order : int
         Polynomial order used in smoothing kernel.  Defaults to 3.
-        DEGAS: currently not smoothing, so doesn't matter.
     
     """
 
@@ -497,7 +517,7 @@ def recipe_degas_noise(
     """
 
     Wrap noise_cube with a set of preferred parameters for the
-    PHANGS-ALMA CO work.
+    DEGAS work
     
     Parameters:
     -----------
@@ -897,9 +917,12 @@ def calculate_channel_correlation(cube, length=1):
 def write_moment0(
         cube, rms=None, channel_correlation=None,
         outfile=None, errorfile=None,
+        snrfile = None,
+        outfile_masked= None,
         overwrite=True, unit=None,
         include_limits=True,
-        line_width=30 * u.km / u.s, #DEGAS default 30 km/s
+        line_width=30 * u.km / u.s, 
+        snr_cut=3.0,
         return_products=False):
 
     """Write out moment0 map for a SpectralCube
@@ -947,7 +970,7 @@ def write_moment0(
     # Spectral cube collapse routine. Applies the masked, automatically
     mom0 = cube.moment0()
     valid = np.isfinite(mom0)
-    if include_limits:
+    if include_limits: ## AAK: Do we want to do this??
         observed = np.any(np.isfinite(cube._data), axis=0)
         mom0[np.logical_and(np.isnan(mom0), observed)] = 0.0
 
@@ -1009,12 +1032,29 @@ def write_moment0(
         # shares metadata with the moment map
         mom0err_proj = Projection(
             mom0err, wcs=mom0.wcs, header=mom0.header, meta=mom0.meta)
+        
+        #ipdb.set_trace()
 
-        #DEGAS - mask mom0 and emom0 based on SNR>=3 -- Work in Progress
-        #right now the edge of the internal mask remains, need to figure out a way to remove it
-        mom0[mom0.value <= 3*mom0err_proj.value]=np.nan
-        mom0err_proj[np.isnan(mom0.value)]=np.nan
-        mom0[np.isnan(mom0err_proj)]=np.nan #trim pb edges to match errormap
+        #DEGAS - mask mom0 and emom0 based on SNR -- Work in Progress
+
+        # write out SNR image -- no cut
+        snr = mom0.value/mom0err_proj.value
+        if snrfile is not None:
+            snr_proj = Projection(snr,
+                                  wcs=mom0.wcs, 
+                                  header=mom0.header,
+                                  meta=mom0.meta)
+            snr_proj.write(snrfile,overwrite=overwrite)
+      
+        ## TODO: AAK SHOULD TAKE A CLOSER LOOK AT THE FOLLOWING. THE
+        ## PHANGS PIPELINE DOESN'T DO THIS (I.E., NO S/N CUTS). WE MAY
+        ## HAVE NEEDED IT FIRST BECAUSE WE DIDN'T HAVE ANY MASKS (OR
+        ## ONLY CO BASED MASKS).
+        
+        mom0_masked = cube.with_mask(snr_proj >= snr_cut).moment0()
+        #mom0[mom0.value <= snr_cut*mom0err_proj.value]=np.nan
+        #mom0err_proj[np.isnan(mom0.value)]=np.nan
+        #mom0[np.isnan(mom0err_proj)]=np.nan #trim pb edges to match errormap
 
         # Write to disk if requested
         if errorfile is not None:
@@ -1034,6 +1074,10 @@ def write_moment0(
         writer(mom0, outfile, overwrite=overwrite)
         # mom0.write(outfile, overwrite=overwrite)
 
+    if outfile_masked is not None:
+        mom0_masked = update_metadata(mom0_masked,cube)
+        writer(mom0_masked,outfile_masked,overwrite=overwrite)
+
     # If requested, return
     if return_products:
         return(mom0, mom0err_proj)
@@ -1043,9 +1087,11 @@ def write_moment0(
 # &%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%&%
 
 def write_moment1(
-    cube, mom0, rms=None, channel_correlation=None,
+    cube, rms=None, channel_correlation=None,
     outfile=None, errorfile=None,
     overwrite=True, unit=None,
+    mom1_template = [],
+    vel_tolerance = 20.0,
     return_products=True):
     """
     Write out moment1 map for a SpectralCube
@@ -1084,6 +1130,11 @@ def write_moment1(
     mom1 = cube.moment1()
     mom1err_proj = None
     spaxis = cube.spectral_axis.value
+
+    # only keep things within a uncertain number of km/s with fiducial
+    if np.any(mom1_template):
+        mom1[abs(mom1.unitless_filled_data[:,:] - mom1_template) > vel_tolerance ] = np.nan
+
 
     if errorfile is not None and rms is None:
         logger.error("Moment 1 error requested but no RMS provided")
@@ -1135,9 +1186,10 @@ def write_moment1(
 
         #DEGAS - mask mom0 and emom0 based on SNR>=3 -- Work in Progress
         #right now the edge of the internal mask remains, need to figure out a way to remove it
-        mom1[np.isnan(mom0.value)]=np.nan
-        mom1err_proj[np.isnan(mom0.value)]=np.nan
-        mom1[np.isnan(mom1err_proj)]=np.nan #trim pb edges
+        #mom1[np.isnan(mom0.value)]=np.nan
+        #mom1err_proj[np.isnan(mom0.value)]=np.nan
+        #mom1[np.isnan(mom1err_proj)]=np.nan #trim pb edges
+        
 
         if errorfile is not None:
             mom1err_proj = update_metadata(mom1err_proj, cube, error=True)

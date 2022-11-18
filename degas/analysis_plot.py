@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
 import ipdb
+import glob
 
 ## TODO?
 
@@ -797,3 +798,79 @@ def plot_fit_coeff_hist(resultspergal, results,
     if pltname:
         fig.savefig(pltname+'.png')
         fig.savefig(pltname+'.pdf')
+
+def plot_moments(galaxy, line, indir='.', outdir='.', moments=[0,1], masked=True):
+    '''
+    
+    Purpose: plot moment maps for galaxies
+
+    Inputs:
+
+    -- galaxy: name of galaxy, capitalized
+    -- line: '13CO', 'C18O', 'HCN', 'HCOp'
+    -- res: 'native' or 'smoothed'
+    -- moments: [0], [1], [0,1]
+
+    Date        Programmer      Description of Changes
+    --------------------------------------------------
+    early 2022  Yiqing Song     Original Code
+    11/3/2022   A.A. Kepley     Modified.
+
+    '''
+    from astropy.io import fits
+    import aplpy
+
+    print ('plotting products for ', galaxy, ' -- ', line)
+    
+    for m in moments:
+        if masked:
+            momfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'_masked.fits'))        
+
+        else:
+            momfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'.fits'))        
+        emomfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_emom'+str(m)+'.fits'))
+
+        if len(momfits) == 0:
+            print ('No products. Moving on....')
+        else:
+            mom=fits.open(momfits[0])[0]
+            emom=fits.open(emomfits[0])[0]
+
+            if m == 0:
+                mystretch = 'linear'
+                myvmin = 0
+                myvmax = 0.95*np.nanmax(mom.data)
+            elif m == 1:
+                mystretch = 'linear'
+                myvmax = np.nanmax(mom.data)
+                myvmin = np.nanmin(mom.data)
+            else:
+                mystretch = 'linear'
+                myvmax = np.nanmax(mom.data)
+                myvmin = np.nanmin(mom.data)
+
+            fig=plt.figure(figsize=(8.5,4.5))
+            f1=aplpy.FITSFigure(mom, figure=fig, subplot=[0.12, 0.1, 0.4, 0.8])
+            f1.show_colorscale(cmap='rainbow',vmin=myvmin, vmax=myvmax, interpolation='bilinear',stretch=mystretch)
+            f1.add_beam()
+            f1.beam.set_color('red')
+            f1.add_colorbar('top')
+            f1.colorbar.set_axis_label_text(mom.header['BUNIT'])
+            f1.add_label(0.5, 0.8, line+'_mom'+str(m), relative=True)
+            f1.add_label(0.5, 0.1, galaxy, relative=True,size='large',weight='medium')
+
+            f2=aplpy.FITSFigure(emom, figure=fig, subplot=[0.57, 0.1, 0.4, 0.8])
+            f2.show_colorscale(cmap='cubehelix',vmin=np.nanmin(emom.data), vmax=np.nanmax(emom.data), interpolation='bilinear',stretch='linear')
+            #f2.add_beam()
+            #f2.beam.set_color('white')
+            f2.add_colorbar('top')
+            f2.colorbar.set_axis_label_text(emom.header['BUNIT'])
+            f2.add_label(0.5, 0.8, line+'_emom'+str(m), relative=True)
+            f2.add_label(0.5, 0.1, galaxy, relative=True, size='large', weight='medium')
+
+            f2.axis_labels.hide_y()
+            f2.tick_labels.hide_y()
+
+            fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.png'))
+            fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.pdf'))
+            plt.close()

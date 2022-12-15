@@ -61,10 +61,21 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
     rms_file = os.path.join(outDir, \
                             os.path.basename(this_base_infile).replace('.fits','_rms.fits'))
 
-    # calculate noise cube.
-    print("Noise estimation for for ", this_base_infile)
+
+    # read in cube
     basecube = SpectralCube.read(this_base_infile)
     
+    # create peak intensity map
+    tpeak_file = os.path.join(outDir, \
+                             os.path.basename(this_base_infile).replace('.fits','_tpeak.fits')) #need to change this later to NAME_LINE_RES_mom0.fits 
+
+    tpeak = basecube.max(axis=0)
+
+    tpeak.write(tpeak_file,overwrite=True)
+
+
+    # calculate noise cube.
+    print("Noise estimation for for ", this_base_infile)    
     rmscube = recipe_degas_noise(incube=basecube, 
                                  mask=co_mask_file, 
                                  outfile=rms_file, 
@@ -76,7 +87,7 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
                              os.path.basename(this_base_infile).replace('.fits','_mom0.fits')) #need to change this later to NAME_LINE_RES_mom0.fits 
     emom0_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_emom0.fits')) #need to change this later to NAME_LINE_RES_emom0.fits
 
-    snr_file = os.path.join(outDir,os.path.basename(this_base_infile).replace('.fits','_snr.fits'))
+    snrfile = os.path.join(outDir,os.path.basename(this_base_infile).replace('.fits','_snr.fits'))
     mom0_masked_file = os.path.join(outDir, \
                              os.path.basename(this_base_infile).replace('.fits','_mom0_masked.fits'))
 
@@ -89,7 +100,7 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
                                channel_correlation=None, #not implemented yet in phangs-pipeline
                                outfile=mom0_file, 
                                errorfile=emom0_file,
-                               snrfile=snr_file,
+                               snrfile=snrfile,
                                outfile_masked=mom0_masked_file,
                                overwrite=True, unit=None,
                                include_limits=True,

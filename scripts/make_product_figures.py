@@ -20,6 +20,6 @@ if not os.path.exists(outdir):
 for gal in gal_list:
     for line in line_list:
         plot_moments(gal, line, indir=indir, outdir=outdir,
-                     moments=[0,1], masked=False)
+                     moments=[0,1], masked=True)
 
 

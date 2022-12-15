@@ -33,8 +33,8 @@ for galaxy in degas_dr1:
                                outDir=outDir, 
                                noise_kwargs=noise_kwargs,
                                line_width=10*u.km/u.s, 
-                               snr_cut=[3.0,5.0],
-                               vel_tolerance=50.0) 
+                               snr_cut=[4.0,4.0],
+                               vel_tolerance=30.0) 
 
 
 

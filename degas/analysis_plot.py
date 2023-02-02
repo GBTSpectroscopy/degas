@@ -882,7 +882,7 @@ def plot_galaxy_overview(galaxy,
                          img_file,
                          img_type='12CO',
                          out_file='test', out_dir='.',
-                         scalebar=150*u.pc,
+                         scalebar=500*u.pc,
                          base_level=5.0,
                          nlevels=10):
     '''
@@ -925,20 +925,11 @@ def plot_galaxy_overview(galaxy,
 
     from astropy.io import fits
     from astropy.wcs import WCS
-    from astropy.visualization import MinMaxInterval, SqrtStretch, LogStretch, ImageNormalize, PercentileInterval, AsymmetricPercentileInterval
+    from astropy.visualization import MinMaxInterval, SqrtStretch, LogStretch, ImageNormalize, PercentileInterval, AsymmetricPercentileInterval, SquaredStretch
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    #from astropy.visualization.wcsaxes import add_beam, add_scalebar
-    ## IT says it can't import -- why?
-    ## only in astropy 5.2.1 and above. and my astropy is older
-    ## but it does have the ability ot get the beam info from header, so yay!
-    ## NEED UP UPDATE ANACONDA INSTALLATION. HAVING ISSUES WITH LIBGFORTRAN4
-    ##  AND LIBGFORTRAN. BUT CAN'T UPDATE PYTHON BEYOND 3.8.0
-    ## -- DELETE AND REINSTALL??
-
-    ## TODO:
-    ## Figure out how I want to name the file?
-    ## split, then take galaxy name and two lines?
+    ## only available in astropy >=5.2.1. Installed via conda-forge 
+    from astropy.visualization.wcsaxes import add_beam, add_scalebar
 
     # read in images
     dense_mom0_hdu = fits.open(dense_mom0_file)[0]
@@ -953,15 +944,26 @@ def plot_galaxy_overview(galaxy,
     img_wcs = WCS(img_hdu.header)
     img_data = img_hdu.data
 
+    img_unit = img_hdu.header['BUNIT'] # used to figure out which image.
+
     # create plot
     fig = plt.figure(figsize=(8,6))
     fig.subplots_adjust(0.1,0.1,0.8,0.8)
     ax = fig.add_subplot(111,projection=img_wcs)
     ax.tick_params(direction='in') # fix stupid matplotlib default
 
+    # pick colormap
+    if img_unit == 'Lsun/pc^2':
+        mycmap = 'magma'
+    elif img_unit == 'K km s-1':
+        mycmap = 'cividis'
+    else:
+        mycmap = 'Greys'
+
+
     # Add image
     norm = ImageNormalize(img_data, interval=AsymmetricPercentileInterval(0.1,99.5),stretch=SqrtStretch())
-    imres = ax.imshow(img_data,origin='lower',cmap='magma',norm=norm)
+    imres = ax.imshow(img_data,origin='lower',cmap=mycmap,norm=norm)
 
     # go through ridiculous shennighans to add colorbar
     ## There are several methods online showing how to do this, but this one
@@ -970,18 +972,31 @@ def plot_galaxy_overview(galaxy,
                         ax.get_position().width,
                         0.05])
     cax.tick_params(direction='in') # fix stupid matplotlib default
+
+    # label for color bar
+    if img_unit == 'Lsun/pc^2':
+        cbar_label = r'S$_{TIR}$ (L$_\odot$ pc$^{-2}$)'
+    elif img_unit == 'K km s-1':
+        cbar_label = r'T$_{\rm B}$ (K km s$^{-1}$)'
+    else:
+        print("Don't reognize label unit")
+        cbar_label = r''
+    
+    # ticks for color bar
+    cbar_stretch = SquaredStretch() # use the opposite stretch to get uniformly spaced ticks.
+    cbar_ticks = cbar_stretch(np.linspace(0,1,6)) * (norm.vmax - norm.vmin) + norm.vmin
+
+    #cbar_ticks = np.logspace(np.log10(norm.vmin),np.log10(norm.vmax),5)
+
     ## important the keyword below is cax NOT ax.
     cbar = fig.colorbar(imres, cax=cax, orientation='horizontal',
-                        label=r'T$_{\rm B}$ (K km s$^{-1})$',
-                        ticklocation='top')
-    ##-----------
-    ## START HERE
-    ##-----------
-
+                        label=cbar_label,
+                        ticklocation='top',
+                        ticks=cbar_ticks)
+    
+    # set level values based on noise.
     mean_emom0 = np.nanmean(dense_emom0_data)
     median_emom0 = np.nanmedian(dense_emom0_data)
-
-    # start at five sigma from noise
     base_value = base_level * np.max([mean_emom0,median_emom0])
     
     # levels at powers of two
@@ -993,27 +1008,26 @@ def plot_galaxy_overview(galaxy,
                levels=mylevels)
     
     # Add beam
-    # TODO:
-    ## determine the beam automatically from the image header?
-    ## add_beam can do this intrinsically.
-    ##add_beam(ax, 
-    ##        major = 15*u.arcsec, minor = 15*u.arcsec, angle=0, 
-    ##       frame=True)
+    add_beam(ax, header=dense_mom0_hdu.header,
+             corner='bottom left', frame=True,
+             facecolor='black',edgecolor='black')
 
     ## TODO:
     ##  set the below based on image headers??
     ax.coords[0].set_axislabel('RA (J2000)') ### check to make sure that this is the correct unit. 
     ax.coords[1].set_axislabel('DEC (J2000)')
 
-    ## TODO:
     ## Include scale bar
     dist = galaxy['DIST_MPC'] * u.Mpc
     angle = (scalebar / dist).to(u.deg, equivalencies=u.dimensionless_angles())
-    ## TODO: 
+
     # convert scalebar value to text
     mylabel = r"{}".format(scalebar.to_string(format="latex",precision=3))
-    ##add_scalebar(ax, scalebar_angle, label=mylabel, color='white')
+    add_scalebar(ax, angle, label=mylabel, color='black', 
+                 corner='bottom right')
 
     # save image
     plt.savefig(os.path.join(out_dir,out_file))
+    
+    plt.close()
     

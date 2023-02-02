@@ -10,9 +10,9 @@ degas_dr1 = degas[degas['DR1'] == 1]
 #degas_dr1 = degas[degas['NAME'] == 'NGC2903']
 
 
-gal_list=degas_dr1['NAME'] #import list of DEGAS targets
+gal_list = degas_dr1['NAME'] #import list of DEGAS targets
 
-line_list=['13CO', 'C18O', 'HCN', 'HCOp']
+line_list = ['13CO', 'C18O', 'HCN', 'HCOp']
 
 if not os.path.exists(outdir):
     os.mkdir(outdir)
@@ -20,6 +20,7 @@ if not os.path.exists(outdir):
 for gal in gal_list:
     for line in line_list:
         plot_moments(gal, line, indir=indir, outdir=outdir,
-                     moments=[0,1], masked=True)
+                     moments=[0], masked=True)
 
-
+        plot_moments(gal, line, indir=indir, outdir=outdir,
+                     moments=[1], masked=False)

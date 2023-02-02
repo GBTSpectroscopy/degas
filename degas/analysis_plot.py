@@ -824,11 +824,13 @@ def plot_moments(galaxy, line, indir='.', outdir='.', moments=[0,1], masked=True
     
     for m in moments:
         if masked:
-            momfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'_masked.fits'))        
+            momfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'_masked.fits'))        
 
         else:
-            momfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'.fits'))        
-        emomfits=glob.glob(os.path.join(indir,galaxy+'_'+line+'*_emom'+str(m)+'.fits'))
+            momfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'.fits'))        
+        emomfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_emom'+str(m)+'.fits'))
+
+        ipdb.set_trace()
 
         if len(momfits) == 0:
             print ('No products. Moving on....')
@@ -874,3 +876,144 @@ def plot_moments(galaxy, line, indir='.', outdir='.', moments=[0,1], masked=True
             fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.png'))
             fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.pdf'))
             plt.close()
+
+def plot_galaxy_overview(galaxy,
+                         dense_mom0_file, dense_emom0_file,                   
+                         img_file,
+                         img_type='12CO',
+                         out_file='test', out_dir='.',
+                         scalebar=150*u.pc,
+                         base_level=5.0,
+                         nlevels=10):
+    '''
+
+    Purpose: create figure showing overview for galaxy. The overview
+    figure should show contours of HCN emission over IR or CO. These
+    are the three fundamental quantities in the paper (dense gas, star
+    formation, and bulk molecular gas).
+
+    I want leave open the possibility of plotting the HCO+ emission as
+    well, so possibly should make that a parameter if possible.
+
+    Input:
+    
+        -- gal_info: galaxy information from DEGAS catalog (includes distance)
+
+        -- dense_mom0_file: file containing moment 0 image of dense gas (e.g., HCN or HCO+). These will be rendered as contours
+
+        -- dense_emom0_file: file containing the moment 0 error image of the dense gas. This will be used to determine contours.
+
+        -- img_file: file containing the background image (either IR or 12CO mom0).
+    
+        -- Type of image file: Use to set defaults for image display.
+
+    Keywords:
+        -- outfile: explicit name of outfile (generate implicitly if not specified)
+        -- outdir: output directory for files (use current directory if not specified)
+        -- scalebar: scalebar length in pc 
+
+    Methods:
+        -- use wcs axes package for maximum plotting flexibility.
+
+    Output:
+        -- pdf and png of appropriate figure
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    1/19/2023   A.A. Kepley     Original Code
+    '''
+
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    from astropy.visualization import MinMaxInterval, SqrtStretch, LogStretch, ImageNormalize, PercentileInterval, AsymmetricPercentileInterval
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    #from astropy.visualization.wcsaxes import add_beam, add_scalebar
+    ## IT says it can't import -- why?
+    ## only in astropy 5.2.1 and above. and my astropy is older
+    ## but it does have the ability ot get the beam info from header, so yay!
+    ## NEED UP UPDATE ANACONDA INSTALLATION. HAVING ISSUES WITH LIBGFORTRAN4
+    ##  AND LIBGFORTRAN. BUT CAN'T UPDATE PYTHON BEYOND 3.8.0
+    ## -- DELETE AND REINSTALL??
+
+    ## TODO:
+    ## Figure out how I want to name the file?
+    ## split, then take galaxy name and two lines?
+
+    # read in images
+    dense_mom0_hdu = fits.open(dense_mom0_file)[0]
+    dense_mom0_wcs = WCS(dense_mom0_hdu.header)
+    dense_mom0_data = dense_mom0_hdu.data
+
+    dense_emom0_hdu = fits.open(dense_emom0_file)[0]
+    dense_emom0_wcs = WCS(dense_emom0_hdu.header) # the WCS should be the same.
+    dense_emom0_data = dense_emom0_hdu.data
+
+    img_hdu = fits.open(img_file)[0]
+    img_wcs = WCS(img_hdu.header)
+    img_data = img_hdu.data
+
+    # create plot
+    fig = plt.figure(figsize=(8,6))
+    fig.subplots_adjust(0.1,0.1,0.8,0.8)
+    ax = fig.add_subplot(111,projection=img_wcs)
+    ax.tick_params(direction='in') # fix stupid matplotlib default
+
+    # Add image
+    norm = ImageNormalize(img_data, interval=AsymmetricPercentileInterval(0.1,99.5),stretch=SqrtStretch())
+    imres = ax.imshow(img_data,origin='lower',cmap='magma',norm=norm)
+
+    # go through ridiculous shennighans to add colorbar
+    ## There are several methods online showing how to do this, but this one
+    ## worked the best from a control and final product sense.    
+    cax = fig.add_axes([ax.get_position().x0,ax.get_position().y1+0.01,
+                        ax.get_position().width,
+                        0.05])
+    cax.tick_params(direction='in') # fix stupid matplotlib default
+    ## important the keyword below is cax NOT ax.
+    cbar = fig.colorbar(imres, cax=cax, orientation='horizontal',
+                        label=r'T$_{\rm B}$ (K km s$^{-1})$',
+                        ticklocation='top')
+    ##-----------
+    ## START HERE
+    ##-----------
+
+    mean_emom0 = np.nanmean(dense_emom0_data)
+    median_emom0 = np.nanmedian(dense_emom0_data)
+
+    # start at five sigma from noise
+    base_value = base_level * np.max([mean_emom0,median_emom0])
+    
+    # levels at powers of two
+    mylevels = base_value * np.power(np.ones(nlevels)*2,np.arange(0,nlevels))
+    
+    # Add contours
+    ax.contour(dense_mom0_data, transform=ax.get_transform(dense_mom0_wcs),
+               colors='lightgray',
+               levels=mylevels)
+    
+    # Add beam
+    # TODO:
+    ## determine the beam automatically from the image header?
+    ## add_beam can do this intrinsically.
+    ##add_beam(ax, 
+    ##        major = 15*u.arcsec, minor = 15*u.arcsec, angle=0, 
+    ##       frame=True)
+
+    ## TODO:
+    ##  set the below based on image headers??
+    ax.coords[0].set_axislabel('RA (J2000)') ### check to make sure that this is the correct unit. 
+    ax.coords[1].set_axislabel('DEC (J2000)')
+
+    ## TODO:
+    ## Include scale bar
+    dist = galaxy['DIST_MPC'] * u.Mpc
+    angle = (scalebar / dist).to(u.deg, equivalencies=u.dimensionless_angles())
+    ## TODO: 
+    # convert scalebar value to text
+    mylabel = r"{}".format(scalebar.to_string(format="latex",precision=3))
+    ##add_scalebar(ax, scalebar_angle, label=mylabel, color='white')
+
+    # save image
+    plt.savefig(os.path.join(out_dir,out_file))
+    

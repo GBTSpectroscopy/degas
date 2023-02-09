@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
 import ipdb
+import glob
 
 ## TODO?
 
@@ -797,3 +798,248 @@ def plot_fit_coeff_hist(resultspergal, results,
     if pltname:
         fig.savefig(pltname+'.png')
         fig.savefig(pltname+'.pdf')
+
+def plot_moments(galaxy, line, indir='.', outdir='.', moments=[0,1], masked=True):
+    '''
+    
+    Purpose: plot moment maps for galaxies
+
+    Inputs:
+
+    -- galaxy: name of galaxy, capitalized
+    -- line: '13CO', 'C18O', 'HCN', 'HCOp'
+    -- res: 'native' or 'smoothed'
+    -- moments: [0], [1], [0,1]
+
+    Date        Programmer      Description of Changes
+    --------------------------------------------------
+    early 2022  Yiqing Song     Original Code
+    11/3/2022   A.A. Kepley     Modified.
+
+    '''
+    from astropy.io import fits
+    import aplpy
+
+    print ('plotting products for ', galaxy, ' -- ', line)
+    
+    for m in moments:
+        if masked:
+            momfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'_masked.fits'))        
+
+        else:
+            momfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_mom'+str(m)+'.fits'))        
+        emomfits = glob.glob(os.path.join(indir,galaxy+'_'+line+'*_emom'+str(m)+'.fits'))
+
+        ipdb.set_trace()
+
+        if len(momfits) == 0:
+            print ('No products. Moving on....')
+        else:
+            mom=fits.open(momfits[0])[0]
+            emom=fits.open(emomfits[0])[0]
+
+            if m == 0:
+                mystretch = 'linear'
+                myvmin = 0
+                myvmax = 0.95*np.nanmax(mom.data)
+            elif m == 1:
+                mystretch = 'linear'
+                myvmax = np.nanmax(mom.data)
+                myvmin = np.nanmin(mom.data)
+            else:
+                mystretch = 'linear'
+                myvmax = np.nanmax(mom.data)
+                myvmin = np.nanmin(mom.data)
+
+            fig=plt.figure(figsize=(8.5,4.5))
+            f1=aplpy.FITSFigure(mom, figure=fig, subplot=[0.12, 0.1, 0.4, 0.8])
+            f1.show_colorscale(cmap='rainbow',vmin=myvmin, vmax=myvmax, interpolation='bilinear',stretch=mystretch)
+            f1.add_beam()
+            f1.beam.set_color('red')
+            f1.add_colorbar('top')
+            f1.colorbar.set_axis_label_text(mom.header['BUNIT'])
+            f1.add_label(0.5, 0.8, line+'_mom'+str(m), relative=True)
+            f1.add_label(0.5, 0.1, galaxy, relative=True,size='large',weight='medium')
+
+            f2=aplpy.FITSFigure(emom, figure=fig, subplot=[0.57, 0.1, 0.4, 0.8])
+            f2.show_colorscale(cmap='cubehelix',vmin=np.nanmin(emom.data), vmax=np.nanmax(emom.data), interpolation='bilinear',stretch='linear')
+            #f2.add_beam()
+            #f2.beam.set_color('white')
+            f2.add_colorbar('top')
+            f2.colorbar.set_axis_label_text(emom.header['BUNIT'])
+            f2.add_label(0.5, 0.8, line+'_emom'+str(m), relative=True)
+            f2.add_label(0.5, 0.1, galaxy, relative=True, size='large', weight='medium')
+
+            f2.axis_labels.hide_y()
+            f2.tick_labels.hide_y()
+
+            fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.png'))
+            fig.savefig(os.path.join(outdir,galaxy+'_'+line+'_mom'+str(m)+'.pdf'))
+            plt.close()
+
+def plot_galaxy_overview(galaxy,
+                         dense_mom0_file, dense_emom0_file,                   
+                         img_file,
+                         plot_title=None,
+                         out_file='test', out_dir='.',
+                         scalebar=500*u.pc,
+                         base_level=5.0,
+                         nlevels=10):
+    '''
+
+    Purpose: create figure showing overview for galaxy. The overview
+    figure should show contours of HCN emission over IR or CO. These
+    are the three fundamental quantities in the paper (dense gas, star
+    formation, and bulk molecular gas).
+
+    I want leave open the possibility of plotting the HCO+ emission as
+    well, so possibly should make that a parameter if possible.
+
+    Input:
+    
+        -- gal_info: galaxy information from DEGAS catalog (includes distance)
+
+        -- dense_mom0_file: file containing moment 0 image of dense gas (e.g., HCN or HCO+). These will be rendered as contours
+
+        -- dense_emom0_file: file containing the moment 0 error image of the dense gas. This will be used to determine contours.
+
+        -- img_file: file containing the background image (either IR or 12CO mom0).
+    
+        -- Type of image file: Use to set defaults for image display.
+
+    Keywords:
+        -- outfile: explicit name of outfile (generate implicitly if not specified)
+        -- outdir: output directory for files (use current directory if not specified)
+        -- scalebar: scalebar length in pc 
+
+    Methods:
+        -- use wcs axes package for maximum plotting flexibility.
+
+    Output:
+        -- pdf and png of appropriate figure
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    1/19/2023   A.A. Kepley     Original Code
+    '''
+
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    from astropy.visualization import MinMaxInterval, SqrtStretch, LogStretch, ImageNormalize, PercentileInterval, AsymmetricPercentileInterval, SquaredStretch
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    ## only available in astropy >=5.2.1. Installed via conda-forge 
+    from astropy.visualization.wcsaxes import add_beam, add_scalebar
+
+    # read in images
+    dense_mom0_hdu = fits.open(dense_mom0_file)[0]
+    dense_mom0_wcs = WCS(dense_mom0_hdu.header)
+    dense_mom0_data = dense_mom0_hdu.data
+
+    dense_emom0_hdu = fits.open(dense_emom0_file)[0]
+    dense_emom0_wcs = WCS(dense_emom0_hdu.header) # the WCS should be the same.
+    dense_emom0_data = dense_emom0_hdu.data
+
+    img_hdu = fits.open(img_file)[0]
+    img_wcs = WCS(img_hdu.header)
+    img_data = img_hdu.data
+
+    img_unit = img_hdu.header['BUNIT'] # used to figure out which image.
+
+    # create plot
+    fig = plt.figure(figsize=(8,6))
+    fig.subplots_adjust(0.1,0.1,0.8,0.8)
+    ax = fig.add_subplot(111,projection=img_wcs)
+    ax.tick_params(direction='in') # fix stupid matplotlib default
+
+    # pick colormap
+    if img_unit == 'Lsun/pc^2':
+        mycmap = 'magma'
+    elif img_unit == 'K km s-1':
+        mycmap = 'cividis'
+    else:
+        mycmap = 'Greys'
+
+
+    # Add image
+    norm = ImageNormalize(img_data, interval=AsymmetricPercentileInterval(0.1,99.5),stretch=SqrtStretch())
+    imres = ax.imshow(img_data,origin='lower',cmap=mycmap,norm=norm)
+
+    # go through ridiculous shennighans to add colorbar
+    ## There are several methods online showing how to do this, but this one
+    ## worked the best from a control and final product sense.    
+    cax = fig.add_axes([ax.get_position().x0,ax.get_position().y1+0.01,
+                        ax.get_position().width,
+                        0.05])
+    cax.tick_params(direction='in') # fix stupid matplotlib default
+
+    # label for color bar
+    if img_unit == 'Lsun/pc^2':
+        cbar_label = r'S$_{TIR}$ (L$_\odot$ pc$^{-2}$)'
+    elif img_unit == 'K km s-1':
+        cbar_label = r'T$_{\rm B}$ (K km s$^{-1}$)'
+    else:
+        print("Don't reognize label unit")
+        cbar_label = r''
+    
+    # ticks for color bar
+    cbar_stretch = SquaredStretch() # use the opposite stretch to get uniformly spaced ticks.
+    cbar_ticks = cbar_stretch(np.linspace(0,1,6)) * (norm.vmax - norm.vmin) + norm.vmin
+
+    #cbar_ticks = np.logspace(np.log10(norm.vmin),np.log10(norm.vmax),5)
+
+    ## important the keyword below is cax NOT ax.
+    cbar = fig.colorbar(imres, cax=cax, orientation='horizontal',
+                        label=cbar_label,
+                        ticklocation='top',
+                        ticks=cbar_ticks)
+    
+    # set level values based on noise.
+    mean_emom0 = np.nanmean(dense_emom0_data)
+    median_emom0 = np.nanmedian(dense_emom0_data)
+    base_value = base_level * np.max([mean_emom0,median_emom0])
+    
+    # levels at powers of two
+    mylevels = base_value * np.power(np.ones(nlevels)*2,np.arange(0,nlevels))
+    
+    # Add contours
+    ax.contour(dense_mom0_data, transform=ax.get_transform(dense_mom0_wcs),
+               colors='lightgray',
+               levels=mylevels)
+    
+    # Add beam
+    add_beam(ax, header=dense_mom0_hdu.header,
+             corner='bottom left', frame=True,
+             facecolor='black',edgecolor='black')
+
+    ## TODO:
+    ##  set the below based on image headers??
+    ax.coords[0].set_axislabel('RA (J2000)') ### check to make sure that this is the correct unit. 
+    ax.coords[1].set_axislabel('DEC (J2000)')
+
+    ## Include galaxy name and plot type
+    ax.text(0.02,0.98,galaxy['NAME'],horizontalalignment='left',
+            verticalalignment='top',transform=ax.transAxes,
+            color='black',
+            fontsize=12)
+
+    ax.text(0.98,0.98,plot_title,horizontalalignment='right',
+            verticalalignment='top',transform=ax.transAxes,
+            color='black',
+            fontsize=12)
+
+    ## Include scale bar
+    dist = galaxy['DIST_MPC'] * u.Mpc
+    angle = (scalebar / dist).to(u.deg, equivalencies=u.dimensionless_angles())
+
+    # convert scalebar value to text
+    mylabel = r"{}".format(scalebar.to_string(format="latex",precision=3))
+    add_scalebar(ax, angle, label=mylabel, color='black', 
+                 corner='bottom right')
+
+    # save image
+    plt.savefig(os.path.join(out_dir,out_file))
+    
+    plt.close()
+    
+    return base_value

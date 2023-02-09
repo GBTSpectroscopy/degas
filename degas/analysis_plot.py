@@ -880,7 +880,7 @@ def plot_moments(galaxy, line, indir='.', outdir='.', moments=[0,1], masked=True
 def plot_galaxy_overview(galaxy,
                          dense_mom0_file, dense_emom0_file,                   
                          img_file,
-                         img_type='12CO',
+                         plot_title=None,
                          out_file='test', out_dir='.',
                          scalebar=500*u.pc,
                          base_level=5.0,
@@ -1017,6 +1017,17 @@ def plot_galaxy_overview(galaxy,
     ax.coords[0].set_axislabel('RA (J2000)') ### check to make sure that this is the correct unit. 
     ax.coords[1].set_axislabel('DEC (J2000)')
 
+    ## Include galaxy name and plot type
+    ax.text(0.02,0.98,galaxy['NAME'],horizontalalignment='left',
+            verticalalignment='top',transform=ax.transAxes,
+            color='black',
+            fontsize=12)
+
+    ax.text(0.98,0.98,plot_title,horizontalalignment='right',
+            verticalalignment='top',transform=ax.transAxes,
+            color='black',
+            fontsize=12)
+
     ## Include scale bar
     dist = galaxy['DIST_MPC'] * u.Mpc
     angle = (scalebar / dist).to(u.deg, equivalencies=u.dimensionless_angles())
@@ -1031,3 +1042,4 @@ def plot_galaxy_overview(galaxy,
     
     plt.close()
     
+    return base_value

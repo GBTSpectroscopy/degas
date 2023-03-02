@@ -4,7 +4,8 @@ import os
 release = 'IR6p1'
 
 scriptDir = os.environ['SCRIPTDIR']
-regridDir=os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
+regridDir = os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
+
 
 # stack using mom1
 outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
@@ -12,7 +13,6 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1')
 
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+release+'_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
-
 
 # stack using peak velocity
 
@@ -29,9 +29,7 @@ myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='
 
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_spatialR21_mom1.fits','stack_'+release+'_spatialR21_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
-
-
-# stack using sigmaSFR and peak velocity
+# Stack using sigmaSFR and peak velocity
 outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_spatialR21_peakVelocity')
 
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='peakVelocity',outname='stack_'+release+'_spatialR21', release='DR1',R21='sigmaSFR')

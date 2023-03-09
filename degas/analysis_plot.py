@@ -59,8 +59,16 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
     
         nprofile = np.sum(idx)
         
+        # if galaxy isn't in stack continue
+        if nprofile == 0:
+            print("Galaxy not in stack: "+ galaxy['NAME'])
+            continue
+        
         ncols = 3
         nrows = int(np.ceil(nprofile / ncols))
+
+
+            
     
         fig, myax = plt.subplots(nrows=nrows, ncols=ncols,
                                  sharex='all', sharey='row',
@@ -148,6 +156,9 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
     1/6/2022    A.A. Kepley     Original Code
 
     '''
+    
+    # make sure all columns are masked on stack.
+    stack = Table(stack, masked=True)
 
     # create plot directory if doesn't already exist
     if not os.path.exists(plot_dir):
@@ -184,14 +195,16 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
         for (quant,marker,color) in zip(plot_quant, markerlist,colorlist):
             styledict[quant] = {'marker': marker, 'color': color, 'label':quant}
 
-
-  
     for galaxy in degas_db[gallist]:
 
         plt.close()
         
         # select data
         idx = ( (stack['galaxy'] == galaxy['NAME'] ) & (stack['bin_type'] == bin_type))
+
+        if np.sum(idx) == 0:
+            print("Galaxy not in stack: "+ galaxy['NAME'])
+            continue
 
         # convert x-axis if needed
         if bin_type == 'radius':
@@ -209,6 +222,9 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
         elif bin_type == 'ICO':
             xvals = stack[idx]['bin_mean']
             xlabel = r'$I_{CO}$ (' + u.Unit(stack[idx]['bin_unit'][0]).to_string('latex_inline') + ')'
+        elif bin_type == 'molgas':
+            xvals = stack[idx]['bin_mean']
+            xlabel = r'$\Sigma_{mol}$ (' + u.Unit(stack[idx]['bin_unit'][0]).to_string('latex_inline') + ')'
         else:
             # keep the units as is for the data
             xvals = stack[idx]['bin_mean'] 
@@ -252,10 +268,16 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
                 else:
                     factor = 1.0
             else:
+
                 factor = 1.0
 
             # get values to plot
             yvals = stack[idx][quant].data / factor
+            
+            # if there's no value to plot, skip
+            if np.all(stack[idx][quant].mask):                
+                print("No values for "+quant+" & " + galaxy['NAME'])
+                continue
             
             if quant+ '_err' in stack.columns:
                 # get errors
@@ -266,13 +288,13 @@ def plot_trends(stack, bin_type, plot_dir, degas_db,
             # get upper and lower limits
             if quant + '_uplim' in stack.columns:
                 uplims = stack[idx][quant + '_uplim']
-                yerrs[uplims] = yvals[uplims] * 0.3
+                yerrs[uplims] = np.abs(yvals[uplims] * 0.3)
             else:
                 uplims = False
 
             if quant + '_lolim' in stack.columns:
                 lolims = stack[idx][quant + '_lolim']
-                yerrs[lolims] = yvals[lolims] * 0.3
+                yerrs[lolims] = np.abs(yvals[lolims] * 0.3)
             else:
                 lolims = False
 
@@ -336,7 +358,8 @@ def compare_stacks_line(stack_list, stack_name_list,
                         galaxy='NGC2903',
                         dist=None,
                         ylim=None,
-                        xlim=None):
+                        xlim=None,
+                        cosi=None):
     
     nquant = len(stack_list)
     markers = ['o','^','s','*','D','>'] # 5 items
@@ -380,8 +403,17 @@ def compare_stacks_line(stack_list, stack_name_list,
     if empire_db:
         if line in ['HCN','HCOp']:
             idx = empire_db['ID'] == galaxy.lower()
-            plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
-                         yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
+            
+            xval = empire_db[idx]['Rad']
+            yval = empire_db[idx]['I'+line.replace('HCOp','HCO+')]
+            yval_err = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')]
+
+            if cosi:
+                yval = yval * np.cos(np.radians(cosi))
+                yval_err = yval_err * np.cos(np.radians(cosi))
+
+            plt.errorbar(xval,yval,
+                         yerr = yval_err,
                          marker='+',label='EMPIRE (pub)',color='purple')
         else:
             print("Value " + line + " not in empire database.\n")

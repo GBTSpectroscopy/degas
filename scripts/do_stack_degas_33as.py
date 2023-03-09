@@ -11,6 +11,7 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+"_33as")
 
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release+"_33as", release='DR1')
 
+
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_33as_mom1.fits','stack_'+release+'_33as_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
 

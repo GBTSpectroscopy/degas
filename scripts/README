@@ -52,6 +52,7 @@
 %run do_stack.py
 
 %run make_stack_plots.py
+%run generate_stack_figure_set.py
 
 # empire stacks
 %run fix_up_empire.py # -- fix up empire cubes
@@ -71,3 +72,22 @@
 %run align_to_alma.py ## smooth to 33 arcsec and regrid images
 %run do_CO21_rescale_alma.py ## do CO21 rescaling for alma data 
 %run do_stack_alma_hcn.py
+
+# compare the different type of stacks
+%run make_stack_comparison_plots.py
+
+## HERE
+
+# compare ltir
+%run make_ltir_comparison.py
+
+# correlation coefficients
+%run do_correlation_calcs.py
+%run plot_correlation_coeff.py
+
+# fits
+%run do_fit_calc.py
+%run make_fit_coeff_table.py
+
+# make the fiducial fdense plots 
+%run make_fdense_plots.py

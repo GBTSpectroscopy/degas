@@ -1,24 +1,35 @@
 galaxy, bin_type, min_val
 NGC0337, ICO, 0.5
+NGC0337, molgas, 2.5
 NGC0337, mstar, 20
-NGC2146, mstar, 20
-NGC2903, mstar, 200
+NGC2146, mstar, 60
+NGC2903, mstar, 150
 NGC2903, ICO, 3
-NGC3147, ICO, 3
-NGC3521, mstar, 350
-NGC3521, ICO, 4.0
-NGC4030, mstar, 30.0
-NGC4030, ICO, 2.5
+NGC2903, molgas, 12.9
+NGC3147, ICO, 2
+NGC3147, molgas, 8.6
+NGC3521, mstar, 250
+NGC3521, ICO, 3.0
+NGC3521, molgas, 12.9
+NGC4030, mstar, 25.0
+NGC4030, ICO, 1.4
+NGC4030, molgas, 6.02
 NGC4038, mstar, 50
 NGC4038, ICO, 2.5
+NGC4038, molgas, 10.75
 NGC4321, ICO, 2.0
+NGC4321, molgas, 8.6
 NGC4414, mstar, 100
-NGC4414, ICO, 1.17
+NGC4414, ICO, 1.0
+NGC4414, molgas, 4.3
 NGC4535, mstar, 46.5
 NGC4535, ICO, 1.5
-NGC4569, mstar, 100
-NGC4569, ICO, 1.5
-NGC5055, mstar, 
+NGC4535, molgas, 6.5
+NGC4569, mstar, 90
+NGC4569, ICO, 1.0
+NGC4569, molgas, 4.3
+NGC5055, mstar, 100
 NGC5055, ICO, 5.5
+NGC5055, molgas, 23.65
 
 

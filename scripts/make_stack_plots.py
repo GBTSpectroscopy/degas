@@ -28,7 +28,7 @@ degas_db = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 plot_dir =  os.path.join(stackDir,'stack_plots')
 
-binlist = ['radius','r25','mstar','ICO']
+binlist = ['radius','r25','mstar','ICO', 'molgas']
 #binlist = ['radius']
 
 for bin_type in binlist:
@@ -41,7 +41,7 @@ for bin_type in binlist:
 
 plot_dir =  os.path.join(stackDir,'stack_trends')
 
-binlist = ['radius','r25','mstar','ICO']
+binlist = ['radius','r25','mstar','ICO','molgas']
 
 mystyledict = {'int_intensity_sum_CO': 
                {'marker':'o','color':'orange', 'label':'CO'}, 
@@ -67,8 +67,8 @@ mystyledict = {'int_intensity_sum_CO':
                {'marker':'>','color':'red', 'label':r'$^{13}$CO/$^{12}$CO'},
                'ratio_C18O_CO':
                {'marker':'D','color': 'magenta', 'label':r'$C^{18}$O/$^{12}$CO'},
-               'comass_mean': 
-               {'marker':'o', 'color':'orange','label':r'$\Sigma_{CO}$ (M$_\odot/pc^2$)'},
+               'molgas_mean': 
+               {'marker':'o', 'color':'orange','label':r'$\Sigma_{mol}$ (M$_\odot/pc^2$)'},
                'mstar_mean':
                {'marker':'o','color':'red','label':r'$\Sigma_*$ (M$_\odot/pc^2$)'},
                'sfr_mean':
@@ -77,7 +77,7 @@ mystyledict = {'int_intensity_sum_CO':
 
 for bin_type in binlist:
 
-    if bin_type in ['mstar', 'ICO']:
+    if bin_type in ['mstar', 'ICO','molgas']:
         xlog = True
     else:
         xlog = False
@@ -95,7 +95,7 @@ for bin_type in binlist:
                 xlog=xlog)
 
     plot_trends(stack, bin_type, plot_dir, degas_db,
-                ['comass_mean','mstar_mean','sfr_mean'],
+                ['molgas_mean','mstar_mean','sfr_mean'],
                 bin_type + '_other',
                 factordict = {'sfr_mean': 1/1e10},
                 yaxislabel = r'Variable',
@@ -152,7 +152,7 @@ for bin_type in binlist:
 plot_dir =  os.path.join(stackDir,'stack_plots_pruned')
 
 
-binlist = ['radius','r25','mstar','ICO']
+binlist = ['radius','r25','mstar','ICO', 'molgas']
 
 for bin_type in binlist:
 
@@ -163,11 +163,11 @@ for bin_type in binlist:
 # plot trends
 plot_dir =  os.path.join(stackDir,'stack_trends_pruned')
 
-binlist = ['radius','r25','mstar','ICO']
+binlist = ['radius','r25','mstar','ICO','molgas']
 
 for bin_type in binlist:
 
-    if bin_type in ['mstar', 'ICO']:
+    if bin_type in ['mstar', 'ICO','molgas']:
         xlog = True
     else:
         xlog = False
@@ -186,7 +186,7 @@ for bin_type in binlist:
 
 
     plot_trends(stack_pruned, bin_type, plot_dir, degas_db,
-                ['comass_mean','mstar_mean','sfr_mean'],
+                ['molgas_mean','mstar_mean','sfr_mean'],
                 bin_type + '_other',
                 factordict = {'sfr_mean': 1/1e10},
                 styledict = mystyledict,

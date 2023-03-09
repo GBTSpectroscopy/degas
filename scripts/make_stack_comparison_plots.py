@@ -29,6 +29,7 @@ for galaxy in overlaplist:
 
     # use empire distance for comparison
     dist = empire_params[empire_params['NAME'] == galaxy]['DIST_MPC'][0] * u.Mpc
+    cosi = empire_params[empire_params['NAME'] == galaxy]['INCL_DEG'][0] 
 
     for line in linelist:
 
@@ -37,6 +38,7 @@ for galaxy in overlaplist:
                             line = line,
                             galaxy = galaxy,
                             dist = dist,
+                            cosi = cosi,
                             ylim = (0.02,9),
                             xlim = (0,7))
 
@@ -52,6 +54,7 @@ for galaxy in overlaplist:
 
     # use empire distance for comparison
     dist = empire_params[empire_params['NAME'] == galaxy]['DIST_MPC'][0] * u.Mpc
+    cosi = empire_params[empire_params['NAME'] == galaxy]['INCL_DEG'][0] 
 
     for line in linelist:
 
@@ -60,6 +63,7 @@ for galaxy in overlaplist:
                             line = line,
                             galaxy = galaxy,
                             dist = dist,
+                            cosi = cosi,
                             ylim = (0.02,9),
                             xlim = (0,7))
 
@@ -74,6 +78,7 @@ for galaxy in overlaplist:
 
     # use empire distance for comparison
     dist = empire_params[empire_params['NAME'] == galaxy]['DIST_MPC'][0] * u.Mpc
+    cosi = empire_params[empire_params['NAME'] == galaxy]['INCL_DEG'][0] 
 
     for line in linelist:
 
@@ -82,5 +87,6 @@ for galaxy in overlaplist:
                             line = line,
                             galaxy = galaxy,
                             dist = dist,
+                            cosi = cosi,
                             ylim = (0.02,9),
                             xlim = (0,7))

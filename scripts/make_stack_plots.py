@@ -5,10 +5,10 @@ import numpy as np
 
 from degas.analysis_plot import plot_stack, plot_trends
 
-release = 'IR6p1'
-#release = 'IR6p1_spatialR21'
-stacktype = 'mom1'
-#stacktype = 'peakVelocity'
+#release = 'IR6p1'
+release = 'IR6p1_spatialR21'
+#stacktype = 'mom1'
+stacktype = 'peakVelocity'
 
 if stacktype == 'mom1':
     stackDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)

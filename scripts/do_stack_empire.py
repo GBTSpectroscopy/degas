@@ -10,7 +10,6 @@ outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
 
 myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='stack_'+release, release='DR1', sourceList=['NGC2903','NGC4321','NGC5055','NGC6946'])
 
-
 myresults2 = pruneSampleTable(outDir,'stack_'+release+'_mom1.fits','stack_'+release+'_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
 
 

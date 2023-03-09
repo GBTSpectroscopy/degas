@@ -358,7 +358,8 @@ def compare_stacks_line(stack_list, stack_name_list,
                         galaxy='NGC2903',
                         dist=None,
                         ylim=None,
-                        xlim=None):
+                        xlim=None,
+                        cosi=None):
     
     nquant = len(stack_list)
     markers = ['o','^','s','*','D','>'] # 5 items
@@ -402,8 +403,17 @@ def compare_stacks_line(stack_list, stack_name_list,
     if empire_db:
         if line in ['HCN','HCOp']:
             idx = empire_db['ID'] == galaxy.lower()
-            plt.errorbar(empire_db[idx]['Rad'],empire_db[idx]['I'+line.replace('HCOp','HCO+')],
-                         yerr = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')],
+            
+            xval = empire_db[idx]['Rad']
+            yval = empire_db[idx]['I'+line.replace('HCOp','HCO+')]
+            yval_err = empire_db[idx]['e_I'+line.replace('HCOp','HCO+')]
+
+            if cosi:
+                yval = yval * np.cos(np.radians(cosi))
+                yval_err = yval_err * np.cos(np.radians(cosi))
+
+            plt.errorbar(xval,yval,
+                         yerr = yval_err,
                          marker='+',label='EMPIRE (pub)',color='purple')
         else:
             print("Value " + line + " not in empire database.\n")

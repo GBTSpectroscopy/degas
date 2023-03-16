@@ -15,8 +15,88 @@ import os
 
 import ipdb
 
-def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
+def normalizeStacks(stack, degas_db,
+                    bin_type_list = ['mstar'],
+                    norm_quant_list = ['ratio_HCN_CO','ratio_ltir_mean_HCN']):
+    '''
+    generate normalized stacks
 
+    Inputs:
+    -------
+
+    stack: per bin_type, per source stack
+    
+    degas_db: database of degas properties
+    
+    bin_type: what bin_types to normalizes
+    
+    norm_quants: quantities I want to normalize.
+
+    Outputs:
+    -------
+
+    stack_norm: normalized stack should include new columns for 
+    norm_val, normalization offset, and normalized fit
+
+    Date        Programmer      Description of Changes
+    --------------------------------------------------
+    3/16/2023   A.A. Kepley     Original Code
+    '''
+
+    import math
+
+    for bin_type in bin_type_list:
+        
+        # if bin_type isn't found skip
+        if bin_type not in mybins:
+            print("Bin type not found: " + bin_type)
+            continue
+            
+        # select out bins
+        idx_bin = (stack['bin_type'] == bin_type)
+        
+        # group by galaxy
+        stack_by_gal = stack[idx_bin].group_by('galaxy')
+        
+        for (group, key) in zip(stack_by_gal.groups,stack_by_gal.groups.keys):
+            galaxy = key['galaxy']
+            
+            # getting galaxy fiducial parameters
+            idx_gal = degas_db['NAME'] == galaxy
+            dist_mpc = degas_db[idx_gal]['DIST_MPC'] 
+            re_arcsec = degas_db[idx_gal]['RE_ARCSEC']
+            mstar = 10**degas_db[idx_gal]['LOGMSTAR']
+            sfr = 10**degas_db[idx_gal]['LOGSFR']
+            ## need to get molecular gas mass. I think I have in 
+            ## line ratio paper data base
+
+            re_pc = (re_arcsec / 206265.0) * dist_mpc * 1e6 # pc
+            mstar_avg = 0.5 * mstar / (math.pi * re_pc**2) # Msun / pc**2                        
+            ## calculate norm value 
+            if bin_type == 'mstar':
+                norm_val = np.log10(mstar_avg)
+            else:
+                norm_val = np.mean(np.log10(group['bin_mean']))
+            
+            xval_log = np.log10(group['bin_mean']) - norm_val 
+
+            
+            ipdb.set_trace()
+            
+            # find crossing point                        
+            idx_cross = np.where(xval_log == 0)[0]
+            if len(idx_cross) == 0:
+                idx_cross = np.where(np.sign(xval_log[0:-1]) != np.sign(xval_log[1:]))[0]
+                idx_cross = [idx_cross, idx_cross+1]
+             
+            # normalize the desiredd quantities
+            for norm_quant in norm_quant_list:
+                yval_log = np.log10(group[norm_quant])
+                yval_log_mean = np.mean(yval_log[norm_quant][idx_cross])
+                yval_log_norm = np.log10(yval_log[norm_quant]) - yval_log_mean
+                ipdb.set_trace()
+
+def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
     '''
     Prune out stacks
 

@@ -5,6 +5,7 @@ from degas.analysis_fit import fit_trend,make_fit_table,make_fit_table_pergal
 release = 'IR6p1'
 
 # R21 simple
+# ----------
 
 stack_dir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release)
 
@@ -17,9 +18,8 @@ myresult_noNGC4414 = make_fit_table(stack,columns = ['ratio_HCN_CO','ratio_ltir_
 myresultpergal = make_fit_table_pergal(stack,columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN','ratio_HCOp_CO','ratio_ltir_mean_HCOp'],outfile=os.path.join(stack_dir,'stack_fits_pergal.fits'),plotDir=os.path.join(stack_dir,'fit_plots_pergal'))
 
 
-
-
-## R21 spatial
+# R21 spatial
+# ------------
 
 stack_dir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_spatialR21')
 
@@ -30,6 +30,21 @@ myresult = make_fit_table(stack,columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN',
 myresult_noNGC4414 = make_fit_table(stack,columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN','ratio_HCOp_CO','ratio_ltir_mean_HCOp'], outfile=os.path.join(stack_dir,'stack_fits_noNGC4414.fits'),plotDir=os.path.join(stack_dir,'fit_plots_noNGC4414'),exclude_gal=['NGC4414'])
 
 myresultpergal = make_fit_table_pergal(stack,columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN','ratio_HCOp_CO','ratio_ltir_mean_HCOp'],outfile=os.path.join(stack_dir,'stack_fits_pergal.fits'),plotDir=os.path.join(stack_dir,'fit_plots_pergal'))
+
+# R21 spatial -- normed
+# ---------------------
+
+
+stack_dir = os.path.join(os.environ['ANALYSISDIR'],'stack_'+release+'_spatialR21')
+
+stack = Table.read(os.path.join(stack_dir,'stack_IR6p1_spatialR21_mom1_pruned_norm.fits'))
+
+myresult = make_fit_table(stack,norm=True, columns = ['ratio_HCN_CO_norm','ratio_ltir_mean_HCN_norm','ratio_HCOp_CO_norm','ratio_ltir_mean_HCOp_norm'],outfile=os.path.join(stack_dir,'stack_norm_fits.fits'),plotDir=os.path.join(stack_dir,'fit_plots_norm'))
+
+myresult_noNGC4414 = make_fit_table(stack,norm=True, columns = ['ratio_HCN_CO_norm','ratio_ltir_mean_HCN_norm','ratio_HCOp_CO_norm','ratio_ltir_mean_HCOp_norm'], outfile=os.path.join(stack_dir,'stack_norm_fits_noNGC4414.fits'),plotDir=os.path.join(stack_dir,'fit_plots_norm_noNGC4414'),exclude_gal=['NGC4414'])
+
+myresultpergal = make_fit_table_pergal(stack, norm=True, columns = ['ratio_HCN_CO_norm','ratio_ltir_mean_HCN_norm','ratio_HCOp_CO_norm','ratio_ltir_mean_HCOp_norm'],outfile=os.path.join(stack_dir,'stack_norm_fits_pergal.fits'),plotDir=os.path.join(stack_dir,'fit_plots_norm_pergal'))
+
 
 # 33 arcsec
 

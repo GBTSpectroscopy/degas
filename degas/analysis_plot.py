@@ -444,12 +444,15 @@ def compare_stacks_line(stack_list, stack_name_list,
 
 
 def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25', 
+                norm = False,
                 add_empire=True, 
                 stack_fit=None,
                 include_uplims=False,
                 release='DR1',
                 pltname=None,
-                pltlabel=None):
+                pltlabel=None,
+                xlim = None,
+                ylim = None):
 
     '''
 
@@ -468,27 +471,52 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
     nrelease = np.sum(release)
 
     # set up x labels
-    if xdata == 'r25':
-        xlabel = r'R/R$_{25}$'
-    elif xdata == 'mstar':
-        xlabel = r'$\Sigma_{*}$ [M$_\odot$ pc$^{-2}$]'
-    elif xdata == 'ICO':
-        xlabel = r'$\Sigma_{mol}$ [M$_\odot$ pc$^{-2}$]'
+    if norm:
+        if xdata == 'r25':
+            xlabel = r'R/R$_{25}$'
+        elif xdata == 'mstar':
+            xlabel = r'log [ $\Sigma_{*}$ / $\langle\Sigma_{*}\rangle$ ]'
+        elif xdata == 'ICO':
+            xlabel = r'log [ $\Sigma_{mol}$ / $\langle\Sigma_{mol}\rangle$ ]'
+        elif xdata == 'molgas':
+            xlabel = r'log [ $\Sigma_{mol}$  / $\langle\Sigma_{mol}\rangle$ ]'
+        else:
+            print("no valid xlabel value using xdata name: " + xdata)
+            xlabel = 'log ' + xdata
+    
     else:
-        print("no valid xlabel value using xdata name: " + xdata)
-        xlabel = xdata
+        if xdata == 'r25':
+            xlabel = r'R/R$_{25}$'
+        elif xdata == 'mstar':
+            xlabel = r'log ( $\Sigma_{*}$ [M$_\odot$ pc$^{-2}$] )'
+        elif xdata == 'ICO':
+            xlabel = r'log ( $\Sigma_{mol}$ [M$_\odot$ pc$^{-2}$] )'
+        elif xdata == 'molgas':
+            xlabel = r'log ( $\Sigma_{mol}$ [M$_\odot$ pc$^{-2}$] )'
+        else:
+            print("no valid xlabel value using xdata name: " + xdata)
+            xlabel = 'log ' + xdata
     
     # set up y labels
     if ydata == 'ratio_HCN_CO':
-        ylabel = r'HCN-to-CO'
+        ylabel = r'log ( HCN/CO ) '
     elif ydata == 'ratio_ltir_mean_HCN':
-        ylabel = r'L$_{TIR}$ / HCN'
+        ylabel = r'log ( L$_{TIR}$/HCN )'
     elif ydata == 'ratio_HCOp_CO':
-        ylabel = r'HCO+-to-CO'
+        ylabel = r'log ( HCO+/CO )'
     elif ydata == 'ratio_ltir_mean_HCOp':
-        ylabel = r'L$_{TIR}$ / HCO+'
+        ylabel = r'log ( L$_{TIR}$/HCO+ )'        
+    elif ydata == 'ratio_HCN_CO_norm':
+        ylabel = r'log [ (HCN/CO) / $\langle$HCN/CO$\rangle$ ]'
+    elif ydata == 'ratio_ltir_mean_HCN_norm':
+        ylabel = r'log [ (L$_{TIR}$/HCN) / $\langle$L$_{TIR}$/HCN$\rangle$ ]'
+    elif ydata == 'ratio_HCOp_CO_norm':
+        ylabel = r'log [(HCO+/CO) / $\langle$HCO+/CO$\rangle$ ]'
+    elif ydata == 'ratio_ltir_mean_HCOp_norm':
+        ylabel = r'log [(L$_{TIR}$/HCO+) / $\langle$L$_{TIR}$/HCO+$\rangle$ ]'
     else:
-        ylabel = ydata
+        ylabel = 'log ' + ydata
+
 
   
     # setup plot style
@@ -512,6 +540,7 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         idx = ( (stack['galaxy'] == galaxy['NAME']) \
                 & (stack['bin_type'] == xdata))
 
+        ## TODO: Do I need this code anymore with the molgas bins?
         if xdata == 'ICO':
             # apply alpha_co and correct for inclination
             alpha_co = float(stack.meta['ALPHA_CO'].split(' ')[0])
@@ -519,19 +548,26 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         else:
             factor = 1.0
 
-        xvals = stack[idx]['bin_mean'] * factor
+        if norm:
+            xvals = stack[idx]['bin_mean_norm'] * factor
+        else:
+            xvals = stack[idx]['bin_mean'] * factor
 
+        if xdata != 'r25':
+            xvals = np.log10(xvals)
+        
+        yvals = np.log10(stack[idx][ydata])
+        yvals_err_pos = np.abs(np.log10(stack[idx][ydata] + stack[idx][ydata+'_err']) - np.log10(stack[idx][ydata]))
+        yvals_err_neg = np.abs(np.log10(stack[idx][ydata]-stack[idx][ydata+'_err']) - np.log10(stack[idx][ydata]) )
 
-
-        yvals = stack[idx][ydata] 
-        yvals_err = stack[idx][ydata+'_err'] 
-
+        
         if ydata+'_uplim' in stack.columns:
             lims = stack[idx][ydata+'_uplim']
         elif ydata + '_lolim' in stack.columns:
             lims = stack[idx][ydata+'_lolim']
-            yvals_err[lims] = yvals[lims] * 0.3 
-
+        yvals_err_pos[lims] = yvals[lims] * 0.3 ## DO I WNAT TO CHANGE 
+        yvals_err_neg[lims] = yvals[lims] * 0.3 ## DO I WNAT TO CHANGE 
+        
         ax.plot(xvals[~lims],yvals[~lims],
                     marker = marker,
                     linestyle= '--',
@@ -539,12 +575,15 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
                     label=galaxy['NAME'],zorder=10)
 
         ax.errorbar(xvals[~lims], yvals[~lims],
-                    yerr = yvals_err[~lims],
+                    yerr = [yvals_err_neg[~lims],yvals_err_pos[~lims]],
                     fmt='none',color=color,zorder=10)
 
-    ax.set_yscale('log')
-    if xdata != 'r25':
-        ax.set_xscale('log')
+ 
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
     ax.set_xlabel(xlabel,fontsize=20)
     ax.set_ylabel(ylabel,fontsize=20)
     ax.tick_params(axis='both',labelsize=16)
@@ -555,59 +594,42 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
     # empire fit parameters
     if add_empire:
         xmin, xmax = ax.get_xlim()
+        xvals_empire = np.linspace(xmin, xmax)
         if ydata == 'ratio_HCN_CO':
             if xdata == 'r25':
-                xvals_empire = np.linspace(xmin, xmax)
-                yvals_empire = 10**(-1.5-0.8*xvals_empire)
+                yvals_empire = -1.5 - 0.8*xvals_empire
             elif xdata == 'mstar':
-                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
-                yvals_empire = 10**(-2.7+0.4*np.log10(xvals_empire))
-            elif xdata == 'ICO':
-                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
-                yvals_empire = 10**(-2.4 + 0.5*np.log10(xvals_empire))
+                yvals_empire = -2.7 + 0.4*xvals_empire
+            elif (xdata == 'ICO') or (xdata == 'molgas'):
+                yvals_empire = -2.4 + 0.5*xvals_empire
             else:
                 print("No empire equation available for " + xdata + ' vs. ' + ydata)
         elif ydata == 'ratio_ltir_mean_HCN':
             if xdata == 'r25': 
-                xvals_empire = np.linspace(xmin,xmax)
-                yvals_empire = 10**(2.8+0.6*xvals_empire)
+                yvals_empire = 2.8 + 0.6*xvals_empire
             elif xdata == 'mstar':
-                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
-                yvals_empire = 10**(4.0-0.4*np.log10(xvals_empire))
-            elif xdata == 'ICO':
-                xvals_empire = np.logspace(np.log10(xmin),np.log10(xmax))
-                yvals_empire = 10**(3.5-0.4*np.log10(xvals_empire))
+                yvals_empire = 4.0 - 0.4*xvals_empire
+            elif (xdata == 'ICO') or (xdata == 'molgas'):
+                yvals_empire = 3.5 - 0.4*xvals_empire
             else:
                 print("No empire equation available for " + xdata + ' vs. ' + ydata)
         else:
             print("Not a validate y data set for EMPIRE: " + ydata)
-                                
-        if xdata != 'r25':
-            ax.loglog(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
-        else:
-            ax.semilogy(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
+
+        ax.plot(xvals_empire,yvals_empire,color='gray',linestyle=':',linewidth=5, label='EMPIRE',zorder=1)
 
     if stack_fit is not None:
+        ## TO DO: FIT FOR PLOTTING IN LOG SPACE
         # add fit derived from data
         fit_idx = (stack_fit['bin'] == xdata) &  (stack_fit['column'] == ydata) 
         slope = stack_fit[fit_idx]['slope']
         intercept = stack_fit[fit_idx]['intercept']
 
         xmin, xmax = ax.get_xlim()
-        if xdata == 'r25':
-            xvals_fit = np.linspace(xmin,xmax)
-            yvals_fit = 10**(slope * xvals_fit + intercept)
-        elif xdata == 'mstar':            
-            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
-            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
-        elif xdata == 'ICO':
-            xvals_fit = np.logspace(np.log10(xmin),np.log10(xmax))
-            yvals_fit = 10**(slope*np.log10(xvals_fit) + intercept)
+        xvals_fit = np.linspace(xmin,xmax)
+        yvals_fit = slope * xvals_fit + intercept
 
-        if xdata != 'r25':
-            ax.loglog(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
-        else:
-            ax.semilogy(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
+        ax.plot(xvals_fit,yvals_fit,color='black',linewidth=5,label='DEGAS',zorder=1,linestyle=':')
 
     # get handles
     handles, labels = ax.get_legend_handles_labels()
@@ -616,7 +638,6 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
     # TODO -- handle all combinations.
     #new_handles = [h[0] for h in handles[2:-1]]
     #new_handles.insert(0,handles[0:1])
-
 
     mylegend = ax.legend(handles, labels, loc='upper left',
                          bbox_to_anchor=(1.0,1.0),handlelength=3, 

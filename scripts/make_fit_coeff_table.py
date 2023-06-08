@@ -40,12 +40,14 @@ def format_data_str(stack_fits, xvar, yvar):
 #----------------------------------------------------------------------
 
 analysis_dir = os.environ['ANALYSISDIR']
-stack_fits= Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1','stack_fits.fits'))
-stack_fits_noNGC4414 = Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1','stack_fits_noNGC4414.fits'))
+#stack_fits= Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1','stack_fits.fits'))
+#stack_fits_noNGC4414 = Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1','stack_fits_noNGC4414.fits'))
 stack_fits_spatialR21 = Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1_spatialR21','stack_fits.fits'))
 stack_fits_spatialR21_noNGC4414 = Table.read(os.path.join('/lustre/cv/users/akepley/degas/stack_IR6p1_spatialR21','stack_fits_noNGC4414.fits'))
 
-r21_list = ['constant','spatial']
+#r21_list = ['constant','spatial']
+
+r21_list = ['spatial']
 
 #----------------------------------------------------------------------
 #                       Put together table header
@@ -53,19 +55,17 @@ r21_list = ['constant','spatial']
 
 outfile = os.path.join(os.environ['ANALYSISDIR'],'tables','degas_dr1_fits.tex')
 
-header = '''\\begin{deluxetable}{llrrrrrrrrr}
+header = '''\\begin{deluxetable}{lrrrrrrrrr}
 \\tablewidth{0pt}
 \\tabletypesize{\scriptsize}
 \\tablecaption{Fit Coefficients \label{tab:fit_coeff}}
-\\tablecolumns{11}
+\\tablecolumns{10}
 \\tablehead{
-       \colhead{} &
        \colhead{} &
        \multicolumn{3}{c}{$R/R_{25}$\\tablenotemark{a}} &
        \multicolumn{3}{c}{$\log \left( \Sigma_* {\\rm [M_\odot \, pc^{-2}]} \\right)$ } &
-       \multicolumn{3}{c}{$\log \left( I_{CO} {\\rm [K \, km \, s^{-1} pc^{2}]} \\right)$ } \\\\
+       \multicolumn{3}{c}{$\log \left( \Sigma_{mol} {\\rm [M_\odot \, pc^{-2}]} \\right)$ } \\\\
        \colhead{} &
-       \colhead{\\rtwoone} & 
        \colhead{m} &
        \colhead{b} &
        \colhead{$\chi^2$} &
@@ -94,7 +94,7 @@ fout.write(header)
 
 
 yvar_list = ['ratio_HCN_CO','ratio_ltir_mean_HCN']
-xvar_list = ['r25','mstar','ICO']
+xvar_list = ['r25','mstar','molgas']
 
 for yvar in yvar_list:
 
@@ -125,7 +125,7 @@ for yvar in yvar_list:
             tmpstr = format_data_str(mystack, xvar, yvar)
             datastr = datastr + tmpstr       
                 
-        fout.write(yvarstr + ' & ' + r21 + ' & ' + datastr + '  \\\\ \n')
+        fout.write(yvarstr + ' & ' + datastr + '  \\\\ \n')
 
 
 fout.write(footer)

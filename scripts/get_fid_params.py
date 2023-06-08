@@ -87,7 +87,9 @@ gal_base_cols = ['RA_DEG','DEC_DEG','REF_POS',
                  'R25_DEG','E_R25','REF_R25',
                  'INCL_DEG','E_INCL','REF_INCL',
                  'POSANG_DEG','E_POSANG','REF_POSANG',
-                 'MORPH','BAR','REF_MORPH']
+                 'MORPH','BAR','REF_MORPH',
+                 'LOGMMOL','E_LOGMMOL','REF_LOGMMOL',
+                 'LOGMHI','E_LOGMHI','REF_LOGMHI']
 z0mgs_cols = ['logM*','e_logM*','logSFR','e_logSFR','r_logSFR']
 
 data = []

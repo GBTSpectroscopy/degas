@@ -4,7 +4,7 @@ import os
 
 degas = Table.read('/lustre/cv/users/akepley/degas/code/degas/scripts/degas_base.fits')
 
-plotdir = '/lustre/cv/users/akepley/degas/sfe_fdense_trends'
+plotdir = '/lustre/cv/users/akepley/degas/sfe_fdense_trends/plots'
 
 # IR6p1 mom1
 stack = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1/stack_IR6p1_mom1_pruned.fits')

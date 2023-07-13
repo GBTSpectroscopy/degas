@@ -56,6 +56,8 @@
 
 # Output format should be fits binary table (because Erik R. said so).
 
+#      Added AGN catalog information from VERON and MILLIQUAS (6/8/2023).
+
 # Questions:
 #       -- Do I just want to copy all the gal_base data to the DEGAS list?
 #           -- Advantages is that I have it.
@@ -71,6 +73,7 @@ import numpy as np
 from astropy.table import Table
 import os
 import math
+from astroquery.heasarc import Heasarc
 
 databaseDir = os.path.join(os.environ['ANALYSISDIR'],'database')
 scriptDir = os.environ['SCRIPTDIR']
@@ -91,6 +94,8 @@ gal_base_cols = ['RA_DEG','DEC_DEG','REF_POS',
                  'LOGMMOL','E_LOGMMOL','REF_LOGMMOL',
                  'LOGMHI','E_LOGMHI','REF_LOGMHI']
 z0mgs_cols = ['logM*','e_logM*','logSFR','e_logSFR','r_logSFR']
+
+heasarc = Heasarc()
 
 data = []
 galaxy = {}
@@ -140,6 +145,20 @@ for line in degas:
         galaxy['E_LOGSFR'] = z0mgs[idx]['e_logSFR'][0]
         galaxy['REF_LOGSFR'] = z0mgs[idx]['r_logSFR'][0]
     
+    # get info on agn
+    try:
+        myres = heasarc.query_object(galaxy['NAME'],mission='veroncat',fields='OBJECT_TYPE')    
+        galaxy['VERON'] = myres['OBJECT_TYPE'][0]
+    except:
+        print(galaxy['NAME'] + ' not found in veroncat')
+        galaxy['VERON'] = ''
+
+    try:
+        myres = heasarc.query_object(galaxy['NAME'],mission='milliquas',fields='BROAD_TYPE')    
+        galaxy['MILLIQUAS'] = myres['BROAD_TYPE'][0]
+    except:
+        galaxy['MILLIQUAS'] = ''
+
     # append on galaxy list
     data.append(galaxy)
     

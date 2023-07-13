@@ -506,6 +506,14 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         ylabel = r'log ( HCO+/CO )'
     elif ydata == 'ratio_ltir_mean_HCOp':
         ylabel = r'log ( L$_{TIR}$/HCO+ )'        
+    elif ydata == 'ratio_HCN_13CO':
+        ylabel = r'log ( HCN/$^{13}$CO )'
+    elif ydata == 'ratio_HCN_C18O':
+        ylabel = r'log ( HCN/C$^{18}$O )'
+    elif ydata == 'ratio_HCOp_13CO':
+        ylabel = r'log ( HCO+/$^{13}$CO )'
+    elif ydata == 'ratio_HCOp_C18O':
+        ylabel = r'log ( HCO+/C$^{18}$O )'
     elif ydata == 'ratio_HCN_CO_norm':
         ylabel = r'log [ (HCN/CO) / $\langle$HCN/CO$\rangle$ ]'
     elif ydata == 'ratio_ltir_mean_HCN_norm':
@@ -565,7 +573,7 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
             lims = stack[idx][ydata+'_uplim']
         elif ydata + '_lolim' in stack.columns:
             lims = stack[idx][ydata+'_lolim']
-        yvals_err_pos[lims] = yvals[lims] * 0.3 ## DO I WNAT TO CHANGE 
+        yvals_err_pos[lims] = yvals[lims] * 0.3 ## DO I WANT TO CHANGE 
         yvals_err_neg[lims] = yvals[lims] * 0.3 ## DO I WNAT TO CHANGE 
         
         ax.plot(xvals[~lims],yvals[~lims],
@@ -649,6 +657,116 @@ def ratio_plots(degas, stack, ydata='ratio_HCN_CO', xdata='r25',
         # save as both png and pdf
         fig.savefig(pltname+'.png')
         fig.savefig(pltname+'.pdf')
+
+
+def ratio_vs_ratio_plots(degas, stack, 
+                         release='DR1',
+                         bin_type='mstar',
+                         xdata='ratio_13CO_CO',
+                         ydata='ratio_HCN_CO',
+                         pltname=None):
+    
+    '''
+    plot the fdense and sfe_dense ratios vs. 12CO/13CO ratio
+
+
+    Date        Programmer      Description of Changes
+    -------------------------------------------------------
+    6/22/2023   A.A. Kepley     Original Code
+    '''
+
+    # select release galaxies. TODO -- offer all option?
+    print("Only plotting release " + release + "\n")
+    release = degas[release] == 1
+    nrelease = np.sum(release)
+
+    ## set up labels
+    ## TODO 
+    xlabel = xdata
+    ylabel = ydata
+
+    # setup plot style
+    markers = ['o','v','^','s','>','D'] # 6 items
+    colors = ['royalblue','forestgreen','darkorange','royalblue','crimson','rebeccapurple','darkcyan','darkmagenta']
+
+    markerlist = np.tile(markers,int(np.ceil(nrelease/len(markers))))
+    markerlist = markerlist[0:nrelease]
+
+    colorlist = np.tile(colors,int(np.ceil(nrelease/len(colors))))
+    colorlist = colorlist[0:nrelease]
+
+    # set up plot
+    fig = plt.figure(figsize=(8,6),facecolor='white',edgecolor='white')
+    fig.subplots_adjust(left=0.15,right=0.78,bottom=0.15, top=0.9)
+
+    ax = fig.add_subplot(1,1,1)
+    
+    # for each dr1 galaxy
+    for (galaxy,color,marker) in zip(degas[release],colorlist,markerlist):
+        idx = ( ( stack['galaxy'] == galaxy['NAME']) \
+                & (stack['bin_type'] == bin_type))
+        
+        xvals = np.log10(stack[idx][xdata])
+        yvals = np.log10(stack[idx][ydata])
+
+        xvals_err_pos = np.abs(np.log10(stack[idx][xdata] + stack[idx][xdata+'_err']) - np.log10(stack[idx][xdata]))
+        xvals_err_neg = np.abs(np.log10(stack[idx][xdata]-stack[idx][xdata+'_err']) - np.log10(stack[idx][xdata]) )
+        
+
+        yvals_err_pos = np.abs(np.log10(stack[idx][ydata] + stack[idx][ydata+'_err']) - np.log10(stack[idx][ydata]))
+        yvals_err_neg = np.abs(np.log10(stack[idx][ydata]-stack[idx][ydata+'_err']) - np.log10(stack[idx][ydata]) )
+
+        if xdata+'_uplim' in stack.columns:
+            xlims = stack[idx][xdata+'_uplim']
+        elif xdata + '_lolim' in stack.columns:
+            xlims = stack[idx][xdata+'_lolim']
+        xvals_err_pos[xlims] = xvals[xlims] * 0.3 ## DO I WANT TO CHANGE 
+        xvals_err_neg[xlims] = xvals[xlims] * 0.3 ## DO I WNAT TO CHANGE 
+
+        if ydata+'_uplim' in stack.columns:
+            ylims = stack[idx][ydata+'_uplim']
+        elif ydata + '_lolim' in stack.columns:
+            ylims = stack[idx][ydata+'_lolim']
+        yvals_err_pos[ylims] = yvals[ylims] * 0.3 ## DO I WANT TO CHANGE 
+        yvals_err_neg[ylims] = yvals[ylims] * 0.3 ## DO I WNAT TO CHANGE 
+
+        
+        lims = (xlims | ylims)
+
+        ax.plot(xvals[~lims],yvals[~lims],
+                    marker = marker,
+                    linestyle='',
+                    color=color,
+                    label=galaxy['NAME'],zorder=10)
+
+        ax.errorbar(xvals[~lims], yvals[~lims],
+                    xerr = [xvals_err_neg[~lims],xvals_err_pos[~lims]],
+                    yerr = [yvals_err_neg[~lims],yvals_err_pos[~lims]],
+                    fmt='none',color=color,zorder=10)
+
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    # get handles
+    handles, labels = ax.get_legend_handles_labels()
+
+    # remove errorbars
+    # TODO -- handle all combinations.
+    #new_handles = [h[0] for h in handles[2:-1]]
+    #new_handles.insert(0,handles[0:1])
+
+    mylegend = ax.legend(handles, labels, loc='upper left',
+                         bbox_to_anchor=(1.0,1.0),handlelength=3, 
+                         borderpad=1.2)    
+
+    fig.show()
+
+    if pltname:
+        # save as both png and pdf
+        fig.savefig(pltname+'.png')
+        fig.savefig(pltname+'.pdf')
+
 
 
 def plot_correlation_coeffs(results, 
@@ -747,7 +865,7 @@ def plot_correlation_coeffs(results,
         else:
             print("Correlation Quantity " + corr_quant + " not recognized. Using corr_quant value as text")
 
-        myax.set_title(corr_quant_str + ' - ' + mybinstr ) 
+        myax.set_title(corr_quant_str + ' - ' + mybinstr )
 
     if corr_quant == 'ratio_HCN_CO':
         myloc = 'lower right'

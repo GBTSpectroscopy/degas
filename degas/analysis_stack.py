@@ -15,8 +15,167 @@ import os
 
 import ipdb
 
-def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
+def normalizeStacks(stack, degas_db,
+                    bin_type_list = ['mstar','molgas','r25'],
+                    norm_quant_list = ['ratio_HCN_CO',
+                                       'ratio_ltir_mean_HCN',
+                                       'ratio_HCOp_CO',
+                                       'ratio_ltir_mean_HCOp'],
+                    outfile = None):
+    '''
+    generate normalized stacks
 
+    Inputs:
+    -------
+
+    stack: per bin_type, per source stack
+    
+    degas_db: database of degas properties
+    
+    bin_type: what bin_types to normalizes
+    
+    norm_quants: quantities I want to normalize.
+
+    Outputs:
+    -------
+
+    stack_norm: normalized stack should include new columns for 
+    norm_val, normalization offset, and normalized fit
+
+    Date        Programmer      Description of Changes
+    --------------------------------------------------
+    3/16/2023   A.A. Kepley     Original Code
+    '''
+
+    import math
+    
+    # empy stack for results
+    new_stack = []
+    
+    # figure out current bins in stack
+    mybins = np.unique(stack['bin_type'])
+    
+    for bin_type in bin_type_list:
+        
+        # if bin_type isn't found skip
+        ## TODO: DO I WANT TO SKIP OR JUST NOT DO AND ADD 
+        ## COLUMNS TO RESULT??
+        if bin_type not in mybins:
+            print("Bin type not found: " + bin_type)
+            continue
+
+        # select out bins
+        idx_bin = (stack['bin_type'] == bin_type)
+        
+        ## calculate norm value 
+        ## TODO: figure out what values I want to use here.
+        #if bin_type == 'mstar':
+        #norm_val = np.log10(mstar_avg)
+        #norm_val = 3.0 # 1000 Msun/pc**2
+        #    norm_val = np.log10(500) #Msun/pc**2
+        #else:
+        #norm_val = np.mean(np.log10(stack[idx_bin]['bin_mean']))
+        
+        # group by galaxy for iterations
+        stack_by_gal = stack[idx_bin].group_by('galaxy')
+        for (group, key) in zip(stack_by_gal.groups,stack_by_gal.groups.keys):
+            
+            # getting galaxy fiducial parameters
+            galaxy = key['galaxy']
+            idx_gal = degas_db['NAME'] == galaxy
+            dist_mpc = degas_db[idx_gal]['DIST_MPC'] 
+            re_arcsec = degas_db[idx_gal]['RE_ARCSEC']
+            mstar = 10**degas_db[idx_gal]['LOGMSTAR']
+            sfr = 10**degas_db[idx_gal]['LOGSFR']
+            ## need to get molecular gas mass. I think I have in 
+            ## line ratio paper data base
+            
+            # calculate effective radius
+            re_pc = (re_arcsec / 206265.0) * dist_mpc * 1e6 # pc
+            
+            # calculate average mass surface density within effective
+            # radius
+            mstar_avg = 0.5 * mstar / (math.pi * re_pc**2) # Msun / pc**2                    
+            
+            ## add columns for output
+            group.add_column(np.zeros(len(group)), 
+                             name='bin_mean_norm')
+            group.add_column(np.zeros(len(group)), 
+                             name='norm_val')
+            for norm_quant in norm_quant_list:
+                group.add_column(np.zeros(len(group)),
+                                 name=norm_quant+'_norm')
+                group.add_column(np.zeros(len(group)),
+                                 name=norm_quant+'_norm_zpt')
+
+            # set the normalization value and the r25 value
+            if bin_type == 'mstar':
+                norm_val = np.log10(mstar_avg)
+                xval_log = np.log10(group['bin_mean']) - norm_val 
+                group['bin_mean_norm'] = 10**xval_log
+                group['norm_val'] = np.full(len(group),10**(norm_val))
+            elif bin_type == 'molgas':
+                ##  TODO: need to get mean molecular gas
+                norm_val = np.mean(np.log10(stack[idx_bin]['bin_mean']))
+                xval_log = np.log10(group['bin_mean']) - norm_val 
+                group['bin_mean_norm'] = 10**xval_log
+                group['norm_val'] = np.full(len(group),10**(norm_val))
+            elif bin_type == 'r25':
+                norm_val = 0.20 #r/r25
+                xval_log = group['bin_mean'] - norm_val 
+                group['bin_mean_norm'] = xval_log
+                group['norm_val'] = np.full(len(group),norm_val)
+            else:
+                norm_val = np.mean(np.log10(stack[idx_bin]['bin_mean']))
+                xval_log = np.log10(group['bin_mean']) - norm_val 
+                group['bin_mean_norm'] = 10**xval_log
+                group['norm_val'] = np.full(len(group),10**(norm_val))
+
+            # setup  grid for interpolation
+            npts = 10 # doesn't need to be super dense, just needs to include zero.
+            xval_log_interp_pos = np.linspace(0,max(xval_log),npts)
+            xval_log_interp = np.append(np.linspace(min(xval_log),0,npts)[0:-1],xval_log_interp_pos)            
+
+            # normalize the desired quantities
+            for norm_quant in norm_quant_list:
+
+                # calculate the y-values
+                yval_log = np.log10(group[norm_quant])
+                
+                # interpolate those to the interpolated xvals 
+                yval_log_interp = np.interp(xval_log_interp, xval_log, yval_log)
+                
+                # find the yval value at zero.
+                zeropt = np.where(xval_log_interp == 0)[0][0]
+                yval_log_zeropt = yval_log_interp[zeropt]
+
+                # subtract the yval zero point to offset
+                yval_log_norm = yval_log - yval_log_zeropt
+             
+                # add information to data base
+                group[norm_quant+'_norm'] = 10**(yval_log_norm)
+                group[norm_quant+'_norm_zpt'] = np.full(len(group),10**(yval_log_zeropt))
+                group[norm_quant+'_norm_err'] = group[norm_quant+'_err'] / 10**norm_val
+                if norm_quant+'_uplim' in group.columns:
+                    group[norm_quant+'_norm_uplim'] = group[norm_quant+'_uplim']
+                if norm_quant+'_lolim' in group.columns:
+                    group[norm_quant+'_norm_lolim'] = group[norm_quant+'_lolim']
+                    
+            # add to stacks
+            if len(new_stack) == 0:
+                new_stack = group
+            else:
+                new_stack = vstack([new_stack,group])
+        
+    if outfile is not None:
+        new_stack.write(outfile,overwrite=True)
+
+    return new_stack
+
+
+                
+
+def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
     '''
     Prune out stacks
 
@@ -788,6 +947,12 @@ def addIntegratedIntensity(full_stack, outDir, incl=0.0):
     ## NO INCLINATION CORRECTIONS NEEDED HERE b/c ratios
     full_stack = calcLineRatio(full_stack,'HCN','CO')
     full_stack = calcLineRatio(full_stack,'HCOp','CO')
+
+    full_stack = calcLineRatio(full_stack,'HCN','13CO')
+    full_stack = calcLineRatio(full_stack,'HCOp','13CO')
+
+    full_stack = calcLineRatio(full_stack,'HCN','C18O')
+    full_stack = calcLineRatio(full_stack,'HCOp','C18O')
 
     full_stack = calcLineRatio(full_stack,'13CO','CO')
     full_stack = calcLineRatio(full_stack,'C18O','CO')

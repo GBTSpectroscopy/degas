@@ -3,7 +3,12 @@ from astropy.table import Table
 import os
 import ipdb
 
-def calc_correlation_coeffs(stack,degas_db, release='DR1',corr_bins = ['r25','mstar','ICO'],corr_quants=['ratio_HCN_CO','ratio_ltir_mean_HCN'], outfile=None):
+def calc_correlation_coeffs(stack,degas_db, 
+                            release='DR1',
+                            corr_bins = ['r25','mstar','molgas'],
+                            norm=False,
+                            corr_quants=['ratio_HCN_CO','ratio_ltir_mean_HCN'], 
+                            outfile=None):
     '''
     calculate correlation coefficients for each galaxy and quantity.
 
@@ -21,6 +26,11 @@ def calc_correlation_coeffs(stack,degas_db, release='DR1',corr_bins = ['r25','ms
     if not np.any(release_idx):
         print("No galaxies found in release :" + release)
         return
+
+    if norm:
+        bin_mean = 'bin_mean_norm'
+    else:
+        bin_mean = 'bin_mean'
 
     galaxy_arr = []
     corr_bin_arr = []
@@ -45,16 +55,21 @@ def calc_correlation_coeffs(stack,degas_db, release='DR1',corr_bins = ['r25','ms
             else:
                 idx_all =  (stack['bin_type'] == mybin) 
 
-            myresult = spearmanr(stack[idx_all]['bin_mean'], 
+            myresult = spearmanr(stack[idx_all][bin_mean], 
                                          stack[idx_all][myquant], 
                                          nan_policy='omit')
 
-            myresult_kendall = kendalltau(stack[idx_all]['bin_mean'], 
+            myresult_kendall = kendalltau(stack[idx_all][bin_mean], 
                                           stack[idx_all][myquant], 
                                           nan_policy='omit')
             
             galaxy_arr = np.append(galaxy_arr, 'all')
-            corr_bin_arr =  np.append(corr_bin_arr, mybin)
+
+            if norm:
+                corr_bin_arr =  np.append(corr_bin_arr, mybin+'_norm')
+            else:
+                corr_bin_arr =  np.append(corr_bin_arr, mybin)
+
             quant_arr = np.append(quant_arr,myquant)
             nval_arr = np.append(nval_arr, np.sum(idx_all))
             corr_val_arr = np.append(corr_val_arr, myresult.correlation)
@@ -75,16 +90,21 @@ def calc_correlation_coeffs(stack,degas_db, release='DR1',corr_bins = ['r25','ms
                 else:
                     idx_gal =  (stack['galaxy'] == galaxy) & (stack['bin_type'] == mybin) 
 
-                myresult = spearmanr(stack[idx_gal]['bin_mean'], 
+                myresult = spearmanr(stack[idx_gal][bin_mean], 
                                      stack[idx_gal][myquant], 
                                      nan_policy='omit')
                 
-                myresult_kendall = kendalltau(stack[idx_gal]['bin_mean'], 
+                myresult_kendall = kendalltau(stack[idx_gal][bin_mean], 
                                               stack[idx_gal][myquant], 
                                               nan_policy='omit')
 
                 galaxy_arr = np.append(galaxy_arr, galaxy)
-                corr_bin_arr =  np.append(corr_bin_arr, mybin)
+
+                if norm:
+                    corr_bin_arr =  np.append(corr_bin_arr, mybin+'_norm')
+                else:
+                    corr_bin_arr =  np.append(corr_bin_arr, mybin)
+                    
                 quant_arr = np.append(quant_arr,myquant)
                 nval_arr = np.append(nval_arr, np.sum(idx_gal))
                 corr_val_arr = np.append(corr_val_arr, myresult.correlation)
@@ -106,7 +126,8 @@ def calc_correlation_coeffs(stack,degas_db, release='DR1',corr_bins = ['r25','ms
 
 
 def make_fit_table(stack, 
-                   bins = ['r25','mstar','ICO'],
+                   bins = ['r25','mstar','molgas'],
+                   norm = False, # get normalized bins
                    columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN'],
                    outfile = 'test.fits',
                    exclude_gal = [],
@@ -152,13 +173,16 @@ def make_fit_table(stack,
         if len(stack[idx]) == 0:
             print("Bin " + mybin+ " not found in stack. Skipping")
             continue
-
+        
         # iterate over columns    
         for mycol in columns: 
             if not mycol in stack.columns:
                 print("Column "+mycol+" not in stack. Skipping")
                 continue
-            myresult = fit_trend(stack[idx],bin_type=mybin,stack_col=mycol, plotDir=plotDir)
+            myresult = fit_trend(stack[idx],
+                                 bin_type=mybin,norm=norm,
+                                 stack_col=mycol, 
+                                 plotDir=plotDir)
 
             t.add_row([mybin,mycol,
                        myresult.params['slope'].value,
@@ -178,7 +202,8 @@ def make_fit_table(stack,
 #----------------------------------------------------------------------
 
 def make_fit_table_pergal(stack, 
-                          bins = ['r25','mstar','ICO'],
+                          bins = ['r25','mstar','molgas'],
+                          norm=False,
                           columns = ['ratio_HCN_CO','ratio_ltir_mean_HCN'],
                           outfile = 'test.fits',
                           exclude_gal = [],
@@ -239,7 +264,10 @@ def make_fit_table_pergal(stack,
                     print("Column "+mycol+" not in stack. Skipping")
                     continue
 
-                myresult = fit_trend(stack[idx],bin_type=mybin,stack_col=mycol, plotDir=plotDir, plot_postfix=gal)
+                myresult = fit_trend(stack[idx],
+                                     bin_type=mybin, norm=norm,
+                                     stack_col=mycol, 
+                                     plotDir=plotDir, plot_postfix=gal)
                 
                 if myresult:
 
@@ -264,9 +292,10 @@ def make_fit_table_pergal(stack,
                                     
 def fit_trend(stack, 
               bin_type='r25', 
+              norm=False,
               stack_col = 'ratio_HCN_CO',
               plotDir = None,
-              plot_postfix = ""):
+              plot_postfix = None):
     '''
 
     Purpose: fit a linear regression to a subset of data from a stack
@@ -294,10 +323,15 @@ def fit_trend(stack,
         idx = (stack['bin_type'] == bin_type) & (stack[stack_col+'_lolim'] == False) 
         
 
-    if bin_type == 'r25':
-        xvals = np.array(stack['bin_mean'][idx])
+    if norm:
+        binval = 'bin_mean_norm'
     else:
-        xvals = np.log10(np.array(stack['bin_mean'][idx]))
+        binval = 'bin_mean'
+    
+    if bin_type == 'r25':
+        xvals = np.array(stack[binval][idx])
+    else:
+        xvals = np.log10(np.array(stack[binval][idx]))
 
     yvals = np.log10(np.array(stack[stack_col][idx]))
 
@@ -305,9 +339,15 @@ def fit_trend(stack,
         print("not enough values to fit")
         return False
     
-    ## percent errors = errors in log space
-    yvals_err = stack[stack_col+"_err"][idx]/stack[stack_col][idx]
-    yvals_weights = 1/(yvals_err**2)
+    ## percent errors = errors in log space. But doesn't work near zero.
+    #yvals_err = stack[stack_col+"_err"][idx]/stack[stack_col][idx]
+    #yvals_weights = 1/(yvals_err**2)
+
+    # doing errors the stupid, but effective way
+    yvals_err_pos = np.abs(np.log10(stack[stack_col][idx] + stack[stack_col+"_err"][idx]) - np.log10(stack[stack_col][idx]))
+    yvals_err_neg = np.abs(np.log10(stack[stack_col][idx] - stack[stack_col+"_err"][idx]) - np.log10(stack[stack_col][idx]))
+
+    
 
     mygals = stack['galaxy'][idx]
 
@@ -329,18 +369,23 @@ def fit_trend(stack,
     gallist = np.unique(mygals)
     for gal in gallist:
         plt.errorbar(xvals[gal == mygals], yvals[gal == mygals],
-                     yerr = yvals_err[gal==mygals],
-                     label=gal)
+                     yerr = [yvals_err_neg[gal==mygals],yvals_err_pos[gal==mygals]],
+                             label=gal)
 
     plt.plot(xvals,modresult.best_fit,label='best fit',color='darkgray',linewidth=3.0)
     plt.xlabel(bin_type)
     plt.ylabel(stack_col)
     plt.legend()
-        
+
+    if plot_postfix is not None:
+        plot_postfix = plot_postfix + '_'
+    else:
+        plot_postfix = ''
+
     if plotDir:
         if not os.path.exists(plotDir):
             os.mkdir(plotDir)
-        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" +plot_postfix + "_fit.png"))
-        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" + plot_postfix + "_fit.pdf"))
+        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" +plot_postfix + "fit.png"))
+        plt.savefig(os.path.join(plotDir,bin_type + "_" + stack_col + "_" + plot_postfix + "fit.pdf"))
 
     return modresult

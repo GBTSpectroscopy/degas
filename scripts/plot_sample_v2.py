@@ -95,4 +95,6 @@ for i in np.arange(len(degas['NAME'])):
 
 plt.savefig(os.path.join(os.environ['ANALYSISDIR'],'plots','sample_degas_all_withnames_v2.pdf'), pad_inches=0.2,bbox_inches='tight')
 
+plt.clf()
+
 plt.close()

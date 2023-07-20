@@ -352,7 +352,6 @@ def fixALMAHCN(fitsimage):
     cube_kms = cube.with_spectral_unit(u.km / u.s)
     cube_kms.write(fitsimage.replace('.fits','_kms.fits'),overwrite=True)
 
-
 #----------------------------------------------------------------------
 
 def calc_stellar_mass(iracFile, MtoLFile, outFile):
@@ -785,7 +784,7 @@ def colorCorrect_24micron(b24, b70, outFile, beam=30.0):
     # write out the results
     fits.writeto(outFile, LTIR_corrected, header=b24_hdr, overwrite=True)
 
-#----------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 def smoothCube(fitsimage,outDir, beam=15.0):
     '''
@@ -927,6 +926,47 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")
+
+#----------------------------------------------------------------------
+
+def calc_sigmaHI(fitsimage, 
+                 outDir,
+                 incl=None):
+    ''' 
+    Purpose: given input HI data set calculate sigma atom output map
+
+    Input: HI moment zero image
+    Output: sigma_atom
+
+    Date        Progammer       Description of Changes
+    ----------------------------------------------------------------------
+    7/20/2023   A.A. Kepley     Original Code
+
+    '''
+
+    img = fits.open(fitsimage)
+
+    header = img[0].header 
+    mom0 = img[0].data
+    img.close()
+
+    # equation taken from Sun+ 2020, equation 14.
+    # equation assumes optically thin emission and helium contribution
+    # hi_mom0 should be in K km/s.
+    # inclination should be in degrees
+    # output in Msun/pc^2
+    sigma_atomic = 2e-2 * mom0 *  np.cos(np.radians(incl))
+    header['BUNIT'] = 'Msun/pc^2'
+
+    outFile = os.path.join(outDir,os.path.basename(fitsimage).replace('.fits','_sigmaHI.fits'))
+
+    fits.writeto(outFile, 
+                 sigma_atomic,
+                 header=header, overwrite=True)
+    
+    
+
+#----------------------------------------------------------------------
 
 def simpleR21scale(infile, r21, r21_ref=None):
     '''

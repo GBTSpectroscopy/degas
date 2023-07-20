@@ -11,7 +11,8 @@ import glob
 ## Could I just define some default plot settings here and reference below?
 
 
-def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
+def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1',
+               fwhm_factor=1.4,vel_lim=500.0):
     '''
     general purpose routine to plot stacks.
 
@@ -23,9 +24,14 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
 
     degas_db: degas galaxy property database in astropy Table format
 
+    fwhm_factor: factor to use to set the limits of the x-axis.
+
+    vel_lim: maximum velocity to plot (+/-)
+
     Date        Programmer      Description of Code
     ----------------------------------------------------------------------
     12/21/2021  A.A. Kepley     Original Code
+    7/18/2023   A.A. Kepley     Modifying to make xlim limits more flexible.
 
     '''
 
@@ -64,12 +70,16 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
             print("Galaxy not in stack: "+ galaxy['NAME'])
             continue
         
+
+        # get the widest CO FWHM fit to set the limit on the plot.
+        fwhm_max = np.max(stack[idx]['int_intensity_fit_CO_fwhm'])
+
+        xlim = min(abs(fwhm_max/2.0) * fwhm_factor,vel_lim)
+
+
         ncols = 3
         nrows = int(np.ceil(nprofile / ncols))
 
-
-            
-    
         fig, myax = plt.subplots(nrows=nrows, ncols=ncols,
                                  sharex='all', sharey='row',
                                  figsize=(8,8))
@@ -108,10 +118,11 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1'):
                                transform=flatax[i].transAxes,fontsize='x-small')
                 flatax[i].legend(loc='upper right',fontsize='x-small')
 
-            
+
         for ax in flatax:
             ax.set(xlabel=r'Velocity (km s$^{-1}$)',
-                   ylabel=r'Stacked Mean Intensity (K)')
+                   ylabel=r'Stacked Mean Intensity (K)',
+                   xlim=(-xlim,xlim))
     
         for ax in flatax:
             ax.label_outer()
@@ -427,9 +438,9 @@ def compare_stacks_line(stack_list, stack_name_list,
 
     plt.yscale('log')
     plt.legend()
-    plt.title(galaxy + ' - ' + line.replace('HCOp','HCO+'),size='large')
-    plt.xlabel('radius (kpc)',size='medium')
-    plt.ylabel('I (K km/s)',size='medium')
+    plt.title(galaxy + ' - ' + line.replace('HCOp','HCO+'),size='x-large',weight='bold')
+    plt.xlabel('radius (kpc)',size='large')
+    plt.ylabel('I cos(i) (K km/s)',size='large')
 
     if outdir == None:
         outDir = './'

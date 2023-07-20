@@ -1,9 +1,12 @@
 import os
 from astropy.table import Table
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 from degas.analysis_plot import plot_stack, plot_trends
+
+matplotlib.use('cairo')
 
 #release = 'IR6p1'
 release = 'IR6p1_spatialR21'
@@ -35,8 +38,8 @@ for bin_type in binlist:
 
     plot_stack(stack, bin_type,
                plot_dir,
-               degas_db, release='DR1')
-    
+               degas_db, release='DR1',fwhm_factor=5.0)
+
 # plot trends
 
 plot_dir =  os.path.join(stackDir,'stack_trends')
@@ -158,7 +161,7 @@ for bin_type in binlist:
 
     plot_stack(stack_pruned, bin_type,
                plot_dir,
-               degas_db, release='DR1')
+               degas_db, release='DR1', fwhm_factor=5.0)
 
 # plot trends
 plot_dir =  os.path.join(stackDir,'stack_trends_pruned')

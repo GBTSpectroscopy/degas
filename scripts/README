@@ -33,8 +33,10 @@
 
 # set up CO 
 %run fix_up_other_data.py
-
 %run process_12CO.py
+
+# set up HI images
+%run process_HI.py 
 
 ## RUN  DEGAS REDUCTION
 
@@ -42,17 +44,21 @@
 %run make_diagnostic_moment_maps.py
 
 # set up data for analysis
+## TODO: add HI data
 %run align_to_degas.py # -- a whole bunch of regridding, etc for analysis.
 %run align_to_degas_nosmooth.py # -- do degas alignment, but don't smooth to common resolution
 
 # rescale the 12CO(2-1) data.
 %run do_CO21_rescale.py # more convenient here because the sigma_SFR map is already regridded.
 
+# calculate PDE -- TODO!!!
+%run do_PDE_calc.py # more convenient here because all other maps are already regridded and smoothed
+
 # run the stacking analysis
 %run do_stack.py
 
-%run make_stack_plots.py
-%run generate_stack_figure_set.py
+%run make_stack_plots.py  ## make stacking plots
+%run generate_stack_figure_set.py ## make figure set latex for paper
 
 # empire stacks
 %run fix_up_empire.py # -- fix up empire cubes
@@ -76,7 +82,6 @@
 # compare the different type of stacks
 %run make_stack_comparison_plots.py
 
-## HERE
 
 # compare ltir
 %run make_ltir_comparison.py

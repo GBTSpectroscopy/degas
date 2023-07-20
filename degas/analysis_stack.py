@@ -229,8 +229,8 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
                 logging.info("Skipping pruning " + mybin + " bin.")
                 continue
 
-            # prune stellar mass or intensity bings
-            elif (mybin == 'mstar') | (mybin == 'ICO'):
+            # prune stellar mass or intensity  or molecular gas 
+            elif (mybin == 'mstar') | (mybin == 'ICO') | (mybin == 'molgas'):
                 logging.info("Pruning "+mybin+".")
                 
                 idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)

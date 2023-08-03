@@ -229,46 +229,52 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
                 logging.info("Skipping pruning " + mybin + " bin.")
                 continue
 
-            # prune stellar mass or intensity  or molecular gas 
+            # prune stellar mass or intensity  or molecular gas or PDE
             else:
                 logging.info("Pruning "+mybin+".")
                 
                 idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)
+                
+                # only prune with there are selected data sets in the stack
+                ## Some stacks (e.g., PDE) won't have stacks for everything.
+                if len(stack_orig[idx]) > 0:
 
-                # use manual override parameters
-                man_idx = (manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)
-                if np.any(man_idx):
-                    logging.info("Using parameters in override file")
+                    # use manual override parameters
+                    man_idx = (manual['galaxy'] == galaxy) & (manual['bin_type'] == mybin)
+                    if np.any(man_idx):
+                        logging.info("Using parameters in override file")
 
-                    # keep everything greater than min_val
-                    min_val = manual[man_idx]['min_val']
-                    stack_orig['keep'][idx] = stack_orig['bin_mean'][idx] > min_val 
+                        # keep everything greater than min_val
+                        min_val = manual[man_idx]['min_val']
+                        stack_orig['keep'][idx] = stack_orig['bin_mean'][idx] > min_val 
 
-                # use trend in number of pixels in region
-                else:
+                    # use trend in number of pixels in region
+                    else:
 
-                    # get bin info
-                    bin_mean = np.flip(stack_orig[idx]['bin_mean'])
-                    stack_weights = np.flip(stack_orig[idx]['stack_weights'])
-                    keep = np.flip(stack_orig[idx]['keep'])
-                    orig_len = np.sum(keep)
+                        # get bin info
+                        bin_mean = np.flip(stack_orig[idx]['bin_mean'])
+                        stack_weights = np.flip(stack_orig[idx]['stack_weights'])
+                        keep = np.flip(stack_orig[idx]['keep'])
+                        orig_len = np.sum(keep)
 
-                    # figure out when the  number of pixels in a region stops increasing
-                    delta_pix = stack_weights[1:] - stack_weights[0:-1]
-                    delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
+                        # figure out when the  number of pixels in a region stops increasing
+                        delta_pix = stack_weights[1:] - stack_weights[0:-1]
+                        delta_pix[np.where( (delta_pix <0 ) & (delta_pix >-5))] = 1
 
-                    lastidx = np.argmax(delta_pix < 0)+1
-                    if lastidx == 1:
-                        lastidx = len(stack_weights)
-                    keep[lastidx:] = False
+                        lastidx = np.argmax(delta_pix < 0)+1
+                        if lastidx == 1:
+                            lastidx = len(stack_weights)
+                        keep[lastidx:] = False
 
-                    # set keep
-                    stack_orig['keep'][idx] = np.flip(keep)
-                    new_len = np.sum(keep) 
+                        # set keep
+                        stack_orig['keep'][idx] = np.flip(keep)
+                        new_len = np.sum(keep) 
                     
-                    logging.info("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stack")
+                        logging.info("Removed " + str(orig_len - new_len) + " of " + str(orig_len) + " spectra from stack")
+                else:
+                    logging.info("No "+mybin+" in stack")
 
-                logging.info(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
+            logging.info(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
             
 
     stack_pruned = stack_orig[stack_orig['keep']]
@@ -635,7 +641,6 @@ def makeStack(galaxy, regridDir, outDir,
 
     stack_molgas.add_column(Column(np.tile('molgas',len(stack_molgas))),name='bin_type',index=0)
     
-    ### TODO: roughing in code here
     if PDEmap is not None:
         # create bins
         binmap, binedge, binlabels = makePDEBins(galaxy, PDEmap, outDir,binspace=0.3) 

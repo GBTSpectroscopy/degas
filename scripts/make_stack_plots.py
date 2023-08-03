@@ -31,7 +31,7 @@ degas_db = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
 
 plot_dir =  os.path.join(stackDir,'stack_plots')
 
-binlist = ['radius','r25','mstar','ICO', 'molgas']
+binlist = ['radius','r25','mstar','ICO', 'molgas','PDE']
 #binlist = ['radius']
 
 for bin_type in binlist:
@@ -44,7 +44,7 @@ for bin_type in binlist:
 
 plot_dir =  os.path.join(stackDir,'stack_trends')
 
-binlist = ['radius','r25','mstar','ICO','molgas']
+binlist = ['radius','r25','mstar','ICO','molgas', 'PDE']
 
 mystyledict = {'int_intensity_sum_CO': 
                {'marker':'o','color':'orange', 'label':'CO'}, 
@@ -80,7 +80,7 @@ mystyledict = {'int_intensity_sum_CO':
 
 for bin_type in binlist:
 
-    if bin_type in ['mstar', 'ICO','molgas']:
+    if bin_type in ['mstar', 'ICO','molgas','PDE']:
         xlog = True
     else:
         xlog = False
@@ -155,7 +155,7 @@ for bin_type in binlist:
 plot_dir =  os.path.join(stackDir,'stack_plots_pruned')
 
 
-binlist = ['radius','r25','mstar','ICO', 'molgas']
+binlist = ['radius','r25','mstar','ICO', 'molgas','PDE']
 
 for bin_type in binlist:
 
@@ -166,11 +166,11 @@ for bin_type in binlist:
 # plot trends
 plot_dir =  os.path.join(stackDir,'stack_trends_pruned')
 
-binlist = ['radius','r25','mstar','ICO','molgas']
+binlist = ['radius','r25','mstar','ICO','molgas','PDE']
 
 for bin_type in binlist:
 
-    if bin_type in ['mstar', 'ICO','molgas']:
+    if bin_type in ['mstar', 'ICO','molgas','PDE']:
         xlog = True
     else:
         xlog = False

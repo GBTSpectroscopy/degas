@@ -67,7 +67,7 @@ def plot_stack(stack, bin_type, plot_dir, degas_db, release='DR1',
         
         # if galaxy isn't in stack continue
         if nprofile == 0:
-            print("Galaxy not in stack: "+ galaxy['NAME'])
+            print("Either galaxy or bin not in stack: "+ galaxy['NAME'] + ', '+bin_type)
             continue
         
 

@@ -11,6 +11,7 @@ release = 'IR6p1'
 
 releaseDir = os.path.join(os.environ['ANALYSISDIR'],release)
 coDir = os.path.join(os.environ['ANALYSISDIR'],'CO')
+hiDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','hi_from_jiayi','15arcsec')
 multiDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','multiwavelength')
 
 regridDir = os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
@@ -77,10 +78,19 @@ for hcn in hcnlist:
         else:
             coproduct = os.path.join(coDir,name+'_12CO_'+product+'.fits')
         if os.path.exists(coproduct):
-            if ((product is 'mask') or (product is 'mask2D')):
+            if ((product == 'mask') or (product == 'mask2D')):
                 regridData(hcn_smooth,coproduct,regridDir,mask=True)
             else:
                 regridData(hcn_smooth,coproduct,regridDir)
+
+    # process HI products -- regrid only -- already smoothed
+    print("** processing " + name + " HI  **")
+
+    hi_mom0 = glob.glob(os.path.join(hiDir,name+'*_21cm_*_mom0_smooth.fits'))
+    if len(hi_mom0) > 0:
+        hi_mom0 = hi_mom0[0]
+        if os.path.exists(hi_mom0):
+            regridData(hcn_smooth,hi_mom0,regridDir)
 
     print("** processing " + name + " SFR **")
 

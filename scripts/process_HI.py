@@ -8,31 +8,42 @@ import shutil
 
 hiDir = os.path.join(os.environ['ANALYSISDIR'],'ancillary_data','hi_from_jiayi')
 
-degas = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base.fits'))
+scriptDir = os.environ['SCRIPTDIR']
+degas = Table.read(os.path.join(scriptDir,'degas_base.fits'))
 hi_db = Table.read(os.path.join(hiDir,'DEGAS-HI-summary.fits'))
+
+if 'HI_DATA' in degas.colnames:
+    degas.remove_column('HI_DATA')
+degas.add_column(Column(np.full_like(degas['NAME'],''),dtype='S25'),name='HI_DATA')
 
 for galaxy in degas:
     print("***Processing galaxy: " + galaxy['NAME'] + "***")
     
     if not hi_db['any'][hi_db['NAME'] == galaxy['NAME']]:
         print("No HI data available for this galaxy. Skipping.")
+        degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = '--'
         continue
     
     if hi_db['THINGS'][hi_db['NAME'] == galaxy['NAME']]:
         print('galaxy in things')
         mom0_path = os.path.join(hiDir,'archival',galaxy['NAME'] + '_THINGS_21cm_strictmask_mom0.fits')
+        degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = 'THINGS'
     elif hi_db['PHANGSVLA'][hi_db['NAME'] == galaxy['NAME']]:
         print('galaxy in phangsvla')
         mom0_path = os.path.join(hiDir,'PHANGSVLA',galaxy['NAME'] + '_PHANGSVLA_21cm_strictmask_mom0.fits')
+        degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = 'PHANGSVLA'
     elif hi_db['VLAHERACLES'][hi_db['NAME'] == galaxy['NAME']]:
             print('galaxy in vlaheracles')
             mom0_path = os.path.join(hiDir,'archival',galaxy['NAME'] + '_VLAHERACLES_21cm_strictmask_mom0.fits')
+            degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = 'VLAHERACLES'
     elif hi_db['HALOGAS'][hi_db['NAME'] == galaxy['NAME']]:
             print('galaxy in halogas')
             mom0_path = os.path.join(hiDir,'archival',galaxy['NAME'] + '_HALOGAS_21cm_strictmask_mom0.fits')
+            degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = 'HALOGAS'
     elif hi_db['EVERYTHINGS'][hi_db['NAME'] == galaxy['NAME']]:
         print("Galaxy in everythings")
         mom0_path = os.path.join(hiDir,'EVERYTHINGS',galaxy['NAME'] + '_EVERYTHINGS_21cm_strictmask_mom0.fits')
+        degas['HI_DATA'][degas['NAME'] == galaxy['NAME']] = 'EVERYTHINGS'
     else:
         print('galaxy not found')
 
@@ -68,8 +79,7 @@ for galaxy in degas:
 
 
     
-
-
+degas.write(os.path.join(scriptDir,"degas_base.fits"),overwrite=True)
     
     
     

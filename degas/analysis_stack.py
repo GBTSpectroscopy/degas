@@ -230,7 +230,7 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
                 continue
 
             # prune stellar mass or intensity  or molecular gas 
-            elif (mybin == 'mstar') | (mybin == 'ICO') | (mybin == 'molgas'):
+            else:
                 logging.info("Pruning "+mybin+".")
                 
                 idx = (stack_orig['galaxy'] == galaxy) & (stack_orig['bin_type'] == mybin)
@@ -270,8 +270,6 @@ def pruneSampleTable(outDir, inTable, outTable, overrideFile=None):
 
                 logging.info(stack_orig[idx]['galaxy','bin_type','bin_mean','stack_weights','keep'])
             
-            else:
-                logging.info("Bin not recognized. Skipping.")    
 
     stack_pruned = stack_orig[stack_orig['keep']]
 
@@ -383,6 +381,16 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
     sfrmap = mapSFR(galaxy, regridDir, outDir)
     ltirmap = mapLTIR(galaxy, regridDir,outDir, ltir=ltir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy, comap) # comap is just used to get coordinates
+    himap, atomicgasmap = mapHI(galaxy,regridDir,outDir) ## TODO
+
+    # use the quantities above to calculate PDEmap
+    if atomicgasmap is not None:
+        PDEmap = calcPDE(galaxy, outDir, 
+                         molgasmap=molgasmap,
+                         atomicgasmap=atomicgasmap, 
+                         stellarmap=stellarmap ) ## TODO
+    else:
+        PDEmap = None
 
     velocity_file = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_12CO*_*'+vtype+'*.fits' ))
     if len(velocity_file) == 1:
@@ -455,6 +463,7 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
         cubeC18O = None
 
     #get the full stack result for each line
+    ## TODO: Add PDE. Create a keyword parameter here. If it is not None, then stack via pde. Otherwise, don't stack via pde.
     full_stack = makeStack(galaxy, regridDir, outDir,
                            cubeCO = cubeCO,
                            cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
@@ -463,7 +472,8 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
                            comap = comap, molgasmap = molgasmap,
                            sfrmap = sfrmap, ltirmap = ltirmap,
                            stellarmap=stellarmap, R_arcsec=R_arcsec,
-                           R_r25=R_r25) 
+                           R_r25=R_r25,
+                           PDEmap=PDEmap) 
 
     # remove stacks that don't have CO spectra 
     nstack = len(full_stack)
@@ -497,7 +507,9 @@ def makeStack(galaxy, regridDir, outDir,
               stellarmap = None, 
               molgasmap= None,
               R_arcsec = None,
-              R_r25 = None):
+              R_r25 = None,
+              atomicgasmap = None,
+              PDEmap = None):
     '''
     
     make stacks for all lines and ancillary data for one galaxy
@@ -541,7 +553,9 @@ def makeStack(galaxy, regridDir, outDir,
                               cube13CO = cube13CO, cubeC18O = cubeC18O,
                               sfrmap = sfrmap, ltirmap = ltirmap, 
                               stellarmap = stellarmap,
-                              molgasmap = molgasmap)
+                              molgasmap = molgasmap,
+                              atomicgasmap = atomicgasmap,
+                              PDEmap = PDEmap)
 
     stack_radius.add_column(Column(np.tile('radius',len(stack_radius))),name='bin_type',index=0)
 
@@ -558,7 +572,9 @@ def makeStack(galaxy, regridDir, outDir,
                            cube13CO = cube13CO, cubeC18O = cubeC18O,
                            sfrmap = sfrmap, ltirmap = ltirmap, 
                            stellarmap = stellarmap,
-                           molgasmap = molgasmap)
+                           molgasmap = molgasmap,
+                           atomicgasmap = atomicgasmap,
+                           PDEmap = PDEmap)
     
     stack_r25.add_column(Column(np.tile('r25',len(stack_r25))),name='bin_type',index=0)
     
@@ -577,7 +593,9 @@ def makeStack(galaxy, regridDir, outDir,
                                  cube13CO = cube13CO, cubeC18O = cubeC18O,
                                  sfrmap = sfrmap, ltirmap = ltirmap,
                                  stellarmap = stellarmap,
-                                 molgasmap=molgasmap)
+                                 molgasmap=molgasmap,
+                                 atomicgasmap = atomicgasmap,
+                                 PDEmap = PDEmap)
 
     stack_stellarmass.add_column(Column(np.tile('mstar',len(stack_stellarmass))),name='bin_type',index=0)
 
@@ -593,7 +611,9 @@ def makeStack(galaxy, regridDir, outDir,
                                  cube13CO = cube13CO, cubeC18O = cubeC18O,
                                  sfrmap = sfrmap, ltirmap = ltirmap,
                                  stellarmap = stellarmap,
-                                 molgasmap = molgasmap) 
+                                 molgasmap = molgasmap,
+                                 atomicgasmap = atomicgasmap,
+                                 PDEmap = PDEmap) 
 
     stack_intensity.add_column(Column(np.tile('ICO',len(stack_intensity))),name='bin_type',index=0)
     
@@ -609,12 +629,37 @@ def makeStack(galaxy, regridDir, outDir,
                               cube13CO = cube13CO, cubeC18O = cubeC18O,
                               sfrmap = sfrmap, ltirmap = ltirmap,
                               stellarmap = stellarmap,
-                              molgasmap = molgasmap) 
+                              molgasmap = molgasmap,
+                              atomicgasmap = atomicgasmap,
+                              PDEmap = PDEmap) 
 
-    stack_molgas.add_column(Column(np.tile('molgas',len(stack_intensity))),name='bin_type',index=0)
+    stack_molgas.add_column(Column(np.tile('molgas',len(stack_molgas))),name='bin_type',index=0)
     
+    ### TODO: roughing in code here
+    if PDEmap is not None:
+        # create bins
+        binmap, binedge, binlabels = makePDEBins(galaxy, PDEmap, outDir,binspace=0.3) 
+        plotBins(galaxy, binmap, binedge, binlabels, 'PDE', outDir) 
 
-    full_stack = vstack([stack_radius, stack_r25, stack_stellarmass, stack_intensity, stack_molgas])
+        stack_PDE = stackLines(galaxy, velocity, 
+                               binmap, binedge, 'PDE', 
+                               cubeCO = cubeCO,
+                               cubeHCN = cubeHCN, cubeHCOp = cubeHCOp,
+                               cube13CO = cube13CO, cubeC18O = cubeC18O,
+                               sfrmap = sfrmap, ltirmap = ltirmap,
+                               stellarmap = stellarmap,
+                               molgasmap = molgasmap,
+                               atomicgasmap = atomicgasmap,
+                               PDEmap = PDEmap)
+
+        stack_PDE.add_column(Column(np.tile('PDE',len(stack_PDE))), name='bin_type',index=0)
+        
+    # put together combined stack.
+    if PDEmap is not None:
+         full_stack = vstack([stack_radius, stack_r25, stack_stellarmass, stack_intensity, stack_molgas,stack_PDE])
+      
+    else:
+        full_stack = vstack([stack_radius, stack_r25, stack_stellarmass, stack_intensity, stack_molgas])
     #full_stack = vstack([stack_radius,stack_r25, stack_stellarmass])
 
     full_stack.add_column(Column(np.tile(galaxy['NAME'],len(full_stack))),name='galaxy',index=0)
@@ -632,6 +677,8 @@ def stackLines(galaxy, velocity,
                ltirmap = None,
                stellarmap = None,
                molgasmap = None,
+               atomicgasmap = None,
+               PDEmap = None,
                maxAbsVel = 250.0):
 
     '''
@@ -753,6 +800,10 @@ def stackLines(galaxy, velocity,
     ltir_mean = np.zeros(nstack)* ltirmap.unit
     mstar_mean = np.zeros(nstack) * stellarmap.unit
     molgas_mean = np.zeros(nstack) * molgasmap.unit
+    if atomicgasmap is not None:
+        atomicgas_mean = np.zeros(nstack) * atomicgasmap.unit
+    if PDEmap is not None:
+        PDEmap_mean = np.zeros(nstack) * PDEmap.unit
 
     spectral_axis = np.zeros((nstack,len(stack['CO'][0]['spectral_axis']))) * stack['CO'][0]['spectral_axis'].unit
 
@@ -779,6 +830,12 @@ def stackLines(galaxy, velocity,
         # calculate mean molecular gas mass as requested
         if molgasmap is not None:
             molgas_mean[i] = np.nanmean(molgasmap[binmap==bin_label[i]])
+        # calculate the mean atomic gas mass as requested
+        if atomicgasmap is not None:
+            atomicgas_mean[i] = np.nanmean(atomicgasmap[binmap==bin_label[i]])
+        # calculate mean PDE as requested
+        if PDEmap is not None:
+            PDEmap_mean[i] = np.nanmean(PDEmap[binmap==bin_label[i]])
     
         # get the spectral profiles
         for line in ['CO','HCN','HCOp','13CO','C18O']:
@@ -812,6 +869,14 @@ def stackLines(galaxy, velocity,
     if molgasmap is not None:
         total_stack.add_column(Column(molgas_mean),name='molgas_mean')
         total_stack.add_column(Column(molgas_mean * bin_area), name='molgas_total')
+
+    if atomicgasmap is not None:
+        total_stack.add_column(Column(atomicgas_mean), name='atomicgas_mean')
+        total_stack.add_column(Column(atomicgas_mean * bin_area), name='atomicgas_total')
+
+    if PDEmap is not None:
+        total_stack.add_column(Column(PDEmap_mean),name='PDE_mean')
+        total_stack.add_column(Column(PDEmap_mean*bin_area),name='PDE_total')
 
     return total_stack
 
@@ -1377,7 +1442,7 @@ def makeCOBins(galaxy, basemap, outDir, binspace=0.25, molgas=False):
     ## Set nan values to nonsense
     bins[np.isnan(basemap.value)]  = 99
 
-    # warn if valid valures are outside map min
+    # warn if valid values are outside map min
     if 0 in np.unique(bins):
        print('WARNING: Value below map minimum\n') 
     if len(binedge) in np.unique(bins):
@@ -1392,6 +1457,46 @@ def makeCOBins(galaxy, basemap, outDir, binspace=0.25, molgas=False):
     
     return binmap, binedge, binlabels
 
+
+def makePDEBins(galaxy, basemap, outDir, binspace):
+    '''
+    Create bins for PDE 
+    
+    basemap: map used to create bins (SpectralCube Projections)
+
+    outDir: directory to write output bin image
+
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    7/27/2023   A.A. Kepley     based on makeCOBins function. Could probably condense this functions down to one.
+    '''
+
+    #Bin the basemap by brightness
+    # go a little lower and a little higher to make sure that you get
+    # the whole range and avoid rounding issues
+    minval = np.nanmin(basemap.value)*0.999
+    logminval = np.log10(minval*0.999)
+    logmaxval = np.log10(np.nanmax(basemap.value)*1.001)
+    
+    nbins = int(np.round((logmaxval - logminval)/binspace))
+    binedge = np.logspace(logminval, logmaxval, num=nbins, base=10) * basemap.unit
+
+    bins = np.digitize(basemap.value, binedge.value) #this will automatically add an extra bin in the end for nan values
+    binlabels = ['{0:1.2f}'.format(i)+basemap.unit.to_string() for i in binedge] #need to add units to map!!
+
+    ## Set nan values to nonsense
+    bins[np.isnan(basemap.value)]  = 99
+
+    # warn if valid values are outside map min
+    if 0 in np.unique(bins):
+       print('WARNING: Value below map minimum\n') 
+    if len(binedge) in np.unique(bins):
+        print('WARNING: Value above map maximum\n')
+
+    # make bins map 
+    binmap = Projection(bins,wcs=basemap.wcs,header=basemap.header)
+    binmap.write(os.path.join(outDir,galaxy['NAME'].upper()+'_binsbyPDE.fits'), overwrite=True)
+    return binmap, binedge, binlabels
 
 def makeRadiusBins(galaxy, basemap,  outDir, beam=15.0, r25=False):
     '''
@@ -1809,14 +1914,99 @@ def mapGCR(galaxy,  basemap):
     # map of galactocentric radius in unit of kpc, arcmin, in r25
     return Rarcsec_map, Rkpc_map, Rr25_map 
 
+def mapHI(galaxy, regridDir, outDir, apply_cosi=True):
+    '''
+    import HI map 
 
+    Date        Programmer      Description of Changes
+    ----------------------------------------------------------------------
+    7/25/2023   Â.A. Kepley     Original Code
+    '''
 
+    HIfile = glob.glob(os.path.join(regridDir,galaxy['NAME']+'_*_21cm_*smooth_regrid.fits'))
 
+    if (len(HIfile) == 0):
+        print("HI file not found for " + galaxy['NAME'])
+        HImap = None
+        atomicgasmap = None
 
+    else:
+        HIfile = HIfile[0]
+        if os.path.exists(HIfile):
+            print("Using " + HIfile + " for HI\n")
 
+            hdu = fits.open(HIfile)[0]
+            data = hdu.data
+            
+            HImap = Projection(data,header=hdu.header,wcs=WCS(hdu.header),unit=hdu.header['BUNIT'])
+            # equation 14 in Sun+ 2020
+            atomicgasmap = Projection(data * 2.0e-2, header=hdu.header,wcs=WCS(hdu.header), unit='Msun/pc^2')
+       
+            # apply inclination correction
+            if apply_cosi:
+                HImap = HImap * np.cos(np.radians(galaxy['INCL_DEG']))
+                atomicgasmap = atomicgasmap * np.cos(np.radians(galaxy['INCL_DEG']))
+            
+            
+        else:
+            print("HI file doesn't exist for " + galaxy['NAME'])
+            HImap = None
+            atomicgasmap = None
+        
+    return HImap, atomicgasmap
+
+def calcPDE(galaxy, outDir,
+            molgasmap=None,
+            atomicgasmap=None,
+            stellarmap=None):
+    '''
+    Purpose:
     
-
-
+    calculate the ISM dynamical equilibrium pressure (PDE). 
     
-    
+    Following the equations in Sun, J. 2020
 
+    Units reminder:
+    P = n * k_b * T
+      = (1/cm**3) * (erg /K) * K
+     
+    erg = g cm**2/s**2
+    
+    P = (1/cm**3) * (g cm**2/s**2)/K * K
+    P = g / (cm * s**2)
+
+    P/k = g / (cm * s**2) / (erg/ K)
+        = (g / (cm * s**2)) * (K * s**2 /( cm**2 * g)
+        = K / cm**3
+
+    Date        Programmer      Description of Changes
+    ---------------------------------------------------
+    7/27/2023   A.A. Kepley     Original Code
+    '''
+    import astropy.constants as const
+
+    gas_surface_density = molgasmap + atomicgasmap
+
+    # assuming scale height of 100 pc to start.
+    rho_star = stellarmap / (4.0 * 100.0 * u.pc)
+    
+    # using the radial scale length
+    #rho_star = stellarmap / (0.54 * r_star)
+
+    sigma_gas = 11 * u.km /u.s
+
+    # equation (1) in Sun 2020
+    firstterm = (np.pi * const.G /2.0) * gas_surface_density**2
+    secondterm = gas_surface_density * np.sqrt(2.0*const.G * rho_star) * sigma_gas
+
+    pde = firstterm.decompose() + secondterm.decompose()
+    
+    # divide by boltzmand constant 
+    pde = pde/const.k_B
+
+    # convert to CGS
+    pde = pde.cgs
+
+    pde.write(os.path.join(outDir,galaxy['NAME']+'_PDE.fits'),overwrite=True)
+
+    return pde

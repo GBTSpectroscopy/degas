@@ -841,12 +841,34 @@ def smoothCube(fitsimage,outDir, beam=15.0):
 
 #----------------------------------------------------------------------
 
+
+'''
+
+## Test case
+
+
+from degas.analysis_setup import regridData, smoothCube
+from importlib import reload
+
+hcn_smooth = '/lustre/cv/users/akepley/degas/IR6p1/NGC2903_HCN_rebase7_smooth1.3_hanning1_maxnchan_smooth.fits'
+
+hcop_smooth = '/lustre/cv/users/akepley/degas/IR6p1/NGC2903_HCOp_rebase7_smooth1.3_hanning1_smooth.fits'
+
+regridDir = '/lustre/cv/users/akepley/degas/IR6p1_regrid'
+
+
+regridData(hcn_smooth,hcop_smooth,regridDir)
+'''
+
+
 def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     '''
     regrids one data set to match the wcs of the base data set, which
     is assumed to be a cube. The regridded data set can be either 2d
     or 3d.
     '''
+
+
 
     # open the base cube
     try:
@@ -874,7 +896,14 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
 
         regridCube.allow_huge_operations=True
-        newCube = regridCube.reproject(baseCube.header)
+        # The below is a work around to the issue seen here: 
+        # https://github.com/radio-astro-tools/spectral-cube/issues/874
+        testHdr = baseCube.header
+        testHdr['RESTFRQ'] =  regridCube.header['RESTFRQ']
+        newCube = regridCube.reproject(testHdr) 
+
+        # original non-hack code:
+        #newCube = regridCube.reproject(baseCube.header)
 
         if mask:
             # if greater than 0.0 set value to 1. otherwise 0.
@@ -926,46 +955,7 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")
-
-#----------------------------------------------------------------------
-
-def calc_sigmaHI(fitsimage, 
-                 outDir,
-                 incl=None):
-    ''' 
-    Purpose: given input HI data set calculate sigma atom output map
-
-    Input: HI moment zero image
-    Output: sigma_atom
-
-    Date        Progammer       Description of Changes
-    ----------------------------------------------------------------------
-    7/20/2023   A.A. Kepley     Original Code
-
-    '''
-
-    img = fits.open(fitsimage)
-
-    header = img[0].header 
-    mom0 = img[0].data
-    img.close()
-
-    # equation taken from Sun+ 2020, equation 14.
-    # equation assumes optically thin emission and helium contribution
-    # hi_mom0 should be in K km/s.
-    # inclination should be in degrees
-    # output in Msun/pc^2
-    sigma_atomic = 2e-2 * mom0 *  np.cos(np.radians(incl))
-    header['BUNIT'] = 'Msun/pc^2'
-
-    outFile = os.path.join(outDir,os.path.basename(fitsimage).replace('.fits','_sigmaHI.fits'))
-
-    fits.writeto(outFile, 
-                 sigma_atomic,
-                 header=header, overwrite=True)
     
-    
-
 #----------------------------------------------------------------------
 
 def simpleR21scale(infile, r21, r21_ref=None):

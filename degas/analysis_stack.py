@@ -387,14 +387,14 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
     sfrmap = mapSFR(galaxy, regridDir, outDir)
     ltirmap = mapLTIR(galaxy, regridDir,outDir, ltir=ltir)
     R_arcsec, R_kpc, R_r25 = mapGCR(galaxy, comap) # comap is just used to get coordinates
-    himap, atomicgasmap = mapHI(galaxy,regridDir,outDir) ## TODO
+    himap, atomicgasmap = mapHI(galaxy,regridDir,outDir) 
 
-    # use the quantities above to calculate PDEmap
+    # use the quantities above to calculate PDEmap if the atomic gas map is available.
     if atomicgasmap is not None:
         PDEmap = calcPDE(galaxy, outDir, 
                          molgasmap=molgasmap,
                          atomicgasmap=atomicgasmap, 
-                         stellarmap=stellarmap ) ## TODO
+                         stellarmap=stellarmap ) 
     else:
         PDEmap = None
 
@@ -469,7 +469,6 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
         cubeC18O = None
 
     #get the full stack result for each line
-    ## TODO: Add PDE. Create a keyword parameter here. If it is not None, then stack via pde. Otherwise, don't stack via pde.
     full_stack = makeStack(galaxy, regridDir, outDir,
                            cubeCO = cubeCO,
                            cubeHCN = cubeHCN, cubeHCOp=cubeHCOp,
@@ -497,7 +496,6 @@ def makeGalaxyTable(galaxy, vtype, regridDir, outDir, R21='simple',ltir='multi',
         os.mkdir(fit_plot_dir)
 
     # calculate integrated intensity 
-    ## TODO: add inclination here as well.
     full_stack = addIntegratedIntensity(full_stack, fit_plot_dir, incl=galaxy['INCL_DEG'])
 
     # return the table and the stack.

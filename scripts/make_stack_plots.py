@@ -8,8 +8,8 @@ from degas.analysis_plot import plot_stack, plot_trends
 
 matplotlib.use('cairo')
 
-#release = 'IR6p1'
-release = 'IR6p1_spatialR21'
+release = 'IR6p1'
+#release = 'IR6p1_spatialR21'
 #stacktype = 'mom1'
 stacktype = 'peakVelocity'
 

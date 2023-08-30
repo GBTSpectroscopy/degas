@@ -66,9 +66,9 @@
 %run do_stack_empire.py # stack the empire data using our code
 
 # degas stacks at empire resolution
-%run align_to_degas_33as.py ## NEEDS TO BE RERUN.
+%run align_to_degas_33as.py ##
 %run do_CO21_rescale_degas_33as.py 
-%run do_stack_degas_33as.py
+%run do_stack_degas_33as.py ## RE_RUNNING NOW
 
 # alma HCN stacks at empire resolution.
 %run fix_up_alma.py ## fix up headers on alma cubes

@@ -15,19 +15,19 @@ stack_norm = normalizeStacks(stack,degas_db,outfile=outfile)
 
 # -----------------
 
-# plotting  code to check results
-idx = (test['galaxy'] == 'NGC4321') & (test['bin_type'] == 'mstar')
-#plt.loglog(test[idx]['bin_mean'],test[idx]['ratio_HCN_CO'])
-plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_HCN_CO_norm'])
+# # plotting  code to check results
+# idx = (test['galaxy'] == 'NGC4321') & (test['bin_type'] == 'mstar')
+# #plt.loglog(test[idx]['bin_mean'],test[idx]['ratio_HCN_CO'])
+# plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_HCN_CO_norm'])
 
-idx = (test['galaxy'] == 'NGC2903') & (test['bin_type'] == 'mstar')
-plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_HCN_CO_norm'])
+# idx = (test['galaxy'] == 'NGC2903') & (test['bin_type'] == 'mstar')
+# plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_HCN_CO_norm'])
 
 
-idx = (test['galaxy'] == 'NGC4321') & (test['bin_type'] == 'mstar')
-#plt.loglog(test[idx]['bin_mean'],test[idx]['ratio_ltir_mean_HCN'])
-plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_ltir_mean_HCN_norm'])
-idx = (test['galaxy'] == 'NGC2903') & (test['bin_type'] == 'mstar')
-plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_ltir_mean_HCN_norm'])
+# idx = (test['galaxy'] == 'NGC4321') & (test['bin_type'] == 'mstar')
+# #plt.loglog(test[idx]['bin_mean'],test[idx]['ratio_ltir_mean_HCN'])
+# plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_ltir_mean_HCN_norm'])
+# idx = (test['galaxy'] == 'NGC2903') & (test['bin_type'] == 'mstar')
+# plt.loglog(test[idx]['bin_mean_norm'],test[idx]['ratio_ltir_mean_HCN_norm'])
 
 

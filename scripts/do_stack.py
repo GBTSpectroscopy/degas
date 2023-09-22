@@ -60,14 +60,18 @@ myresults2 = pruneSampleTable(outDir,'stack_'+release+'_L24micron_mom1.fits','st
 
 # from degas.analysis_stack import makeSampleTable, pruneSampleTable
 # import os
-
+    
 # release = 'IR6p1'
 
 # scriptDir = os.environ['SCRIPTDIR']
 # regridDir=os.path.join(os.environ['ANALYSISDIR'],release+'_regrid')
 # outDir = os.path.join(os.environ['ANALYSISDIR'],'stack_test')
 
-# myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903', 'IC0342', 'NGC3631'])
+# myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC3521','NGC4569','NGC5055','NGC6946'])
+
+# myresults2 = pruneSampleTable(outDir,'test_mom1.fits','test_mom1_pruned.fits',overrideFile=os.path.join(scriptDir,'manualOverrides.csv'))
+
+#sourceList=['NGC2903', 'NGC6946', 'NGC3521']) # no HI, HI, HI
 
 # #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['NGC2903','NGC3631'])
 # #myresults = makeSampleTable(regridDir, outDir, scriptDir, vtype='mom1',outname='test', release='DR1',sourceList=['IC0342'])

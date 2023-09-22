@@ -9,9 +9,9 @@ empire_db = Table.read('/lustre/cv/users/akepley/degas/ancillary_data/empire/apj
 empire_params = Table.read(os.path.join(os.environ['SCRIPTDIR'],'degas_base_empireparams.fits'))
 
 # set up stacks
-stack = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1/stack_IR6p1_mom1_pruned.fits')
+stack = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1/stack_IR6p1_mom1_pruned.fits') ## TODO: SHOULD THIS BE SWITCHED TO SPATIALR21?
 stack_empire = Table.read('/lustre/cv/users/akepley/degas/stack_empire/stack_empire_mom1.fits')
-stack_33as = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1_33as/stack_IR6p1_33as_mom1_pruned.fits')
+stack_33as = Table.read('/lustre/cv/users/akepley/degas/stack_IR6p1_33as/stack_IR6p1_33as_mom1_pruned.fits') ## TODO: SHOULD THIS BE SWITCHED TO SPATIALR21? WOULD NEED TO CREATE
 stack_empire_wempireparams = Table.read('/lustre/cv/users/akepley/degas/stack_empire_wempireparams/stack_empire_mom1.fits')
 stack_alma = Table.read('/lustre/cv/users/akepley/degas/stack_alma_hcn/stack_alma_hcn_mom1_pruned.fits')
 
@@ -34,7 +34,7 @@ for galaxy in overlaplist:
     for line in linelist:
 
         compare_stacks_line(stack_list, stack_name_list, empire_db,
-                            outdir = '/lustre/cv/users/akepley/degas/empire_degas_comp',
+                            outdir = '/lustre/cv/users/akepley/degas/analysis/empire_degas_comp/plots',
                             line = line,
                             galaxy = galaxy,
                             dist = dist,
@@ -59,7 +59,7 @@ for galaxy in overlaplist:
     for line in linelist:
 
         compare_stacks_line(stack_list, stack_name_list, empire_db,
-                            outdir = '/lustre/cv/users/akepley/degas/empire_degas_comp',
+                            outdir = '/lustre/cv/users/akepley/degas/analysis/empire_degas_comp/plots',
                             line = line,
                             galaxy = galaxy,
                             dist = dist,
@@ -83,7 +83,7 @@ for galaxy in overlaplist:
     for line in linelist:
 
         compare_stacks_line(stack_list, stack_name_list, empire_db,
-                            outdir = '/lustre/cv/users/akepley/degas/empire_degas_comp',
+                            outdir = '/lustre/cv/users/akepley/degas/analysis/empire_degas_comp/plots',
                             line = line,
                             galaxy = galaxy,
                             dist = dist,

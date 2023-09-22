@@ -17,12 +17,12 @@ import numpy as np
 from spectral_cube import SpectralCube
 
 # calculate masks
-domask = True
-#domask = False
+#domask = True
+domask = False
 
 # calculate moments
-generateMomentsInit = True
-#generateMomentsInit = False
+#generateMomentsInit = True
+generateMomentsInit = False
 
 # set desired mask parameters
 peakCut = 5.0

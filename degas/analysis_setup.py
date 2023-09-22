@@ -352,7 +352,6 @@ def fixALMAHCN(fitsimage):
     cube_kms = cube.with_spectral_unit(u.km / u.s)
     cube_kms.write(fitsimage.replace('.fits','_kms.fits'),overwrite=True)
 
-
 #----------------------------------------------------------------------
 
 def calc_stellar_mass(iracFile, MtoLFile, outFile):
@@ -785,7 +784,7 @@ def colorCorrect_24micron(b24, b70, outFile, beam=30.0):
     # write out the results
     fits.writeto(outFile, LTIR_corrected, header=b24_hdr, overwrite=True)
 
-#----------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 def smoothCube(fitsimage,outDir, beam=15.0):
     '''
@@ -842,12 +841,34 @@ def smoothCube(fitsimage,outDir, beam=15.0):
 
 #----------------------------------------------------------------------
 
+
+'''
+
+## Test case
+
+
+from degas.analysis_setup import regridData, smoothCube
+from importlib import reload
+
+hcn_smooth = '/lustre/cv/users/akepley/degas/IR6p1/NGC2903_HCN_rebase7_smooth1.3_hanning1_maxnchan_smooth.fits'
+
+hcop_smooth = '/lustre/cv/users/akepley/degas/IR6p1/NGC2903_HCOp_rebase7_smooth1.3_hanning1_smooth.fits'
+
+regridDir = '/lustre/cv/users/akepley/degas/IR6p1_regrid'
+
+
+regridData(hcn_smooth,hcop_smooth,regridDir)
+'''
+
+
 def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
     '''
     regrids one data set to match the wcs of the base data set, which
     is assumed to be a cube. The regridded data set can be either 2d
     or 3d.
     '''
+
+
 
     # open the base cube
     try:
@@ -875,7 +896,14 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
         regridCube = otherCube.spectral_interpolate(baseCube.spectral_axis)
 
         regridCube.allow_huge_operations=True
-        newCube = regridCube.reproject(baseCube.header)
+        # The below is a work around to the issue seen here: 
+        # https://github.com/radio-astro-tools/spectral-cube/issues/874
+        testHdr = baseCube.header
+        testHdr['RESTFRQ'] =  regridCube.header['RESTFRQ']
+        newCube = regridCube.reproject(testHdr) 
+
+        # original non-hack code:
+        #newCube = regridCube.reproject(baseCube.header)
 
         if mask:
             # if greater than 0.0 set value to 1. otherwise 0.
@@ -927,6 +955,8 @@ def regridData(baseCubeFits, otherDataFits, outDir, mask=False):
 
     else:
         print("Number of dimensions of other data set is not 2 or 3.")
+    
+#----------------------------------------------------------------------
 
 def simpleR21scale(infile, r21, r21_ref=None):
     '''

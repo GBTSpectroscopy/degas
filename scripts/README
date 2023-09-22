@@ -44,31 +44,30 @@
 %run make_diagnostic_moment_maps.py
 
 # set up data for analysis
-## TODO: add HI data
+
 %run align_to_degas.py # -- a whole bunch of regridding, etc for analysis. 
-%run align_to_degas_nosmooth.py # -- do degas alignment, but don't smooth to common resolution -- NEEDS TO BE RERUN.
+
+%run align_to_degas_nosmooth.py # -- do degas alignment, but don't smooth to common resolution 
 
 # rescale the 12CO(2-1) data.
 %run do_CO21_rescale.py # more convenient here because the sigma_SFR map is already regridded.
 
 # run the stacking analysis
 %run do_stack.py
-
 %run make_stack_plots.py  ## make stacking plots
-%run generate_stack_figure_set.py ## make figure set latex for paper
 
 # empire stacks
 %run fix_up_empire.py # -- fix up empire cubes
 %run calc_LIR_empire.py # calculate LTIR for 33arcsec case.
-%run align_to_empire.py # -- regridding empire data to match our code convention -- NEEDS TO BE RERUN
-
+%run align_to_empire.py # -- regridding empire data to match our code convention 
 %run do_CO21_rescale_empire.py # do CO21 rescaling for empire data 
 %run do_stack_empire.py # stack the empire data using our code
+%run do_stack_empire_wempireparams.py
 
 # degas stacks at empire resolution
 %run align_to_degas_33as.py ##
 %run do_CO21_rescale_degas_33as.py 
-%run do_stack_degas_33as.py ## RE_RUNNING NOW
+%run do_stack_degas_33as.py ## 
 
 # alma HCN stacks at empire resolution.
 %run fix_up_alma.py ## fix up headers on alma cubes
@@ -76,12 +75,21 @@
 %run do_CO21_rescale_alma.py ## do CO21 rescaling for alma data 
 %run do_stack_alma_hcn.py
 
+## DONE
+
+
+
+## MOVE ALL THIS BELOW TO LAPTOP?
+### NEED TO ADD NORMED STACKS??
+
 # compare the different type of stacks
 %run make_stack_comparison_plots.py
 
 
 # compare ltir
 %run make_ltir_comparison.py
+
+### HERE
 
 # correlation coefficients
 %run do_correlation_calcs.py
@@ -93,3 +101,8 @@
 
 # make the fiducial fdense plots 
 %run make_fdense_plots.py
+
+#create normed stacks
+%run make_normed_stacks.py ##  this uses analysis_stack.py code, but operates on existing stacks.
+
+%run generate_stack_figure_set.py ## make figure set latex for paper -- CAN BE MOVED TO ANALYSIS

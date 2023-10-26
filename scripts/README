@@ -77,10 +77,9 @@
 
 ## DONE
 
+#### -------------------------------------------------
 
-
-## MOVE ALL THIS BELOW TO LAPTOP?
-### NEED TO ADD NORMED STACKS??
+## everying below here moved to degas-analysis repo so it can sit along side the relevant repos.
 
 # compare the different type of stacks
 %run make_stack_comparison_plots.py

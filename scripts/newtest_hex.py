@@ -29,7 +29,7 @@ def GScompare(tablefile, dataDir=datadir, outDir=outputdir):
     plt.subplots_adjust(top=0.7, wspace=0.4)
     filelist=glob.glob(dataDir+'*.ecsv')
     colors=plt.cm.tab20b(np.linspace(0,1,len(filelist))) 
-    for (i, c) in zip(range(len(filelist)), colors): #plot comparison datasets, with unique color coding
+    for (i, c) in zip(range(len(filelist)), colors): #plot comparison datasets, with 7unique color coding
         table=at.read(filelist[i])
         if 'LIR' in table.colnames and 'LHCN' in table.colnames: 
             axs1[0].loglog(table['LHCN'],table['LIR'], ls='', marker='o', c=c, alpha=0.6, label=table.meta['source'])

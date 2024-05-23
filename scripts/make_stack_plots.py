@@ -1,3 +1,9 @@
+#####
+###   Note (3/20/2024): I've reworked substantial portions of the plot_stack
+###   and plot_trends code. The script below will have to be reworked before being
+###   functional.
+#####
+
 import os
 from astropy.table import Table
 import matplotlib
@@ -7,6 +13,8 @@ import numpy as np
 from degas.analysis_plot import plot_stack, plot_trends
 
 matplotlib.use('cairo')
+
+
 
 #release = 'IR6p1'
 #release = 'IR6p1_spatialR21'

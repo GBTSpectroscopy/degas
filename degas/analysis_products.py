@@ -24,6 +24,8 @@ import os
 import sys
 import ipdb
 
+mad_to_std_fac = 1.482602218505602
+
 #based on PHANGS-example_make_products.py
 #save the generated noise cubes
 def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
@@ -46,6 +48,10 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
 
         do_spec: whether to estimate noise assuming same for all channels or over several channels (True, spec_box = 1 for now)
 
+    Date        Programmer      Description of Changes
+    -------------------------------------------------
+    ???         Y. Song         Original Code
+    6/3/2024    Â.A. Kepley     modifications to original code
     '''
 
     #check line input
@@ -61,12 +67,57 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
     rms_file = os.path.join(outDir, \
                             os.path.basename(this_base_infile).replace('.fits','_rms.fits'))
 
+    # calculate moments
+    calc_products(this_base_infile,
+                  co_mask_file,
+                  rms_file,
+                  out_dir = outDir,
+                  mom1_template_file = co_mom1_file,
+                  noise_kwargs = noise_kwargs,
+                  line_width = line_width,
+                  snr_cut = snr_cut,
+                  vel_tolerance = vel_tolerance)
 
+
+    ## do I need to add some code here??
+    
+def calc_products(this_base_infile,
+                  mask_file,
+                  rms_file,
+                  out_dir='.',                  
+                  mom1_template_file=None,
+                  noise_kwargs = None,
+                  line_width=30*u.km/u.s,
+                  snr_cut=[3.0,4.0],
+                  vel_tolerance=30):
+    '''
+    Purpose: calculate moments for one galaxy using PHANGS routine
+
+    Input:
+    * this_base_infile: file to read cube from
+    
+    * mask_file: file with mask
+
+    * rms_file: file to output rms to.
+
+    * mom1_template_file: file with mom1 template
+
+    Output:
+    * tpeak, mom0, and mom1 with associated errors
+
+    Date        Programmer      Description of Changes
+    ---------------------------------------------------
+    ????        Y. Song         Original Code
+    6/3/2024    A.A. Kepley     Modifications to original code to make the 
+                                inputs more general.
+
+    '''
+    
     # read in cube
     basecube = SpectralCube.read(this_base_infile)
     
     # create peak intensity map
-    tpeak_file = os.path.join(outDir, \
+    tpeak_file = os.path.join(out_dir, \
                              os.path.basename(this_base_infile).replace('.fits','_tpeak.fits')) #need to change this later to NAME_LINE_RES_mom0.fits 
 
     tpeak = basecube.max(axis=0)
@@ -76,64 +127,67 @@ def make_line_products(galaxy, line, inDir, maskDir, outDir, noise_kwargs,
 
     # calculate noise cube.
     print("Noise estimation for for ", this_base_infile)    
-    rmscube = recipe_degas_noise(incube=basecube, 
-                                 mask=co_mask_file, 
-                                 outfile=rms_file, 
-                                 noise_kwargs=noise_kwargs,
-                                 overwrite=True) 
+    rmscube = recipe_degas_noise(incube = basecube, 
+                                 mask = mask_file, 
+                                 outfile = rms_file, 
+                                 noise_kwargs = noise_kwargs,
+                                 overwrite = True) 
    
     # set up mom0 files
-    mom0_file = os.path.join(outDir, \
+    mom0_file = os.path.join(out_dir, \
                              os.path.basename(this_base_infile).replace('.fits','_mom0.fits')) #need to change this later to NAME_LINE_RES_mom0.fits 
-    emom0_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_emom0.fits')) #need to change this later to NAME_LINE_RES_emom0.fits
+    emom0_file = os.path.join(out_dir, os.path.basename(this_base_infile).replace('.fits','_emom0.fits')) #need to change this later to NAME_LINE_RES_emom0.fits
 
-    snrfile = os.path.join(outDir,os.path.basename(this_base_infile).replace('.fits','_snr.fits'))
-    mom0_masked_file = os.path.join(outDir, \
+    snrfile = os.path.join(out_dir,os.path.basename(this_base_infile).replace('.fits','_snr.fits'))
+    mom0_masked_file = os.path.join(out_dir, \
                              os.path.basename(this_base_infile).replace('.fits','_mom0_masked.fits'))
 
     # calculate mom0
-    co_mask = SpectralCube.read(co_mask_file)
-    co_mask = np.array(co_mask.filled_data[:].value,dtype=np.bool)
-    basecube_masked_wco = basecube.with_mask(co_mask,inherit_mask=False) ## inherit_mask=False means any existing mask on the cube is removed.
+    mymask = SpectralCube.read(mask_file)
+    mymask = np.array(mymask.filled_data[:].value,dtype=np.bool)
+    basecube_masked_mymask = basecube.with_mask(mymask,inherit_mask=False) ## inherit_mask=False means any existing mask on the cube is removed.
 
-    mom0,emom0 = write_moment0(basecube_masked_wco, rms=rmscube, 
-                               channel_correlation=None, #not implemented yet in phangs-pipeline
-                               outfile=mom0_file, 
-                               errorfile=emom0_file,
-                               snrfile=snrfile,
-                               outfile_masked=mom0_masked_file,
-                               overwrite=True, unit=None,
-                               include_limits=True,
-                               line_width=line_width,
-                               snr_cut=snr_cut[0],
-                               return_products=True)
+    mom0,emom0 = write_moment0(basecube_masked_mymask, rms = rmscube, 
+                               channel_correlation = None, #not implemented yet in phangs-pipeline
+                               outfile = mom0_file, 
+                               errorfile = emom0_file,
+                               snrfile = snrfile,
+                               outfile_masked = mom0_masked_file,
+                               overwrite = True, unit = None,
+                               include_limits = True,
+                               line_width = line_width,
+                               snr_cut = snr_cut[0],
+                               return_products = True)
     print('mom0: ',mom0_file, '; error map:', emom0_file)
 
     # set up mom1 files
-    mom1_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_mom1.fits')) #need to change this later to NAME_LINE_RES_mom1.fits 
-    emom1_file = os.path.join(outDir, os.path.basename(this_base_infile).replace('.fits','_emom1.fits')) #need to change this later to NAME_LINE_RES_emom1.fits
+    if mom1_template_file:
+        mom1_file = os.path.join(out_dir, os.path.basename(this_base_infile).replace('.fits','_mom1.fits')) #need to change this later to NAME_LINE_RES_mom1.fits 
+        emom1_file = os.path.join(out_dir, os.path.basename(this_base_infile).replace('.fits','_emom1.fits')) #need to change this later to NAME_LINE_RES_emom1.fits
 
-    #calculate mom1
-    basecube_masked_wmom0 = basecube_masked_wco.with_mask(mom0 > snr_cut[1] * emom0,inherit_mask=True)
-    co_mom1 = fits.open(co_mom1_file)[0].data
+        #calculate mom1
+        basecube_masked_wmom0 = basecube_masked_mymask.with_mask(mom0 > snr_cut[1] * emom0,inherit_mask=True)
+        mom1_template = fits.open(mom1_template_file)[0].data
 
-    write_moment1(basecube_masked_wmom0, 
-                  rms = rmscube, channel_correlation = None,
-                  outfile = mom1_file, 
-                  errorfile = emom1_file,
-                  mom1_template = co_mom1,
-                  vel_tolerance = vel_tolerance,
-                  overwrite = True, unit = None,
-                  return_products = False)
-    print('mom1: ',mom1_file, '; error map:', emom1_file)
+        write_moment1(basecube_masked_wmom0, 
+                      rms = rmscube, channel_correlation = None,
+                      outfile = mom1_file, 
+                      errorfile = emom1_file,
+                      mom1_template = mom1_template,
+                      vel_tolerance = vel_tolerance,
+                      overwrite = True, unit = None,
+                      return_products = False)
+        print('mom1: ',mom1_file, '; error map:', emom1_file)
     
-    print('DONE. Check ', outDir, 'for products.')
+    print('DONE. Check ', out_dir, 'for products.')
     #os.chdir(outDir)
+
+
 ##########################################
 ########## Estimate noise cube #########
 #####PHANGS: scNoiseRoutines.py###########
 ##########################################
-mad_to_std_fac = 1.482602218505602
+
 
 #grab noise estimation func from phangs
 def mad_zero_centered(data, mask=None):

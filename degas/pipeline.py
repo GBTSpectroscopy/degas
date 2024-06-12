@@ -393,7 +393,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialSpectralMask,
                                       mask=mask, wcs=w, floatvalues=True,
-                                      offpct=100)
+                                      offpct=30)
 
     else:
         warnings.warn('No mask found. Using zone of avoidance masking')

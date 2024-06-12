@@ -78,7 +78,7 @@ def noise_cube(data, mask=None, box=None, spec_box=None,
     Keywords:
     ---------
     
-    mask : np.bool
+    mask : bool
         Boolean array with False indicating where data can be 
         used in the noise estimate. (i.e., True is Signal)
     
@@ -116,10 +116,10 @@ def noise_cube(data, mask=None, box=None, spec_box=None,
     step = 1
     boxr = step // 2 # floor division
     if box is not None:
-        step = np.floor(box/2.5).astype(np.int)
+        step = np.floor(box/2.5).astype(int)
         boxr = int(box // 2)
     if spec_box is not None:
-        spec_step = np.floor(spec_box / 2).astype(np.int)
+        spec_step = np.floor(spec_box / 2).astype(int)
         boxv = int(spec_box // 2)
     else:
         boxv = 0
@@ -364,7 +364,7 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
         dtype = np.float
         outtype = np.float
     else:
-        dtype = np.bool
+        dtype = bool
         outtype = np.uint8
 
     # HCN_HCO+
@@ -406,12 +406,12 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
             if 0 <= zz_hcop < s_hcop.shape[0]:
                 mask[zz, :, :] = np.array(s_hcop.filled_data[zz_hcop, :, :],
                                           dtype=dtype)
-        if grow_v > 0 and (dtype == np.bool):
+        if grow_v > 0 and (dtype == bool):
             mask = binary_dilation(mask,
                                    np.ones((int(2 * grow_v + 1), 1, 1),
                                            dtype=dtype))
 
-        if grow_xy > 0 and dtype == np.bool:
+        if grow_xy > 0 and dtype == bool:
             mask = binary_dilation(mask,
                                    np.ones((1,
                                             int(2 * grow_xy + 1),
@@ -463,11 +463,11 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
             if 0 <= zz_c18o < s_c18o.shape[0]:
                 mask[zz, :, :] = np.array(s_c18o.filled_data[zz_c18o, :, :],
                                           dtype=dtype)
-        if grow_v > 0 and dtype == np.bool:
+        if grow_v > 0 and dtype == bool:
             mask = binary_dilation(mask,
                                    np.ones((int(2 * grow_v + 1), 1, 1),
                                            dtype=dtype))
-        if grow_xy > 0 and dtype == np.bool:
+        if grow_xy > 0 and dtype == bool:
             mask = binary_dilation(mask,
                                    np.ones((1,
                                             int(2 * grow_xy + 1),
@@ -510,11 +510,11 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
             if 0 <= zz_12co < s_12co.shape[0]:
                 mask[zz, :, :] = np.array(s_12co.filled_data[zz_12co, :, :],
                                           dtype=dtype)
-        if grow_v > 0 and dtype == np.bool:
+        if grow_v > 0 and dtype == bool:
             mask = binary_dilation(mask,
                                    np.ones((int(2 * grow_v + 1), 1, 1),
                                            dtype=dtype))
-        if grow_xy > 0 and dtype == np.bool:
+        if grow_xy > 0 and dtype == bool:
             mask = binary_dilation(mask,
                                    np.ones((1,
                                             int(2 * grow_xy + 1),

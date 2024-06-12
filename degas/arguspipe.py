@@ -317,7 +317,7 @@ def calscans(inputdir, start=82, stop=105, refscans=[80],
                             xaxis = np.linspace(-0.5,0.5,ON.shape[0])
                             xaxis.shape += (1,)
                             xaxis = xaxis * np.ones((1,ON.shape[1]))
-                            cutidx = np.int(OffFrac * ON.shape[0])
+                            cutidx = (OffFrac * ON.shape[0]).astype(int)
                             xsub = np.r_[xaxis[0:cutidx,:], xaxis[-cutidx:,:]]
                             ONsub = np.r_[ON[0:cutidx,:], ON[-cutidx:,:]]
 

@@ -67,13 +67,13 @@ def parseLog(logfile='ObservationLog.csv'):
 
     # Convert from Google Booleans to Python Booleans
 
-    qa0 = np.zeros(len(t), dtype=np.bool)
-    dr1 = np.zeros(len(t), dtype=np.bool)
+    qa0 = np.zeros(len(t), dtype=bool)
+    dr1 = np.zeros(len(t), dtype=bool)
     for idx, row in enumerate(t):
         qa0[idx] = ('TRUE' in row['QA0'])
         dr1[idx] = ('TRUE' in row['DR1'])
-    qa0col = Column(qa0, dtype=np.bool, name='QA0')
-    dr1col = Column(dr1, dtype=np.bool, name='DR1')
+    qa0col = Column(qa0, dtype=bool, name='QA0')
+    dr1col = Column(dr1, dtype=bool, name='DR1')
 
     t.replace_column('QA0', qa0col)
     t.replace_column('DR1', dr1col)

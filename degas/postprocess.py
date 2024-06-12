@@ -94,7 +94,7 @@ def circletrim(cube, wtsFile, x0, y0, weightCut=0.2, minRadius=None):
         if mindist < minradpix:
             mindist = minradpix
     mask = dist < mindist
-    cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
+    cubemask = (np.ones(cube.shape) * mask).astype(bool)
     cube = cube.with_mask(cubemask)
     cube = cube.minimal_subcube()
     return(cube)
@@ -117,7 +117,7 @@ def edgetrim(cube, wtsFile, weightCut=None):
         # create a disk structuring element
         elt = ((xx - radius)**2 + (yy - radius)**2)<=radius
         mask = nd.binary_closing(mask, structure=elt)
-    cubemask = (np.ones(cube.shape) * mask).astype(np.bool)
+    cubemask = (np.ones(cube.shape) * mask).astype(bool)
     cube = cube.with_mask(cubemask)
     cube = cube.minimal_subcube()
     return(cube)
@@ -180,7 +180,7 @@ def cleansplit(filename, galaxy=None,
     # are mapping
     if galaxy is None:
         RABound, DecBound = Cube.world_extrema
-        match = np.zeros_like(Catalog, dtype=np.bool)
+        match = np.zeros_like(Catalog, dtype=bool)
         for index, row in enumerate(Catalog):
             galcoord = SkyCoord(row['RA'],
                                 row['DEC'],
@@ -199,7 +199,7 @@ def cleansplit(filename, galaxy=None,
         V0 = MatchRow['CATVEL'].data[0] * u.km / u.s
 
     elif type(galaxy) is str:
-        match = np.zeros_like(Catalog, dtype=np.bool)
+        match = np.zeros_like(Catalog, dtype=bool)
         for index, row in enumerate(Catalog):
             if galaxy in row['NAME']:
                 match[index] = True

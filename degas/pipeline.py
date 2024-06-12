@@ -351,7 +351,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         # multiple values as string. 
         if BadScans.isascii():
             # the below may or may not work. We'll find out!!!
-            BadScanArray = np.array(BadScans.split(','),dtype=np.int)
+            BadScanArray = np.array(BadScans.split(','),dtype=int)
         else:
             BadScanArray = np.array([BadScans])
 
@@ -362,7 +362,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         # issue here is that single value is read as a int, but
         # multiple values as string. 
         if BadFeeds.isascii():
-            BadFeedArray = np.array(BadFeeds.split(','),dtype=np.int)
+            BadFeedArray = np.array(BadFeeds.split(','),dtype=int)
         else:           
             BadFeedArray = np.array([BadFeeds])
     else:
@@ -388,7 +388,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         warnings.warn('Using spatial masking to set OFF positions')
         maskhdu = fits.open(MaskName.format(Galaxy.upper()))
         # mask = ~np.any(maskhdu[0].data, axis=0)
-        mask = (maskhdu[0].data).astype(np.bool)
+        mask = (maskhdu[0].data).astype(bool)
         mask = maskhdu[0].data
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialSpectralMask,

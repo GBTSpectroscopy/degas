@@ -4,9 +4,9 @@ datadir='/mnt/bigdata/erosolow/surveys/DEGAS/'
 
 datadir = '/mnt/bigdata/erosolow/surveys/DEGAS/'
 ppo = False
-gridGalaxy(galaxy='IC0342', setup='12CO',
-           release='QA0', datadir=datadir,
-           PostprocOnly=ppo)
+# gridGalaxy(galaxy='IC0342', setup='12CO',
+#            release='QA0', datadir=datadir,
+#            PostprocOnly=ppo)
 
 gallist = ['IC0342',
            'NGC0337',
@@ -26,14 +26,15 @@ gallist = ['IC0342',
            'NGC5055',
            'NGC6946']
 # gallist = gallist[-2:]
-# gallist = ['IC0342']
-HCNgals = gallist
+# gallist = ['NGC2903']
+HCNgals = gallist[0:2]
 
 # HCNgals = ['NGC2903', 'NGC2146', 'IC0342']
 # HCNgals = ['IC0342']
 for gal in HCNgals:
     gridGalaxy(galaxy=gal, setup='HCN_HCO+',
-               release='QA0', datadir=datadir, PostprocOnly=ppo)
+               release='QA0', datadir=datadir, PostprocOnly=ppo,
+               posblorder=5)
 
 
 COgals = gallist
@@ -42,7 +43,8 @@ COgals = gallist
 # COgals = ['IC0342']
 for gal in COgals:
      gridGalaxy(galaxy=gal, setup='13CO_C18O',
-                release='QA0', datadir=datadir, PostprocOnly=ppo)
+                release='QA0', datadir=datadir, PostprocOnly=ppo,
+                posblorder=5)
 
 
 
@@ -51,7 +53,6 @@ HCNgals = [
     'NGC2146',
     'NGC6946',
     'NGC7331',
-    'NGC5248',
     'NGC2903',
     'NGC4321',
     'NGC5055',
@@ -67,7 +68,7 @@ HCNgals = [
     'NGC4569',
 ]
 
-HCNgals=['IC0342']
+# HCNgals=['IC0342']
 
 COgals = [
     'NGC4038',

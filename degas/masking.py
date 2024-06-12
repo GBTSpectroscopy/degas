@@ -290,7 +290,8 @@ def deduplicate_keywords(hdr):
 
 def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
                grow_v=0, grow_xy=0, setups=['HCN_HCO+','13CO_C18O','12CO'],
-               emissionfile=None, galname=None, zsource=0):
+               emissionfile=None, galname=None, zsource=0,
+               velocity_convention='radio'):
     """Builds masks for use in DEGAS imaging pipeline. 
 
     Parameters
@@ -319,6 +320,8 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     grow_v : int
         Spectrally grow_v the mask by this number of channels
 
+    velocity_convention : str
+        Velocity convention of input mask
     """
 
 
@@ -345,7 +348,8 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     c = 299792.458
     # Read in original cube, ensure in velocity space
     s = SpectralCube.read(filename)
-    s = s.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+    s = s.with_spectral_unit(u.km / u.s,
+                             velocity_convention=velocity_convention)
     if galname is None:
         galname = os.path.split(filename)[1].split('_')[0]
 
@@ -354,7 +358,7 @@ def buildmasks(filename, nChan=2000, width=2e9, outdir=None,
     if emissionfile:
         cube = SpectralCube.read(emissionfile)
         cube = cube.with_spectral_unit(u.km / u.s,
-                                       velocity_convention='radio')
+                                       velocity_convention=velocity_convention)
         s = cube.with_mask(s > 0 * s.unit)
         s = s.with_fill_value(0 * s.unit)
         dtype = np.float

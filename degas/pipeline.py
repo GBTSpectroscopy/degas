@@ -292,6 +292,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
                MaskName=None,
                CatalogFile=None,
                nProc=1,
+               offpct=30,
                **kwargs):
     """
     This is the basic DEGAS pipeline which in turn uses the gbt pipeline.
@@ -393,7 +394,7 @@ def doPipeline(SessionNumber=7,StartScan = 27, EndScan=44,
         w = wcs.WCS(maskhdu[0].header)
         offselect = functools.partial(ArgusCal.SpatialSpectralMask,
                                       mask=mask, wcs=w, floatvalues=True,
-                                      offpct=30)
+                                      offpct=offpct)
 
     else:
         warnings.warn('No mask found. Using zone of avoidance masking')
